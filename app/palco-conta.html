@@ -1,0 +1,2503 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#14121a">
+<meta name="description" content="Palco — login, cadastro e perfil com foto. Seus dados salvos no seu dispositivo.">
+<title>Palco · Sua conta</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%2314121a'/%3E%3Ctext x='32' y='45' font-family='Georgia,serif' font-size='36' fill='%23eed48b' text-anchor='middle'%3EP%3C/text%3E%3C/svg%3E">
+<style>
+/* ============================================================
+   Palco · Conta — login, cadastro e perfil
+   Zero dependências. Funciona offline e em file://
+   ============================================================ */
+
+:root {
+  --bg: #f6f5f2;
+  --surface: #ffffff;
+  --surface-2: #fbfaf8;
+  --line: #e6e2db;
+  --line-strong: #d5cfc5;
+  --ink: #17161b;
+  --ink-soft: #5f5b55;
+  --ink-faint: #918b83;
+  --brand: #1f1c26;
+  --brand-ink: #f3ecdd;
+  --accent: #b0873a;
+  --accent-soft: #f5efe1;
+  --accent-line: #e2d2ad;
+  --ok: #1c7a52;
+  --ok-soft: #e4f4ec;
+  --bad: #b02a1f;
+  --bad-soft: #fdecea;
+  --wa: #9a6615;
+  --wa-soft: #fdf3e0;
+  --ring: rgba(176, 135, 58, 0.22);
+  --shadow-1: 0 1px 2px rgba(23, 22, 27, 0.05);
+  --shadow-2: 0 10px 30px -18px rgba(23, 22, 27, 0.3), 0 2px 8px rgba(23, 22, 27, 0.04);
+  --shadow-3: 0 30px 70px -40px rgba(23, 22, 27, 0.55);
+  --r-sm: 9px;
+  --r: 13px;
+  --r-lg: 20px;
+  --sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --serif: "Cormorant Garamond", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+}
+
+html[data-theme="dark"] {
+  --bg: #0f0e12;
+  --surface: #17161c;
+  --surface-2: #1d1c23;
+  --line: #2a2831;
+  --line-strong: #3a3743;
+  --ink: #f2eee7;
+  --ink-soft: #a8a29a;
+  --ink-faint: #706b64;
+  --brand: #08070b;
+  --brand-ink: #f3ecdd;
+  --accent: #d3ab5e;
+  --accent-soft: #2a2317;
+  --accent-line: #4a3d24;
+  --ok: #57c295;
+  --ok-soft: #12291f;
+  --bad: #f18a7e;
+  --bad-soft: #2e1512;
+  --wa: #e0b062;
+  --wa-soft: #2b2114;
+  --ring: rgba(211, 171, 94, 0.25);
+  --shadow-2: 0 10px 30px -18px rgba(0, 0, 0, 0.8);
+  --shadow-3: 0 30px 70px -40px rgba(0, 0, 0, 0.9);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 14.5px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  transition: background .3s ease, color .3s ease;
+}
+body[data-booting] { visibility: hidden; }
+
+h1, h2, h3 { margin: 0; font-weight: 600; letter-spacing: -0.015em; }
+p { margin: 0; }
+a { color: var(--accent); text-decoration: none; font-weight: 550; }
+a:hover { text-decoration: underline; }
+button { font: inherit; cursor: pointer; }
+input, textarea { font: inherit; color: inherit; }
+::selection { background: var(--accent); color: #fff; }
+.hidden { display: none !important; }
+.muted { color: var(--ink-soft); }
+.tiny { font-size: 11.5px; }
+.stack { display: grid; gap: 12px; }
+
+/* ------------------------------- layout ------------------------------- */
+
+.shell { display: grid; grid-template-columns: 1.05fr 1fr; min-height: 100dvh; }
+.panel {
+  display: flex; align-items: center; justify-content: center;
+  padding: 40px 24px; background: var(--bg); overflow-y: auto;
+}
+
+/* ------------------------------- marca ------------------------------- */
+
+.brand {
+  position: relative; overflow: hidden; display: flex; flex-direction: column;
+  justify-content: space-between; padding: 40px 46px;
+  background: radial-gradient(1200px 600px at 15% 10%, #2b2438 0%, transparent 55%),
+              radial-gradient(900px 500px at 90% 90%, #40301a 0%, transparent 60%),
+              linear-gradient(150deg, #14121a 0%, #191620 55%, #221a12 100%);
+  color: var(--brand-ink);
+}
+.brand::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background-image: linear-gradient(rgba(255, 255, 255, .028) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(255, 255, 255, .028) 1px, transparent 1px);
+  background-size: 46px 46px;
+  mask-image: radial-gradient(70% 60% at 50% 40%, #000 35%, transparent 100%);
+}
+.brand > * { position: relative; z-index: 1; }
+.brand-top { display: flex; align-items: center; justify-content: space-between; }
+.brand-logo {
+  display: flex; align-items: center; gap: 12px;
+  font-family: var(--serif); font-size: 23px; letter-spacing: .2em; text-transform: uppercase;
+}
+.brand-mark {
+  width: 42px; height: 42px; border-radius: 13px; display: grid; place-items: center;
+  background: linear-gradient(145deg, #eed48b, #b0873a); color: #1a1409;
+  font-family: var(--sans); font-size: 18px; font-weight: 800; letter-spacing: 0;
+  box-shadow: 0 10px 26px -12px rgba(238, 212, 139, .85);
+}
+.brand-mark.sm { width: 30px; height: 30px; border-radius: 9px; font-size: 14px; box-shadow: none; }
+.brand-theme { color: rgba(243, 236, 221, .7); border-color: rgba(243, 236, 221, .18); }
+.brand-center { max-width: 460px; }
+.brand h1 {
+  font-family: var(--serif); font-size: 52px; line-height: 1.03; font-weight: 500; letter-spacing: -0.025em;
+}
+.brand h1 em { font-style: italic; color: #eed48b; }
+.brand p { margin-top: 18px; font-size: 14.5px; line-height: 1.7; color: rgba(243, 236, 221, .72); }
+.brand-list { list-style: none; margin: 32px 0 0; padding: 0; display: grid; gap: 14px; }
+.brand-list li { display: flex; gap: 12px; align-items: flex-start; font-size: 13px; color: rgba(243, 236, 221, .8); }
+.brand-list svg { color: #eed48b; flex-shrink: 0; margin-top: 2px; }
+.brand-list strong { color: #f6efe2; font-weight: 600; }
+.brand-foot { font-size: 11.5px; color: rgba(243, 236, 221, .42); }
+
+/* ------------------------------- cards ------------------------------- */
+
+.card {
+  width: 100%; max-width: 460px; background: var(--surface);
+  border: 1px solid var(--line); border-radius: var(--r-lg);
+  box-shadow: var(--shadow-2); overflow: hidden;
+  animation: rise .45s cubic-bezier(.2, .8, .2, 1) both;
+}
+@keyframes rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+.card-head { padding: 30px 32px 6px; }
+.card-head h2 { font-family: var(--serif); font-size: 30px; font-weight: 600; letter-spacing: -0.02em; }
+.card-head p { margin-top: 6px; font-size: 13px; color: var(--ink-soft); }
+.card-foot {
+  padding: 16px 32px 26px; font-size: 13px; color: var(--ink-soft); text-align: center;
+}
+.notice {
+  display: flex; gap: 10px; align-items: flex-start; margin: 0 32px 26px;
+  padding: 11px 13px; border-radius: var(--r-sm);
+  background: var(--accent-soft); border: 1px solid var(--accent-line);
+  color: var(--wa); font-size: 12px; line-height: 1.5;
+}
+.notice svg { flex-shrink: 0; margin-top: 1px; }
+
+/* ------------------------------- forms ------------------------------- */
+
+.form { padding: 20px 32px 26px; display: grid; gap: 15px; }
+.field { display: grid; gap: 6px; }
+.field label { font-size: 12.5px; font-weight: 600; color: var(--ink-soft); letter-spacing: .01em; }
+.field .opt { font-weight: 400; color: var(--ink-faint); }
+.control { position: relative; display: flex; align-items: center; }
+.control > svg {
+  position: absolute; left: 13px; color: var(--ink-faint); pointer-events: none; transition: color .18s;
+}
+.control input, .field textarea {
+  width: 100%; padding: 11px 13px 11px 40px;
+  background: var(--surface-2); color: var(--ink);
+  border: 1px solid var(--line-strong); border-radius: var(--r-sm);
+  outline: none; transition: border-color .16s, box-shadow .16s, background .16s;
+}
+.field textarea { padding-left: 13px; min-height: 82px; resize: vertical; }
+.control input::placeholder, .field textarea::placeholder { color: var(--ink-faint); }
+.control input:focus, .field textarea:focus {
+  border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 3.5px var(--ring);
+}
+.control input:focus + svg, .control input:focus ~ svg { color: var(--accent); }
+.control input.invalid { border-color: var(--bad); box-shadow: 0 0 0 3.5px var(--bad-soft); }
+.reveal {
+  position: absolute; right: 8px; display: grid; place-items: center;
+  width: 30px; height: 30px; border: 0; border-radius: 7px;
+  background: transparent; color: var(--ink-faint);
+}
+.reveal:hover { background: var(--line); color: var(--ink); }
+.control input + .field-check, .control input ~ .field-check {
+  position: absolute; right: 12px; display: grid; place-items: center;
+}
+.field-check.ok { color: var(--ok); }
+.field-check.bad { color: var(--bad); }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; }
+.error-slot {
+  font-size: 11.5px; color: var(--bad); line-height: 1.4;
+  max-height: 0; opacity: 0; overflow: hidden; transition: max-height .2s, opacity .2s;
+}
+.error-slot.show { max-height: 44px; opacity: 1; }
+.counter { font-size: 11px; color: var(--ink-faint); text-align: right; }
+.form-actions { display: flex; gap: 9px; align-items: center; flex-wrap: wrap; }
+
+.strength { display: flex; gap: 5px; margin-top: 2px; }
+.strength span { height: 4px; flex: 1; border-radius: 4px; background: var(--line); transition: background .25s; }
+.strength[data-score="1"] span:nth-child(1) { background: var(--bad); }
+.strength[data-score="2"] span:nth-child(-n+2) { background: var(--wa); }
+.strength[data-score="3"] span:nth-child(-n+3) { background: #2b6ca3; }
+.strength[data-score="4"] span { background: var(--ok); }
+.strength-label { font-size: 11px; color: var(--ink-faint); }
+.html-dark .strength-label { color: var(--ink-soft); }
+
+/* ------------------------------- botões ------------------------------- */
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 11px 18px; border-radius: var(--r-sm); border: 1px solid transparent;
+  font-size: 13.5px; font-weight: 600; line-height: 1.2;
+  transition: transform .12s ease, background .18s, border-color .18s, box-shadow .18s, opacity .18s;
+  white-space: nowrap;
+}
+.btn:active:not(:disabled) { transform: translateY(1px); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn-primary {
+  background: linear-gradient(180deg, #1f1c26, #14121a); color: #f6efe2;
+  box-shadow: 0 8px 20px -12px rgba(23, 22, 27, .85), inset 0 1px 0 rgba(255, 255, 255, .07);
+}
+.btn-primary:hover:not(:disabled) { background: linear-gradient(180deg, #2a2533, #1b1822); }
+html[data-theme="dark"] .btn-primary {
+  background: linear-gradient(180deg, #eed48b, #c79f4d); color: #1a1409;
+  box-shadow: 0 8px 22px -14px rgba(238, 212, 139, .8);
+}
+html[data-theme="dark"] .btn-primary:hover:not(:disabled) { background: linear-gradient(180deg, #f4dfa4, #d3ab5e); }
+.btn-outline { background: var(--surface); color: var(--ink); border-color: var(--line-strong); }
+.btn-outline:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.btn-ghost { background: transparent; color: var(--ink-soft); }
+.btn-ghost:hover:not(:disabled) { background: var(--surface-2); color: var(--ink); }
+.btn-danger { background: var(--bad); color: #fff; }
+.btn-danger:hover:not(:disabled) { filter: brightness(1.08); }
+.btn-danger-ghost { background: transparent; color: var(--bad); border-color: transparent; }
+.btn-danger-ghost:hover { background: var(--bad-soft); }
+.btn-block { width: 100%; }
+.btn-sm { padding: 7px 12px; font-size: 12.5px; border-radius: 8px; }
+.icon-btn {
+  display: grid; place-items: center; width: 36px; height: 36px;
+  border: 1px solid var(--line); border-radius: 10px;
+  background: var(--surface); color: var(--ink-soft); transition: all .18s;
+}
+.icon-btn:hover { color: var(--ink); border-color: var(--line-strong); background: var(--surface-2); }
+.spinner {
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid currentColor; border-top-color: transparent;
+  display: inline-block; animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ------------------------------- app / perfil ------------------------------- */
+
+.app { min-height: 100dvh; display: flex; flex-direction: column; }
+.topbar {
+  position: sticky; top: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between;
+  gap: 14px; padding: 12px 28px; border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--bg) 86%, transparent); backdrop-filter: blur(14px);
+}
+.topbar-brand {
+  display: flex; align-items: center; gap: 10px;
+  font-family: var(--serif); font-size: 18px; letter-spacing: .18em; text-transform: uppercase;
+}
+.topbar-right { display: flex; align-items: center; gap: 10px; }
+.account-chip { display: flex; align-items: center; gap: 9px; padding: 4px 12px 4px 4px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); }
+.account-chip-text { display: grid; line-height: 1.25; }
+.account-chip-text strong { font-size: 12.5px; }
+.account-chip-text span { font-size: 10.5px; color: var(--ink-faint); }
+.save-chip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px;
+  font-size: 11.5px; font-weight: 600; color: var(--ok); background: var(--ok-soft);
+  transition: all .25s;
+}
+.save-chip.pulse { transform: scale(1.04); }
+
+.view { width: 100%; max-width: 1120px; margin: 0 auto; padding: 26px 24px 70px; }
+.hero {
+  display: flex; align-items: center; justify-content: space-between; gap: 22px; flex-wrap: wrap;
+  padding: 24px; border-radius: var(--r-lg); border: 1px solid var(--line);
+  background:
+    radial-gradient(700px 300px at 100% 0%, var(--accent-soft) 0%, transparent 62%),
+    var(--surface);
+  box-shadow: var(--shadow-1);
+}
+.hero-left { display: flex; align-items: center; gap: 20px; }
+.hero-info h1 { font-family: var(--serif); font-size: 32px; font-weight: 600; letter-spacing: -0.02em; }
+.hero-email { font-size: 13px; color: var(--ink-soft); margin-top: 3px; }
+.chips { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 11px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 999px;
+  font-size: 11px; font-weight: 500; color: var(--ink-soft);
+  background: var(--surface-2); border: 1px solid var(--line);
+}
+.hero-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.photo-block { position: relative; flex-shrink: 0; }
+.avatar {
+  display: grid; place-items: center; overflow: hidden; flex-shrink: 0;
+  border-radius: 50%; background: var(--accent-soft); color: var(--accent);
+  font-weight: 700; border: 1px solid var(--line-strong);
+}
+.avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.avatar-sm { width: 32px; height: 32px; font-size: 12px; }
+.avatar-md { width: 46px; height: 46px; font-size: 15px; }
+.avatar-xl { width: 116px; height: 116px; font-size: 34px; border-width: 3px; }
+.photo-badge {
+  position: absolute; right: 0; bottom: 2px; width: 34px; height: 34px; border-radius: 50%;
+  display: grid; place-items: center; background: var(--surface); color: var(--ink);
+  border: 1px solid var(--line-strong); box-shadow: var(--shadow-2); transition: transform .16s;
+}
+.photo-badge:hover { transform: scale(1.07); border-color: var(--accent); color: var(--accent); }
+
+.layout { display: grid; grid-template-columns: 1.55fr 1fr; gap: 18px; margin-top: 18px; align-items: start; }
+.col-main, .col-side { display: grid; gap: 16px; }
+.card-width-auto { max-width: none; }
+.view .card { max-width: none; animation: none; }
+.card-title {
+  display: flex; align-items: center; gap: 9px; padding: 15px 20px;
+  border-bottom: 1px solid var(--line);
+}
+.card-title svg { color: var(--accent); }
+.card-title h2 { font-size: 14px; font-weight: 650; letter-spacing: -0.005em; }
+.card-title > :last-child:not(h2):not(svg) { margin-left: auto; }
+.badge-soft {
+  font-size: 10.5px; font-weight: 600; color: var(--ok); background: var(--ok-soft);
+  padding: 3px 9px; border-radius: 999px;
+}
+.card-body { padding: 18px 20px; }
+.card-body.form-pad { padding: 18px 20px; }
+.kv { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; font-size: 12.5px; }
+.kv span { color: var(--ink-soft); }
+.kv strong { font-weight: 600; text-align: right; }
+
+.dropzone {
+  display: grid; justify-items: center; gap: 5px; text-align: center;
+  padding: 26px 18px; border-radius: var(--r); cursor: pointer;
+  border: 1.5px dashed var(--line-strong); background: var(--surface-2);
+  color: var(--ink-soft); transition: all .18s;
+}
+.dropzone svg { color: var(--ink-faint); }
+.dropzone strong { font-size: 13px; color: var(--ink); font-weight: 600; }
+.dropzone span { font-size: 11.5px; color: var(--ink-faint); }
+.dropzone:hover, .dropzone:focus-visible, .dropzone.drag {
+  border-color: var(--accent); background: var(--accent-soft); outline: none;
+}
+.dropzone.busy { opacity: .6; pointer-events: none; }
+.photo-hint { margin-top: 4px; }
+.photo-actions { display: flex; gap: 8px; margin-top: 13px; }
+
+.danger-box {
+  margin-top: 14px; padding: 14px; border-radius: var(--r);
+  border: 1px solid var(--bad); background: var(--bad-soft); display: grid; gap: 10px;
+}
+.danger-box p { font-size: 12px; color: var(--bad); }
+.danger-box .control input { background: var(--surface); }
+
+/* ------------------------------- toasts ------------------------------- */
+
+.toasts { position: fixed; z-index: 90; right: 20px; bottom: 20px; display: grid; gap: 9px; width: min(360px, calc(100vw - 32px)); }
+.toast {
+  display: flex; gap: 11px; align-items: flex-start; padding: 13px 15px;
+  border-radius: var(--r); background: var(--surface); border: 1px solid var(--line);
+  box-shadow: var(--shadow-3); animation: toast-in .28s cubic-bezier(.2, .9, .3, 1.1) both;
+}
+.toast.out { animation: toast-out .25s ease forwards; }
+@keyframes toast-in { from { opacity: 0; transform: translateX(26px) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes toast-out { to { opacity: 0; transform: translateX(26px); } }
+.toast-content { display: grid; gap: 1px; }
+.toast-content strong { font-size: 12.5px; }
+.toast-content span { font-size: 12px; color: var(--ink-soft); line-height: 1.45; }
+.toast-icon { flex-shrink: 0; margin-top: 1px; }
+.toast-success { border-left: 3px solid var(--ok); }
+.toast-success .toast-icon { color: var(--ok); }
+.toast-error { border-left: 3px solid var(--bad); }
+.toast-error .toast-icon { color: var(--bad); }
+.toast-info { border-left: 3px solid var(--accent); }
+.toast-info .toast-icon { color: var(--accent); }
+
+/* ------------------------------- responsivo ------------------------------- */
+
+@media (max-width: 980px) {
+  .shell { grid-template-columns: 1fr; }
+  .brand { display: none; }
+  .layout { grid-template-columns: 1fr; }
+  .panel { padding: 26px 16px; align-items: flex-start; padding-top: 8vh; }
+}
+@media (max-width: 620px) {
+  .card-head { padding: 24px 22px 4px; }
+  .form { padding: 16px 22px 22px; }
+  .card-foot, .notice { padding-left: 22px; padding-right: 22px; }
+  .notice { margin-left: 22px; margin-right: 22px; }
+  .grid-2 { grid-template-columns: 1fr; }
+  .topbar { padding: 10px 14px; }
+  .account-chip-text { display: none; }
+  .account-chip { padding: 3px; }
+  .view { padding: 16px 14px 60px; }
+  .hero { padding: 18px; }
+  .hero-left { flex-direction: column; align-items: flex-start; gap: 14px; }
+  .hero-info h1 { font-size: 26px; }
+  .avatar-xl { width: 92px; height: 92px; font-size: 28px; }
+  .brand h1 { font-size: 40px; }
+  .save-chip { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+}
+
+@media print {
+  .topbar, .toasts, .hero-actions, .dropzone, .photo-actions { display: none !important; }
+}
+
+</style>
+</head>
+<body data-booting>
+<div id="app"></div>
+<div class="toasts" id="toasts"></div>
+<noscript><p style="padding:28px;text-align:center;font-family:system-ui">Ative o JavaScript para usar sua conta.</p></noscript>
+<script>
+/*
+ * Núcleo de validação e formatação — funções puras, sem DOM.
+ * Roda no navegador e no Node (testes).
+ */
+(function (root, factory) {
+  if (typeof module === "object" && module.exports) module.exports = factory();
+  else root.AccountCore = factory();
+})(typeof globalThis !== "undefined" ? globalThis : this, function () {
+  "use strict";
+
+  function onlyDigits(value) {
+    return String(value === null || value === undefined ? "" : value).replace(/\D/g, "");
+  }
+
+  /* ------------------------------- E-mail ------------------------------- */
+
+  function normalizeEmail(value) {
+    return String(value || "").trim().toLowerCase();
+  }
+
+  function isValidEmail(value) {
+    var email = normalizeEmail(value);
+    if (email.length < 5 || email.length > 254) return false;
+    if (/\s/.test(email)) return false;
+    return /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)*\.[A-Za-z]{2,}$/.test(email);
+  }
+
+  /* -------------------------------- Nome -------------------------------- */
+
+  function normalizeName(value) {
+    return String(value || "")
+      .trim()
+      .replace(/\s+/g, " ");
+  }
+
+  function isValidName(value) {
+    var name = normalizeName(value);
+    return name.length >= 3 && name.length <= 80 && /[A-Za-zÀ-ÿ]/.test(name);
+  }
+
+  function initials(name) {
+    var parts = normalizeName(name).split(" ").filter(Boolean);
+    if (!parts.length) return "?";
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+
+  /* -------------------------------- Senha ------------------------------- */
+
+  var COMMON = [
+    "12345678", "123456789", "1234567890", "senha123", "password", "password1",
+    "admin123", "qwerty123", "passarela", "palco123", "abcd1234", "11111111"
+  ];
+
+  /** Devolve a mensagem de erro ou null se a senha for aceitável. */
+  function validatePassword(password) {
+    var p = String(password || "");
+    if (p.length < 8) return "A senha precisa ter pelo menos 8 caracteres.";
+    if (p.length > 128) return "A senha pode ter no máximo 128 caracteres.";
+    if (!/[A-Za-zÀ-ÿ]/.test(p)) return "Inclua pelo menos uma letra.";
+    if (!/\d/.test(p)) return "Inclua pelo menos um número.";
+    if (COMMON.indexOf(p.toLowerCase()) > -1) return "Essa senha é muito comum. Escolha outra.";
+    if (/^(.)\1+$/.test(p)) return "Não use o mesmo caractere repetido.";
+    return null;
+  }
+
+  /** 0 a 4 — usado na barra de força. */
+  function passwordScore(password) {
+    var p = String(password || "");
+    var score = 0;
+    if (p.length >= 8) score += 1;
+    if (p.length >= 12) score += 1;
+    if (/[a-z]/.test(p) && /[A-Z]/.test(p)) score += 1;
+    if (/\d/.test(p) && /[^\w\s]/.test(p)) score += 1;
+    return Math.min(4, score);
+  }
+
+  function passwordLabel(score) {
+    return ["Muito fraca", "Fraca", "Média", "Boa", "Forte"][Math.min(4, Math.max(0, score))];
+  }
+
+  /* ----------------------------- Documentos ----------------------------- */
+
+  function formatCPF(value) {
+    var v = onlyDigits(value).slice(0, 11);
+    return v
+      .replace(/^(\d{3})(\d)/, "$1.$2")
+      .replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
+      .replace(/\.(\d{3})(\d{1,2})$/, ".$1-$2");
+  }
+
+  function isValidCPF(value) {
+    var cpf = onlyDigits(value);
+    if (cpf.length !== 11 || /^(\d)\1{10}$/.test(cpf)) return false;
+    var sum = 0;
+    for (var i = 0; i < 9; i++) sum += parseInt(cpf[i], 10) * (10 - i);
+    var d1 = (sum * 10) % 11;
+    if (d1 === 10) d1 = 0;
+    if (d1 !== parseInt(cpf[9], 10)) return false;
+    sum = 0;
+    for (var j = 0; j < 10; j++) sum += parseInt(cpf[j], 10) * (11 - j);
+    var d2 = (sum * 10) % 11;
+    if (d2 === 10) d2 = 0;
+    return d2 === parseInt(cpf[10], 10);
+  }
+
+  function formatPhone(value) {
+    var v = onlyDigits(value).slice(0, 11);
+    if (v.length <= 10) return v.replace(/^(\d{2})(\d)/, "($1) $2").replace(/(\d{4})(\d{1,4})$/, "$1-$2");
+    return v.replace(/^(\d{2})(\d)/, "($1) $2").replace(/(\d{5})(\d{1,4})$/, "$1-$2");
+  }
+
+  function isValidPhone(value) {
+    var digits = onlyDigits(value);
+    if (!digits) return true; // opcional
+    return digits.length === 10 || digits.length === 11;
+  }
+
+  /* -------------------------------- Datas ------------------------------- */
+
+  function todayKey(date) {
+    var d = date || new Date();
+    return (
+      d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0")
+    );
+  }
+
+  function nowIso() {
+    return new Date().toISOString();
+  }
+
+  function formatDateBR(value) {
+    if (!value) return "";
+    var match = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(value));
+    if (match) return match[3] + "/" + match[2] + "/" + match[1];
+    return "";
+  }
+
+  function formatDateTimeBR(value) {
+    if (!value) return "";
+    var d = new Date(value);
+    if (isNaN(d.getTime())) return "";
+    return (
+      String(d.getDate()).padStart(2, "0") + "/" + String(d.getMonth() + 1).padStart(2, "0") + "/" + d.getFullYear() +
+      " às " + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0")
+    );
+  }
+
+  function relativeTime(value, nowMs) {
+    var then = new Date(value).getTime();
+    if (isNaN(then)) return "";
+    var diff = Math.max(0, (nowMs || Date.now()) - then);
+    var min = Math.floor(diff / 60000);
+    if (min < 1) return "agora mesmo";
+    if (min < 60) return "há " + min + " min";
+    var hours = Math.floor(min / 60);
+    if (hours < 24) return "há " + hours + (hours === 1 ? " hora" : " horas");
+    var days = Math.floor(hours / 24);
+    if (days === 1) return "ontem";
+    if (days < 30) return "há " + days + " dias";
+    var months = Math.floor(days / 30);
+    if (months < 12) return "há " + months + (months === 1 ? " mês" : " meses");
+    return "há " + Math.floor(months / 12) + " ano(s)";
+  }
+
+  function ageFromBirthDate(birthDate, now) {
+    if (!birthDate) return null;
+    var b = new Date(String(birthDate) + "T00:00:00");
+    if (isNaN(b.getTime())) return null;
+    var ref = now || new Date();
+    var age = ref.getFullYear() - b.getFullYear();
+    var m = ref.getMonth() - b.getMonth();
+    if (m < 0 || (m === 0 && ref.getDate() < b.getDate())) age -= 1;
+    return age >= 0 && age < 130 ? age : null;
+  }
+
+  /* ------------------------------- Cadastro ------------------------------ */
+
+  /**
+   * Valida o cadastro. existingEmails: array de e-mails já cadastrados.
+   */
+  function validateSignup(payload, existingEmails) {
+    var data = payload || {};
+    var errors = {};
+
+    if (!isValidName(data.name)) errors.name = "Informe seu nome completo (mínimo 3 letras).";
+
+    var email = normalizeEmail(data.email);
+    if (!isValidEmail(email)) errors.email = "Digite um e-mail válido, como nome@email.com.";
+    else if ((existingEmails || []).indexOf(email) > -1) errors.email = "Este e-mail já tem conta. Faça login.";
+
+    var passwordError = validatePassword(data.password);
+    if (passwordError) errors.password = passwordError;
+    if (String(data.password || "") !== String(data.passwordConfirm || "") || !data.passwordConfirm) {
+      errors.passwordConfirm = "As duas senhas precisam ser iguais.";
+    }
+
+    if (data.document && onlyDigits(data.document).length > 0) {
+      if (!isValidCPF(data.document)) errors.document = "CPF inválido — confira os números.";
+    }
+    if (!isValidPhone(data.phone)) errors.phone = "Telefone incompleto: use DDD + número.";
+
+    return { valid: Object.keys(errors).length === 0, errors: errors };
+  }
+
+  function validateLogin(payload) {
+    var data = payload || {};
+    var errors = {};
+    if (!isValidEmail(data.email)) errors.email = "Digite o e-mail da sua conta.";
+    if (!data.password) errors.password = "Digite sua senha.";
+    return { valid: Object.keys(errors).length === 0, errors: errors };
+  }
+
+  /** Feedback de "e-mail já cadastrado" enquanto digita. */
+  function emailStatus(email, existingEmails) {
+    var value = normalizeEmail(email);
+    if (!value) return { state: "empty", message: "" };
+    if (!isValidEmail(value)) return { state: "invalid", message: "E-mail incompleto." };
+    if ((existingEmails || []).indexOf(value) > -1) return { state: "taken", message: "Este e-mail já tem conta." };
+    return { state: "ok", message: "E-mail disponível." };
+  }
+
+  return {
+    onlyDigits: onlyDigits,
+    normalizeEmail: normalizeEmail,
+    isValidEmail: isValidEmail,
+    normalizeName: normalizeName,
+    isValidName: isValidName,
+    initials: initials,
+    validatePassword: validatePassword,
+    passwordScore: passwordScore,
+    passwordLabel: passwordLabel,
+    formatCPF: formatCPF,
+    isValidCPF: isValidCPF,
+    formatPhone: formatPhone,
+    isValidPhone: isValidPhone,
+    todayKey: todayKey,
+    nowIso: nowIso,
+    formatDateBR: formatDateBR,
+    formatDateTimeBR: formatDateTimeBR,
+    relativeTime: relativeTime,
+    ageFromBirthDate: ageFromBirthDate,
+    validateSignup: validateSignup,
+    validateLogin: validateLogin,
+    emailStatus: emailStatus
+  };
+});
+
+</script>
+<script>
+/*
+ * Hash de senhas (PBKDF2-HMAC-SHA256) sem dependências.
+ *
+ * Primário: Web Crypto (crypto.subtle) — 210.000 iterações.
+ * Fallback: implementação própria de SHA-256/HMAC/PBKDF2, para navegadores
+ * que não expõem crypto.subtle em contexto file:// (ex.: Safari antigo).
+ *
+ * Formato armazenado: pbkdf2$<iterações>$<salt base64>$<hash base64>
+ * A senha em texto puro NUNCA é gravada.
+ */
+(function (root, factory) {
+  if (typeof module === "object" && module.exports) {
+    module.exports = factory();
+  } else {
+    root.AccountHash = factory();
+  }
+})(typeof globalThis !== "undefined" ? globalThis : this, function () {
+  "use strict";
+
+  var K = [
+    0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+    0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+    0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+    0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+    0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+    0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+    0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+    0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
+  ];
+
+  function rotr(x, n) {
+    return (x >>> n) | (x << (32 - n));
+  }
+
+  /** SHA-256 de um Uint8Array → Uint8Array(32). */
+  function sha256(msg) {
+    var H = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19];
+    var len = msg.length;
+    var bitLenHi = Math.floor(len / 536870912);
+    var bitLenLo = (len << 3) >>> 0;
+    var padded = new Uint8Array(Math.ceil((len + 9) / 64) * 64);
+    padded.set(msg);
+    padded[len] = 0x80;
+    var dv = new DataView(padded.buffer);
+    dv.setUint32(padded.length - 8, bitLenHi);
+    dv.setUint32(padded.length - 4, bitLenLo);
+
+    var w = new Uint32Array(64);
+    for (var off = 0; off < padded.length; off += 64) {
+      for (var i = 0; i < 16; i++) w[i] = dv.getUint32(off + i * 4);
+      for (i = 16; i < 64; i++) {
+        var s0 = rotr(w[i - 15], 7) ^ rotr(w[i - 15], 18) ^ (w[i - 15] >>> 3);
+        var s1 = rotr(w[i - 2], 17) ^ rotr(w[i - 2], 19) ^ (w[i - 2] >>> 10);
+        w[i] = (w[i - 16] + s0 + w[i - 7] + s1) >>> 0;
+      }
+      var a = H[0], b = H[1], c = H[2], d = H[3], e = H[4], f = H[5], g = H[6], h = H[7];
+      for (i = 0; i < 64; i++) {
+        var S1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25);
+        var ch = (e & f) ^ (~e & g);
+        var t1 = (h + S1 + ch + K[i] + w[i]) >>> 0;
+        var S0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22);
+        var maj = (a & b) ^ (a & c) ^ (b & c);
+        var t2 = (S0 + maj) >>> 0;
+        h = g; g = f; f = e;
+        e = (d + t1) >>> 0;
+        d = c; c = b; b = a;
+        a = (t1 + t2) >>> 0;
+      }
+      H[0] = (H[0] + a) >>> 0; H[1] = (H[1] + b) >>> 0;
+      H[2] = (H[2] + c) >>> 0; H[3] = (H[3] + d) >>> 0;
+      H[4] = (H[4] + e) >>> 0; H[5] = (H[5] + f) >>> 0;
+      H[6] = (H[6] + g) >>> 0; H[7] = (H[7] + h) >>> 0;
+    }
+
+    var out = new Uint8Array(32);
+    var odv = new DataView(out.buffer);
+    for (i = 0; i < 8; i++) odv.setUint32(i * 4, H[i]);
+    return out;
+  }
+
+  function concat() {
+    var total = 0, i;
+    for (i = 0; i < arguments.length; i++) total += arguments[i].length;
+    var out = new Uint8Array(total), pos = 0;
+    for (i = 0; i < arguments.length; i++) {
+      out.set(arguments[i], pos);
+      pos += arguments[i].length;
+    }
+    return out;
+  }
+
+  function hmacSha256(key, msg) {
+    if (key.length > 64) key = sha256(key);
+    var k = new Uint8Array(64);
+    k.set(key);
+    var ipad = new Uint8Array(64), opad = new Uint8Array(64);
+    for (var i = 0; i < 64; i++) {
+      ipad[i] = k[i] ^ 0x36;
+      opad[i] = k[i] ^ 0x5c;
+    }
+    return sha256(concat(opad, sha256(concat(ipad, msg))));
+  }
+
+  /** PBKDF2-HMAC-SHA256 com saída de 32 bytes (um bloco). */
+  function pbkdf2Js(passwordBytes, saltBytes, iterations) {
+    var block = concat(saltBytes, new Uint8Array([0, 0, 0, 1]));
+    var u = hmacSha256(passwordBytes, block);
+    var out = new Uint8Array(u);
+    for (var i = 1; i < iterations; i++) {
+      u = hmacSha256(passwordBytes, u);
+      for (var j = 0; j < out.length; j++) out[j] ^= u[j];
+    }
+    return out;
+  }
+
+  var B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+  function bytesToBase64(bytes) {
+    var out = "", i;
+    for (i = 0; i + 2 < bytes.length; i += 3) {
+      var n = (bytes[i] << 16) | (bytes[i + 1] << 8) | bytes[i + 2];
+      out += B64[(n >> 18) & 63] + B64[(n >> 12) & 63] + B64[(n >> 6) & 63] + B64[n & 63];
+    }
+    var rest = bytes.length - i;
+    if (rest === 1) {
+      var n1 = bytes[i] << 16;
+      out += B64[(n1 >> 18) & 63] + B64[(n1 >> 12) & 63] + "==";
+    } else if (rest === 2) {
+      var n2 = (bytes[i] << 16) | (bytes[i + 1] << 8);
+      out += B64[(n2 >> 18) & 63] + B64[(n2 >> 12) & 63] + B64[(n2 >> 6) & 63] + "=";
+    }
+    return out;
+  }
+
+  function base64ToBytes(str) {
+    var clean = String(str).replace(/[^A-Za-z0-9+/=]/g, "");
+    var out = [];
+    for (var i = 0; i < clean.length; i += 4) {
+      var c1 = B64.indexOf(clean[i]);
+      var c2 = B64.indexOf(clean[i + 1]);
+      var c3 = B64.indexOf(clean[i + 2]);
+      var c4 = B64.indexOf(clean[i + 3]);
+      out.push(((c1 << 2) | (c2 >> 4)) & 255);
+      if (c3 >= 0) out.push(((c2 << 4) | (c3 >> 2)) & 255);
+      if (c4 >= 0) out.push(((c3 << 6) | c4) & 255);
+    }
+    return new Uint8Array(out);
+  }
+
+  function utf8Bytes(text) {
+    if (typeof TextEncoder !== "undefined") return new TextEncoder().encode(text);
+    var s = unescape(encodeURIComponent(text));
+    var out = new Uint8Array(s.length);
+    for (var i = 0; i < s.length; i++) out[i] = s.charCodeAt(i);
+    return out;
+  }
+
+  function randomBytes(n) {
+    var out = new Uint8Array(n);
+    if (typeof crypto !== "undefined" && crypto.getRandomValues) {
+      crypto.getRandomValues(out);
+      return out;
+    }
+    for (var i = 0; i < n; i++) out[i] = Math.floor(Math.random() * 256);
+    return out;
+  }
+
+  function hasSubtle() {
+    return (
+      typeof crypto !== "undefined" &&
+      crypto.subtle &&
+      typeof crypto.subtle.importKey === "function" &&
+      typeof TextEncoder !== "undefined"
+    );
+  }
+
+  function constantTimeEqual(a, b) {
+    if (a.length !== b.length) return false;
+    var diff = 0;
+    for (var i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
+    return diff === 0;
+  }
+
+  var SUBTLE_ITERATIONS = 210000;
+  var JS_ITERATIONS = 25000;
+
+  async function hashPassword(password) {
+    var salt = randomBytes(16);
+    if (hasSubtle()) {
+      try {
+        var key = await crypto.subtle.importKey("raw", utf8Bytes(password), "PBKDF2", false, ["deriveBits"]);
+        var bits = await crypto.subtle.deriveBits(
+          { name: "PBKDF2", hash: "SHA-256", salt: salt, iterations: SUBTLE_ITERATIONS },
+          key,
+          256
+        );
+        return "pbkdf2$" + SUBTLE_ITERATIONS + "$" + bytesToBase64(salt) + "$" + bytesToBase64(new Uint8Array(bits));
+      } catch (err) {
+        /* cai no fallback abaixo */
+      }
+    }
+    var hash = pbkdf2Js(utf8Bytes(password), salt, JS_ITERATIONS);
+    return "pbkdf2$" + JS_ITERATIONS + "$" + bytesToBase64(salt) + "$" + bytesToBase64(hash);
+  }
+
+  async function verifyPassword(password, stored) {
+    var parts = String(stored || "").split("$");
+    if (parts.length !== 4 || parts[0] !== "pbkdf2") return false;
+    var iterations = parseInt(parts[1], 10);
+    if (!iterations || iterations < 1) return false;
+    var salt = base64ToBytes(parts[2]);
+    var expected = base64ToBytes(parts[3]);
+
+    if (hasSubtle()) {
+      try {
+        var key = await crypto.subtle.importKey("raw", utf8Bytes(password), "PBKDF2", false, ["deriveBits"]);
+        var bits = await crypto.subtle.deriveBits(
+          { name: "PBKDF2", hash: "SHA-256", salt: salt, iterations: iterations },
+          key,
+          expected.length * 8
+        );
+        return constantTimeEqual(new Uint8Array(bits), expected);
+      } catch (err) {
+        /* fallback */
+      }
+    }
+    var derived = pbkdf2Js(utf8Bytes(password), salt, iterations);
+    return constantTimeEqual(derived, expected);
+  }
+
+  /** Token de sessão (32 bytes aleatórios em hexadecimal). */
+  function randomToken() {
+    var bytes = randomBytes(32);
+    var out = "";
+    for (var i = 0; i < bytes.length; i++) out += ("0" + bytes[i].toString(16)).slice(-2);
+    return out;
+  }
+
+  return {
+    sha256: sha256,
+    hmacSha256: hmacSha256,
+    pbkdf2: pbkdf2Js,
+    bytesToBase64: bytesToBase64,
+    base64ToBytes: base64ToBytes,
+    hashPassword: hashPassword,
+    verifyPassword: verifyPassword,
+    randomToken: randomToken,
+    hasSubtle: hasSubtle
+  };
+});
+
+</script>
+<script>
+/*
+ * Núcleo da conta: cadastro, login, sessão persistente, perfil e foto.
+ *
+ * Persistência em camadas:
+ *   1. IndexedDB  (principal — guarda também a foto em base64)
+ *   2. localStorage (espelho/fallback — ex.: janela privada, file:// restrito)
+ *   3. memória (último recurso, avisado na interface)
+ *
+ * A senha nunca é gravada: só o hash PBKDF2 (ver hash.js).
+ */
+(function (root, factory) {
+  if (typeof module === "object" && module.exports) module.exports = factory();
+  else root.AccountStore = factory();
+})(typeof globalThis !== "undefined" ? globalThis : this, function () {
+  "use strict";
+
+  var DB_NAME = "conta_palco";
+  var STORE = "kv";
+  var PREFIX = "conta:";
+  var SESSION_HOURS = 24;
+
+  var KEYS = { accounts: "accounts", session: "session" };
+
+  /* ============================ PERSISTÊNCIA ============================ */
+
+  function createDB() {
+    var idb = null;
+    var driver = "memory";
+    var memory = {};
+
+    function hasLocal() {
+      try {
+        localStorage.setItem("__probe__", "1");
+        localStorage.removeItem("__probe__");
+        return true;
+      } catch (err) {
+        return false;
+      }
+    }
+
+    function openIDB() {
+      return new Promise(function (resolve) {
+        if (typeof indexedDB === "undefined") return resolve(null);
+        var settled = false;
+        var timer = setTimeout(function () {
+          if (!settled) {
+            settled = true;
+            resolve(null);
+          }
+        }, 4000);
+        try {
+          var req = indexedDB.open(DB_NAME, 1);
+          req.onupgradeneeded = function () {
+            if (!req.result.objectStoreNames.contains(STORE)) req.result.createObjectStore(STORE);
+          };
+          req.onsuccess = function () {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            resolve(req.result);
+          };
+          req.onerror = req.onblocked = function () {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            resolve(null);
+          };
+        } catch (err) {
+          if (!settled) {
+            settled = true;
+            clearTimeout(timer);
+            resolve(null);
+          }
+        }
+      });
+    }
+
+    function idbGet(key) {
+      return new Promise(function (resolve) {
+        try {
+          var req = idb.transaction(STORE, "readonly").objectStore(STORE).get(key);
+          req.onsuccess = function () {
+            resolve(req.result === undefined ? null : req.result);
+          };
+          req.onerror = function () {
+            resolve(null);
+          };
+        } catch (err) {
+          resolve(null);
+        }
+      });
+    }
+
+    function idbSet(key, value) {
+      return new Promise(function (resolve) {
+        try {
+          var tx = idb.transaction(STORE, "readwrite");
+          tx.objectStore(STORE).put(value, key);
+          tx.oncomplete = function () {
+            resolve(true);
+          };
+          tx.onerror = function () {
+            resolve(false);
+          };
+        } catch (err) {
+          resolve(false);
+        }
+      });
+    }
+
+    function readLocal(key) {
+      if (!hasLocal()) return null;
+      var raw = localStorage.getItem(PREFIX + key);
+      if (raw === null) return null;
+      try {
+        return JSON.parse(raw);
+      } catch (err) {
+        return null;
+      }
+    }
+
+    function writeLocal(key, value) {
+      if (!hasLocal()) return false;
+      try {
+        localStorage.setItem(PREFIX + key, JSON.stringify(value));
+        return true;
+      } catch (err) {
+        return false;
+      }
+    }
+
+    return {
+      async init() {
+        idb = await openIDB();
+        if (idb) {
+          driver = "indexeddb";
+        } else if (hasLocal()) {
+          driver = "localstorage";
+        } else {
+          driver = "memory";
+        }
+        return driver;
+      },
+      driver: function () {
+        return driver;
+      },
+      async get(key, fallback) {
+        var value = null;
+        if (driver === "indexeddb") {
+          value = await idbGet(key);
+          if (value === null) value = readLocal(key);
+        } else if (driver === "localstorage") {
+          value = readLocal(key);
+        } else {
+          value = Object.prototype.hasOwnProperty.call(memory, key) ? memory[key] : null;
+        }
+        return value === null || value === undefined ? fallback : value;
+      },
+      async set(key, value) {
+        if (driver === "indexeddb") {
+          var ok = await idbSet(key, value);
+          writeLocal(key, value);
+          return ok;
+        }
+        if (driver === "localstorage") return writeLocal(key, value);
+        memory[key] = value;
+        return true;
+      },
+      async remove(key) {
+        await this.set(key, null);
+      }
+    };
+  }
+
+  /* ============================== UTILIDADES ============================== */
+
+  function uid() {
+    if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+    return "id-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+  }
+
+  function now() {
+    return new Date().toISOString();
+  }
+
+  /* ================================ STORE ================================ */
+
+  function createStore(deps) {
+    var db = deps.db;
+    var hash = deps.hash;
+    var core = deps.core;
+    var cryptoLib = deps.crypto || (typeof crypto !== "undefined" ? crypto : null);
+
+    var state = { accounts: [], session: null };
+    var current = null;
+    var listeners = [];
+    var MAX_ATTEMPTS = 5;
+    var LOCK_MINUTES = 15;
+
+    function emit() {
+      listeners.forEach(function (fn) {
+        try {
+          fn();
+        } catch (err) {
+          /* ignora listener com erro */
+        }
+      });
+    }
+
+    function subscribe(fn) {
+      listeners.push(fn);
+      return function () {
+        listeners = listeners.filter(function (l) {
+          return l !== fn;
+        });
+      };
+    }
+
+    function publicAccount(account) {
+      if (!account) return null;
+      return {
+        id: account.id,
+        name: account.name,
+        email: account.email,
+        phone: account.phone,
+        document: account.document,
+        birthDate: account.birthDate,
+        city: account.city,
+        bio: account.bio,
+        avatar: account.avatar,
+        createdAt: account.createdAt,
+        updatedAt: account.updatedAt,
+        lastLoginAt: account.lastLoginAt,
+        photoUpdatedAt: account.photoUpdatedAt
+      };
+    }
+
+    function findAccount(email) {
+      var target = core.normalizeEmail(email);
+      return state.accounts.find(function (a) {
+        return a.email === target;
+      });
+    }
+
+    async function persistAccounts() {
+      await db.set(KEYS.accounts, state.accounts);
+    }
+
+    async function load() {
+      var results = await Promise.all([db.get(KEYS.accounts, []), db.get(KEYS.session, null)]);
+      state.accounts = results[0] || [];
+      state.session = results[1] || null;
+      current = null;
+
+      if (state.session && state.session.accountId) {
+        var account = state.accounts.find(function (a) {
+          return a.id === state.session.accountId;
+        });
+        var valid = state.session.expiresAt && new Date(state.session.expiresAt).getTime() > Date.now();
+        if (account && valid) current = account;
+        else {
+          state.session = null;
+          await db.set(KEYS.session, null);
+        }
+      }
+      emit();
+      return state;
+    }
+
+    async function startSession(account) {
+      var session = {
+        token: hash.randomToken(),
+        accountId: account.id,
+        createdAt: now(),
+        expiresAt: new Date(Date.now() + SESSION_HOURS * 3600 * 1000).toISOString()
+      };
+      state.session = session;
+      current = account;
+      await db.set(KEYS.session, session);
+    }
+
+    /* ------------------------------ CADASTRO ------------------------------ */
+
+    async function signup(payload) {
+      var emails = state.accounts.map(function (a) {
+        return a.email;
+      });
+      var check = core.validateSignup(payload, emails);
+      if (!check.valid) {
+        var err = new Error("Confira os campos destacados.");
+        err.fields = check.errors;
+        throw err;
+      }
+
+      var passwordHash = await hash.hashPassword(payload.password);
+      var account = {
+        id: uid(),
+        name: core.normalizeName(payload.name),
+        email: core.normalizeEmail(payload.email),
+        phone: payload.phone ? core.onlyDigits(payload.phone) : "",
+        document: payload.document ? core.onlyDigits(payload.document) : "",
+        birthDate: payload.birthDate || "",
+        city: core.normalizeName(payload.city || ""),
+        bio: "",
+        avatar: "",
+        passwordHash: passwordHash,
+        failedAttempts: 0,
+        lockedUntil: null,
+        lastLoginAt: now(),
+        createdAt: now(),
+        updatedAt: now(),
+        photoUpdatedAt: null
+      };
+      state.accounts = state.accounts.concat([account]);
+      await persistAccounts();
+      await startSession(account);
+      emit();
+      return publicAccount(account);
+    }
+
+    /* -------------------------------- LOGIN ------------------------------- */
+
+    async function login(email, password) {
+      var account = findAccount(email);
+      if (!account) {
+        var unknown = new Error("E-mail ou senha incorretos.");
+        unknown.fields = { password: "E-mail ou senha incorretos." };
+        throw unknown;
+      }
+
+      if (account.lockedUntil && new Date(account.lockedUntil).getTime() > Date.now()) {
+        var minutes = Math.max(1, Math.ceil((new Date(account.lockedUntil).getTime() - Date.now()) / 60000));
+        var locked = new Error(
+          "Sua conta foi bloqueada por segurança. Tente novamente em " + minutes + " minuto(s)."
+        );
+        locked.fields = { password: "Conta bloqueada temporariamente." };
+        throw locked;
+      }
+
+      var ok = await hash.verifyPassword(password, account.passwordHash);
+      if (!ok) {
+        account.failedAttempts = Number(account.failedAttempts || 0) + 1;
+        if (account.failedAttempts >= MAX_ATTEMPTS) {
+          account.lockedUntil = new Date(Date.now() + LOCK_MINUTES * 60000).toISOString();
+          account.failedAttempts = 0;
+        }
+        account.updatedAt = now();
+        await persistAccounts();
+        var invalid = new Error(
+          account.lockedUntil
+            ? "Sua conta foi bloqueada por 15 minutos após 5 tentativas incorretas."
+            : "E-mail ou senha incorretos. Restam " + (MAX_ATTEMPTS - Number(account.failedAttempts || 0)) + " tentativa(s)."
+        );
+        invalid.fields = { password: "E-mail ou senha incorretos." };
+        throw invalid;
+      }
+
+      account.failedAttempts = 0;
+      account.lockedUntil = null;
+      account.lastLoginAt = now();
+      account.updatedAt = now();
+      await persistAccounts();
+      await startSession(account);
+      emit();
+      return publicAccount(account);
+    }
+
+    async function logout() {
+      current = null;
+      state.session = null;
+      await db.set(KEYS.session, null);
+      emit();
+    }
+
+    /* -------------------------------- PERFIL ------------------------------ */
+
+    async function updateProfile(patch) {
+      if (!current) throw new Error("Sua sessão expirou. Entre novamente.");
+      var errors = {};
+
+      var name = patch.name === undefined ? current.name : core.normalizeName(patch.name);
+      if (!core.isValidName(name)) errors.name = "Informe seu nome completo.";
+
+      var email = patch.email === undefined ? current.email : core.normalizeEmail(patch.email);
+      if (!core.isValidEmail(email)) errors.email = "E-mail inválido.";
+      else {
+        var duplicated = state.accounts.some(function (a) {
+          return a.id !== current.id && a.email === email;
+        });
+        if (duplicated) errors.email = "Este e-mail já pertence a outra conta.";
+      }
+
+      if (patch.document) {
+        if (!core.isValidCPF(patch.document)) errors.document = "CPF inválido.";
+      }
+      if (patch.phone && !core.isValidPhone(patch.phone)) errors.phone = "Telefone incompleto.";
+
+      if (Object.keys(errors).length) {
+        var err = new Error("Confira os campos destacados.");
+        err.fields = errors;
+        throw err;
+      }
+
+      var updated = Object.assign({}, current, {
+        name: name,
+        email: email,
+        phone: patch.phone === undefined ? current.phone : core.onlyDigits(patch.phone),
+        document: patch.document === undefined ? current.document : core.onlyDigits(patch.document),
+        birthDate: patch.birthDate === undefined ? current.birthDate : patch.birthDate,
+        city: patch.city === undefined ? current.city : core.normalizeName(patch.city),
+        bio: patch.bio === undefined ? current.bio : String(patch.bio).slice(0, 300),
+        updatedAt: now()
+      });
+
+      state.accounts = state.accounts.map(function (a) {
+        return a.id === updated.id ? updated : a;
+      });
+      current = updated;
+      await persistAccounts();
+      emit();
+      return publicAccount(updated);
+    }
+
+    /** Salva a foto (data URL já redimensionada) do jeito mais seguro possível. */
+    async function savePhoto(dataUrl) {
+      if (!current) throw new Error("Sua sessão expirou. Entre novamente.");
+      if (!dataUrl || !/^data:image\/(jpeg|png|webp);base64,/.test(dataUrl)) {
+        throw new Error("Formato de imagem não aceito.");
+      }
+      if (dataUrl.length > 900 * 1024) throw new Error("Imagem muito grande. Tente outra foto.");
+
+      var updated = Object.assign({}, current, {
+        avatar: dataUrl,
+        photoUpdatedAt: now(),
+        updatedAt: now()
+      });
+      state.accounts = state.accounts.map(function (a) {
+        return a.id === updated.id ? updated : a;
+      });
+      current = updated;
+      await persistAccounts();
+
+      // Confirma que realmente persistiu (IndexedDB + espelho).
+      var stored = await db.get(KEYS.accounts, []);
+      var saved = (stored || []).find(function (a) {
+        return a.id === updated.id;
+      });
+      emit();
+      return { saved: Boolean(saved && saved.avatar === dataUrl), account: publicAccount(updated) };
+    }
+
+    async function clearPhoto() {
+      if (!current) throw new Error("Sua sessão expirou. Entre novamente.");
+      var updated = Object.assign({}, current, { avatar: "", photoUpdatedAt: null, updatedAt: now() });
+      state.accounts = state.accounts.map(function (a) {
+        return a.id === updated.id ? updated : a;
+      });
+      current = updated;
+      await persistAccounts();
+      emit();
+      return publicAccount(updated);
+    }
+
+    async function changePassword(currentPassword, newPassword, confirmPassword) {
+      if (!current) throw new Error("Sua sessão expirou. Entre novamente.");
+      var fields = {};
+      var ok = await hash.verifyPassword(currentPassword, current.passwordHash);
+      if (!ok) fields.currentPassword = "A senha atual está incorreta.";
+      var error = core.validatePassword(newPassword);
+      if (error) fields.newPassword = error;
+      if (newPassword !== confirmPassword) fields.confirmPassword = "As senhas não conferem.";
+      if (Object.keys(fields).length) {
+        var err = new Error("Confira os campos destacados.");
+        err.fields = fields;
+        throw err;
+      }
+      var updated = Object.assign({}, current, {
+        passwordHash: await hash.hashPassword(newPassword),
+        updatedAt: now()
+      });
+      state.accounts = state.accounts.map(function (a) {
+        return a.id === updated.id ? updated : a;
+      });
+      current = updated;
+      await persistAccounts();
+      emit();
+      return true;
+    }
+
+    async function deleteAccount(password) {
+      if (!current) throw new Error("Sua sessão expirou.");
+      var ok = await hash.verifyPassword(password, current.passwordHash);
+      if (!ok) {
+        var err = new Error("Senha incorreta.");
+        err.fields = { password: "Senha incorreta." };
+        throw err;
+      }
+      state.accounts = state.accounts.filter(function (a) {
+        return a.id !== current.id;
+      });
+      await persistAccounts();
+      await logout();
+      return true;
+    }
+
+    /* ------------------------------ CONSULTAS ----------------------------- */
+
+    function currentAccount() {
+      return publicAccount(current);
+    }
+
+    function isAuthenticated() {
+      return Boolean(current);
+    }
+
+    function listEmails() {
+      return state.accounts.map(function (a) {
+        return a.email;
+      });
+    }
+
+    function accountCount() {
+      return state.accounts.length;
+    }
+
+    function storageEstimate() {
+      try {
+        var total = 0;
+        for (var i = 0; i < localStorage.length; i++) {
+          var key = localStorage.key(i);
+          if (key && key.indexOf(PREFIX) === 0) total += (localStorage.getItem(key) || "").length + key.length;
+        }
+        if (total < 1024) return total + " B";
+        if (total < 1024 * 1024) return (total / 1024).toFixed(1) + " KB";
+        return (total / 1024 / 1024).toFixed(2) + " MB";
+      } catch (err) {
+        return "—";
+      }
+    }
+
+    function hasSupport() {
+      return Boolean(cryptoLib && cryptoLib.subtle);
+    }
+
+    return {
+      load: load,
+      subscribe: subscribe,
+      getState: function () {
+        return state;
+      },
+      currentAccount: currentAccount,
+      isAuthenticated: isAuthenticated,
+      signup: signup,
+      login: login,
+      logout: logout,
+      updateProfile: updateProfile,
+      savePhoto: savePhoto,
+      removePhoto: clearPhoto,
+      changePassword: changePassword,
+      deleteAccount: deleteAccount,
+      listEmails: listEmails,
+      accountCount: accountCount,
+      storageEstimate: storageEstimate,
+      hasSupport: hasSupport,
+      driver: function () {
+        return db.driver();
+      }
+    };
+  }
+
+  return { createStore: createStore, createDB: createDB, KEYS: KEYS };
+});
+
+</script>
+<script>
+/* Ícones em SVG inline (traço 1.7, grade 24) — sem dependências. */
+(function (root, factory) {
+  if (typeof module === "object" && module.exports) module.exports = factory();
+  else root.AppIcons = factory();
+})(typeof globalThis !== "undefined" ? globalThis : this, function () {
+  "use strict";
+
+  var paths = {
+    dashboard: '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
+    pos: '<circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h3l2.4 11.2a2 2 0 0 0 2 1.6h8.3a2 2 0 0 0 2-1.6L21 7H6"/>',
+    sales: '<path d="M5 3h14v18l-3.5-2.2L12 21l-3.5-2.2L5 21z"/><path d="M9 8h6M9 12h6"/>',
+    products: '<path d="M12 3 3 7.5v9L12 21l9-4.5v-9z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/>',
+    stock: '<path d="M3 9.5 12 4l9 5.5V19a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M3 9.5h18M9.5 20v-6h5v6"/>',
+    customers: '<circle cx="9" cy="8" r="3.4"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M17 5.2a3.2 3.2 0 0 1 0 5.6M18.5 20a5.6 5.6 0 0 0-2-4.3"/>',
+    finance: '<path d="M12 2v20"/><path d="M17 6.5c0-1.9-2.2-3-5-3s-5 1.1-5 3 2.2 2.8 5 3.4 5 1.5 5 3.6-2.2 3-5 3-5-1.1-5-3"/>',
+    reports: '<path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6" rx="1"/><rect x="12.5" y="8" width="3" height="10" rx="1"/><rect x="18" y="5" width="3" height="13" rx="1"/>',
+    profile: '<circle cx="12" cy="8" r="3.6"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/>',
+    settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.55 1.7 1.7 0 0 0-1.88.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.65 8.4a1.7 1.7 0 0 0-.34-1.88l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.03a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87V9a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
+    logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    minus: '<path d="M5 12h14"/>',
+    close: '<path d="M18 6 6 18M6 6l12 12"/>',
+    check: '<path d="M20 6 9 17l-5-5"/>',
+    checkCircle: '<circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.5 2.5 4.5-5"/>',
+    alert: '<path d="M10.3 3.6 2 18a2 2 0 0 0 1.7 3h16.6A2 2 0 0 0 22 18L13.7 3.6a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>',
+    info: '<circle cx="12" cy="12" r="9"/><path d="M12 16v-5M12 8h.01"/>',
+    xCircle: '<circle cx="12" cy="12" r="9"/><path d="m15 9-6 6M9 9l6 6"/>',
+    search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+    trash: '<path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14"/><path d="M10 11v6M14 11v6"/>',
+    edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+    camera: '<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>',
+    upload: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5M12 3v12"/>',
+    download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5M12 15V3"/>',
+    eye: '<path d="M1.5 12S5 5.5 12 5.5 22.5 12 22.5 12 19 18.5 12 18.5 1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3"/>',
+    eyeOff: '<path d="M17.9 17.9A10.4 10.4 0 0 1 12 19.5C5 19.5 1.5 12 1.5 12a19 19 0 0 1 4.1-5.2M9.9 4.7A10 10 0 0 1 12 4.5c7 0 10.5 7.5 10.5 7.5a19 19 0 0 1-2.2 3.3M1 1l22 22"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/>',
+    lock: '<rect x="4" y="10.5" width="16" height="10.5" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/>',
+    mail: '<rect x="2.5" y="4.5" width="19" height="15" rx="2"/><path d="m3 6 9 6.5L21 6"/>',
+    user: '<circle cx="12" cy="8" r="3.6"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/>',
+    phone: '<path d="M22 16.9v2.6a2 2 0 0 1-2.2 2 19.6 19.6 0 0 1-8.6-3.1 19.3 19.3 0 0 1-6-6A19.6 19.6 0 0 1 2.1 3.7 2 2 0 0 1 4.1 1.5h2.6a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8 9a15.5 15.5 0 0 0 6 6l.9-.9a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/>',
+    calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/>',
+    mapPin: '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="2.6"/>',
+    sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+    moon: '<path d="M21 12.8A8.5 8.5 0 1 1 11.2 3a6.6 6.6 0 0 0 9.8 9.8z"/>',
+    refresh: '<path d="M3 12a9 9 0 0 1 15.3-6.4L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.3 6.4L3 16"/><path d="M3 21v-5h5"/>',
+    printer: '<path d="M6 9V2h12v7"/><rect x="6" y="14" width="12" height="8"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>',
+    filter: '<path d="M22 3H2l8 9.5V19l4 2v-8.5z"/>',
+    chevronDown: '<path d="m6 9 6 6 6-6"/>',
+    chevronRight: '<path d="m9 6 6 6-6 6"/>',
+    trendUp: '<path d="m22 7-8.5 8.5-4-4L2 19"/><path d="M16 7h6v6"/>',
+    trendDown: '<path d="m22 17-8.5-8.5-4 4L2 5"/><path d="M16 17h6v-6"/>',
+    wallet: '<path d="M20 7H5a2 2 0 0 1 0-4h13v4"/><path d="M3 5v13a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1z"/><path d="M17 13h.01"/>',
+    shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/>',
+    sparkles: '<path d="m12 3 1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>',
+    box: '<path d="M12 3 3 7.5v9L12 21l9-4.5v-9z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/>',
+    tag: '<path d="M20.6 13.4 12 22l-9-9V3h10z"/><circle cx="7.5" cy="7.5" r="1.5"/>',
+    receipt: '<path d="M5 3h14v18l-3.5-2.2L12 21l-3.5-2.2L5 21z"/><path d="M9 8h6M9 12h6M9 16h3"/>',
+    clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>',
+    home: '<path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/>',
+    menu: '<path d="M3 6h18M3 12h18M3 18h18"/>',
+    copy: '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
+    external: '<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6M10 14 21 3"/>',
+    id: '<rect x="2.5" y="4.5" width="19" height="15" rx="2.5"/><circle cx="8.5" cy="11" r="2.2"/><path d="M5 17c.6-1.9 2-2.8 3.5-2.8S11.4 15.1 12 17"/><path d="M14.5 10h4M14.5 13.5h4"/>',
+    pin: '<path d="M20 10.2c0 5.7-8 11.3-8 11.3s-8-5.6-8-11.3a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="2.6"/>',
+    camera: '<path d="M22 18.5a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h3l1.6-2.5h6.8L17 7h3a2 2 0 0 1 2 2z"/><circle cx="12" cy="13.2" r="3.6"/>',
+    database: '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5"/><path d="M3 12c0 1.7 4 3 9 3s9-1.3 9-3"/>'
+  };
+
+  function icon(name, size) {
+    var body = paths[name] || paths.info;
+    var s = size || 18;
+    return (
+      '<svg viewBox="0 0 24 24" width="' + s + '" height="' + s + '" fill="none" stroke="currentColor" ' +
+      'stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + body + "</svg>"
+    );
+  }
+
+  return { icon: icon, paths: paths };
+});
+
+</script>
+<script>
+/*
+ * Interface de conta: Login, Criar conta e Meu perfil.
+ * Sem framework. Todo o estado vive no AccountStore (IndexedDB + localStorage).
+ */
+(function () {
+  "use strict";
+
+  var core = window.AccountCore;
+  var hash = window.AccountHash;
+  var lib = window.AccountStore;
+  var Icons = window.AppIcons;
+
+  var db = null;
+  var store = null;
+  var route = "login";
+  var pendingPhoto = null;
+  var photoState = { saved: false, at: null };
+  var MAX_PHOTO_SIDE = 512;
+
+  /* ============================== HELPERS DOM ============================== */
+
+  function $(selector, scope) {
+    return (scope || document).querySelector(selector);
+  }
+  function $$(selector, scope) {
+    return Array.prototype.slice.call((scope || document).querySelectorAll(selector));
+  }
+  function esc(text) {
+    return String(text === null || text === undefined ? "" : text)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+  function val(scope, name) {
+    var node = scope ? scope.querySelector('[name="' + name + '"]') : null;
+    return node ? node.value : "";
+  }
+  /** scrollIntoView seguro (ambientes sem a API, ex.: testes). */
+  function reveal(node) {
+    if (node && typeof node.scrollIntoView === "function") {
+      node.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }
+
+  function sleep(ms) {
+    return new Promise(function (resolve) { setTimeout(resolve, ms); });
+  }
+
+  /* ================================ TOASTS ================================ */
+
+  var TOAST_ICONS = {
+    success: '<circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.5 2.5 4.5-5"/>',
+    error: '<circle cx="12" cy="12" r="9"/><path d="m15 9-6 6M9 9l6 6"/>',
+    info: '<circle cx="12" cy="12" r="9"/><path d="M12 16v-5M12 8h.01"/>'
+  };
+
+  function toast(message, type, title) {
+    var holder = $("#toasts");
+    if (!holder) return;
+    var kind = type || "success";
+    var node = document.createElement("div");
+    node.className = "toast toast-" + kind;
+    node.innerHTML =
+      '<span class="toast-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" ' +
+      'stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">' + (TOAST_ICONS[kind] || TOAST_ICONS.info) + "</svg></span>" +
+      '<div class="toast-content"><strong>' + esc(title || (kind === "error" ? "Não foi possível" : "Tudo certo")) + "</strong>" +
+      "<span>" + esc(message) + "</span></div>";
+    holder.appendChild(node);
+    setTimeout(function () {
+      node.classList.add("out");
+      setTimeout(function () { node.remove(); }, 260);
+    }, kind === "error" ? 5200 : 3200);
+  }
+
+  /* ============================== VALIDAÇÃO UI ============================== */
+
+  function setError(form, name, message) {
+    var slot = form.querySelector('[data-error="' + name + '"]');
+    var input = form.querySelector('[name="' + name + '"]');
+    if (slot) {
+      slot.textContent = message || "";
+      slot.classList.toggle("show", Boolean(message));
+    }
+    if (input) {
+      input.classList.toggle("invalid", Boolean(message));
+      input.setAttribute("aria-invalid", message ? "true" : "false");
+    }
+  }
+
+  function clearErrors(form) {
+    $$("[data-error]", form).forEach(function (slot) {
+      slot.textContent = "";
+      slot.classList.remove("show");
+    });
+    $$(".invalid", form).forEach(function (input) {
+      input.classList.remove("invalid");
+      input.removeAttribute("aria-invalid");
+    });
+  }
+
+  function showErrors(form, errors) {
+    clearErrors(form);
+    var names = Object.keys(errors || {});
+    names.forEach(function (name) { setError(form, name, errors[name]); });
+    if (names.length) {
+      var first = form.querySelector('[name="' + names[0] + '"]');
+      if (first) first.focus();
+    }
+    return names.length;
+  }
+
+  function setBusy(button, busy, label) {
+    if (!button) return;
+    if (busy) {
+      button.dataset.label = button.innerHTML;
+      button.disabled = true;
+      button.innerHTML = '<span class="spinner"></span> ' + esc(label || "Aguarde...");
+    } else {
+      button.disabled = false;
+      if (button.dataset.label) button.innerHTML = button.dataset.label;
+    }
+  }
+
+  /* ============================== MÁSCARAS ============================== */
+
+  function maskInput(input, formatter) {
+    if (!input) return;
+    input.addEventListener("input", function () {
+      var before = input.value.length;
+      var pos = input.selectionStart;
+      input.value = formatter(input.value);
+      var after = input.value.length;
+      if (pos !== null) input.setSelectionRange(pos + (after - before), pos + (after - before));
+    });
+  }
+
+  /* ============================== TEMA / CONTRASTE ============================== */
+
+  function bootChrome() {
+    var saved = null;
+    try { saved = localStorage.getItem("conta:theme"); } catch (err) { saved = null; }
+    var theme = saved || (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    applyTheme(theme);
+  }
+
+  function applyTheme(theme) {
+    document.documentElement.setAttribute("data-theme", theme);
+    try { localStorage.setItem("conta:theme", theme); } catch (err) { /* ignora */ }
+    $$("[data-theme-toggle]").forEach(function (btn) {
+      btn.innerHTML = Icons.icon(theme === "dark" ? "sun" : "moon", 18);
+      btn.setAttribute("aria-label", theme === "dark" ? "Ativar tema claro" : "Ativar tema escuro");
+    });
+  }
+
+  function toggleTheme() {
+    var next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    applyTheme(next);
+  }
+
+  /* ================================ AVATAR ================================ */
+
+  function avatarMarkup(account, size) {
+    var cls = "avatar avatar-" + (size || "md");
+    if (account && account.avatar) {
+      return '<span class="' + cls + '"><img src="' + account.avatar + '" alt="Foto de ' + esc(account.name) + '"></span>';
+    }
+    return '<span class="' + cls + '">' + esc(core.initials(account && account.name)) + "</span>";
+  }
+
+  /* ================================ FOTO ================================ */
+
+  function readPhoto(file) {
+    return new Promise(function (resolve, reject) {
+      if (!file) return reject(new Error("Nenhum arquivo selecionado."));
+      if (!/^image\/(jpeg|png|webp|heic|heif)$/.test(file.type)) {
+        return reject(new Error("Escolha uma imagem JPG, PNG ou WEBP."));
+      }
+      if (file.size > 15 * 1024 * 1024) return reject(new Error("A imagem precisa ter menos de 15 MB."));
+
+      var reader = new FileReader();
+      reader.onerror = function () { reject(new Error("Não conseguimos ler o arquivo.")); };
+      reader.onload = function () {
+        var img = new Image();
+        img.onerror = function () { reject(new Error("O arquivo parece não ser uma imagem válida.")); };
+        img.onload = function () {
+          var scale = Math.min(1, MAX_PHOTO_SIDE / Math.max(img.width, img.height));
+          var w = Math.max(1, Math.round(img.width * scale));
+          var h = Math.max(1, Math.round(img.height * scale));
+          var canvas = document.createElement("canvas");
+          canvas.width = w;
+          canvas.height = h;
+          var ctx = canvas.getContext("2d");
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = "high";
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, w, h);
+          ctx.drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL("image/jpeg", 0.88));
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function handlePhotoFile(file) {
+    var zone = $("#photo-drop");
+    try {
+      if (zone) zone.classList.add("busy");
+      var dataUrl = await readPhoto(file);
+      pendingPhoto = dataUrl;
+      $("#photo-preview").innerHTML = '<span class="avatar avatar-xl"><img src="' + dataUrl + '" alt="Prévia da foto"></span>';
+      $("#photo-actions").classList.remove("hidden");
+      $("#photo-hint").textContent = "Prévia carregada — clique em “Salvar foto” para gravar no seu perfil.";
+      $("#photo-save").focus();
+    } catch (err) {
+      toast(err.message, "error", "Foto não aceita");
+    } finally {
+      if (zone) zone.classList.remove("busy");
+    }
+  }
+
+  /* ================================ ROTAS ================================ */
+
+  function routeFromHash() {
+    var h = (window.location.hash || "").replace("#", "");
+    if (store.isAuthenticated()) {
+      if (h === "cadastro" || h === "login") return "perfil";
+      return "perfil";
+    }
+    return h === "cadastro" ? "cadastro" : "login";
+  }
+
+  function go(next) {
+    window.location.hash = next;
+  }
+
+  function render() {
+    route = routeFromHash();
+    var root = $("#app");
+    if (store.isAuthenticated()) {
+      root.innerHTML = profileView(store.currentAccount());
+      bindProfile();
+    } else {
+      root.innerHTML = route === "cadastro" ? signupView() : loginView();
+      route === "cadastro" ? bindSignup() : bindLogin();
+    }
+  }
+
+  function brandPanel() {
+    return (
+      '<aside class="brand">' +
+        '<div class="brand-top">' +
+          '<div class="brand-logo"><span class="brand-mark">P</span><span>Palco</span></div>' +
+          '<button class="icon-btn brand-theme" data-theme-toggle type="button"></button>' +
+        "</div>" +
+        '<div class="brand-center">' +
+          '<h1>Sua conta,<br><em>no seu tempo.</em></h1>' +
+          '<p>Cadastro rápido, login seguro e sua foto guardada. Volte quando quiser — a sessão continua salva neste dispositivo.</p>' +
+          '<ul class="brand-list">' +
+            "<li>" + Icons.icon("shield", 18) + "<span><strong>Senha protegida</strong> com PBKDF2-SHA256, 210 mil iterações</span></li>" +
+            "<li>" + Icons.icon("camera", 18) + "<span><strong>Foto de perfil</strong> redimensionada e salva</span></li>" +
+            "<li>" + Icons.icon("database", 18) + "<span><strong>Dados no aparelho</strong> — nada sai para servidores</span></li>" +
+          "</ul>" +
+        "</div>" +
+        '<div class="brand-foot">Ao criar a conta, seus dados ficam salvos apenas neste navegador.</div>' +
+      "</aside>"
+    );
+  }
+
+  /* ================================ LOGIN ================================ */
+
+  function loginView() {
+    return (
+      '<div class="shell">' + brandPanel() +
+        '<main class="panel">' +
+          '<div class="card">' +
+            '<div class="card-head">' +
+              "<h2>Entrar na sua conta</h2>" +
+              "<p>Informe o e-mail e a senha que você cadastrou.</p>" +
+            "</div>" +
+            '<form class="form" id="form-login" novalidate autocomplete="on">' +
+              '<div class="field">' +
+                '<label for="login-email">E-mail</label>' +
+                '<div class="control">' + Icons.icon("mail", 17) +
+                  '<input id="login-email" name="email" type="email" autocomplete="username" placeholder="voce@email.com" required>' +
+                "</div>" +
+                '<span class="error-slot" data-error="email"></span>' +
+              "</div>" +
+              '<div class="field">' +
+                '<label for="login-password">Senha</label>' +
+                '<div class="control">' + Icons.icon("lock", 17) +
+                  '<input id="login-password" name="password" type="password" autocomplete="current-password" placeholder="Sua senha" required>' +
+                  '<button class="reveal" type="button" data-reveal="login-password" aria-label="Mostrar senha">' + Icons.icon("eye", 17) + "</button>" +
+                "</div>" +
+                '<span class="error-slot" data-error="password"></span>' +
+              "</div>" +
+              '<button class="btn btn-primary btn-block" type="submit" id="login-submit">Entrar</button>' +
+            "</form>" +
+            '<div class="card-foot">Ainda não tem conta? <a href="#cadastro">Criar conta grátis</a></div>' +
+            (store.accountCount() === 0
+              ? '<div class="notice">' + Icons.icon("info", 17) + "<span>Nenhuma conta neste navegador ainda. <a href=\"#cadastro\">Crie a primeira</a> — leva 30 segundos.</span></div>"
+              : "") +
+          "</div>" +
+        "</main>" +
+      "</div>"
+    );
+  }
+
+  function bindLogin() {
+    var form = $("#form-login");
+    if (!form) return;
+    var reveal = $("[data-reveal]", form);
+    if (reveal) reveal.addEventListener("click", function () {
+      var input = $("#login-password");
+      var show = input.type === "password";
+      input.type = show ? "text" : "password";
+      reveal.innerHTML = Icons.icon(show ? "eyeOff" : "eye", 17);
+      reveal.setAttribute("aria-label", show ? "Ocultar senha" : "Mostrar senha");
+    });
+
+    form.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      clearErrors(form);
+      var payload = { email: val(form, "email"), password: val(form, "password") };
+      var check = core.validateLogin(payload);
+      if (!check.valid) return showErrors(form, check.errors);
+
+      var button = $("#login-submit");
+      setBusy(button, true, "Entrando...");
+      try {
+        var account = await store.login(payload.email, payload.password);
+        toast("Que bom te ver, " + account.name.split(" ")[0] + "!", "success", "Login realizado");
+        go("perfil");
+        render();
+        setTimeout(function () { window.scrollTo({ top: 0, behavior: "smooth" }); }, 60);
+      } catch (err) {
+        showErrors(form, err.fields || {});
+        if (!err.fields) toast(err.message, "error");
+      } finally {
+        setBusy(button, false);
+      }
+    });
+  }
+
+  /* ================================ CADASTRO ================================ */
+
+  function signupView() {
+    return (
+      '<div class="shell">' + brandPanel() +
+        '<main class="panel">' +
+          '<div class="card">' +
+            '<div class="card-head">' +
+              "<h2>Criar sua conta</h2>" +
+              "<p>Leva menos de um minuto. A foto você adiciona depois, no perfil.</p>" +
+            "</div>" +
+            '<form class="form" id="form-signup" novalidate autocomplete="on">' +
+              '<div class="field">' +
+                '<label for="su-name">Nome completo</label>' +
+                '<div class="control">' + Icons.icon("user", 17) +
+                  '<input id="su-name" name="name" autocomplete="name" placeholder="Ana Beatriz Lopes" required>' +
+                "</div>" +
+                '<span class="error-slot" data-error="name"></span>' +
+              "</div>" +
+              '<div class="field">' +
+                '<label for="su-email">E-mail</label>' +
+                '<div class="control">' + Icons.icon("mail", 17) +
+                  '<input id="su-email" name="email" type="email" autocomplete="email" placeholder="voce@email.com" required>' +
+                  '<span class="field-check" data-email-check></span>' +
+                "</div>" +
+                '<span class="error-slot" data-error="email"></span>' +
+              "</div>" +
+              '<div class="grid-2">' +
+                '<div class="field">' +
+                  '<label for="su-phone">Telefone <span class="opt">(opcional)</span></label>' +
+                  '<div class="control">' + Icons.icon("phone", 17) +
+                    '<input id="su-phone" name="phone" inputmode="tel" autocomplete="tel" placeholder="(31) 99999-8888">' +
+                  "</div>" +
+                  '<span class="error-slot" data-error="phone"></span>' +
+                "</div>" +
+                '<div class="field">' +
+                  '<label for="su-document">CPF <span class="opt">(opcional)</span></label>' +
+                  '<div class="control">' + Icons.icon("id", 17) +
+                    '<input id="su-document" name="document" inputmode="numeric" placeholder="000.000.000-00">' +
+                  "</div>" +
+                  '<span class="error-slot" data-error="document"></span>' +
+                "</div>" +
+              "</div>" +
+              '<div class="field">' +
+                '<label for="su-password">Senha</label>' +
+                '<div class="control">' + Icons.icon("lock", 17) +
+                  '<input id="su-password" name="password" type="password" autocomplete="new-password" placeholder="Mínimo 8 caracteres com número" required>' +
+                  '<button class="reveal" type="button" data-reveal="su-password" aria-label="Mostrar senha">' + Icons.icon("eye", 17) + "</button>" +
+                "</div>" +
+                '<div class="strength" data-strength><span></span><span></span><span></span><span></span></div>' +
+                '<span class="strength-label" data-strength-label></span>' +
+                '<span class="error-slot" data-error="password"></span>' +
+              "</div>" +
+              '<div class="field">' +
+                '<label for="su-password-confirm">Confirmar senha</label>' +
+                '<div class="control">' + Icons.icon("lock", 17) +
+                  '<input id="su-password-confirm" name="passwordConfirm" type="password" autocomplete="new-password" placeholder="Repita a senha" required>' +
+                  '<span class="field-check" data-match-check></span>' +
+                "</div>" +
+                '<span class="error-slot" data-error="passwordConfirm"></span>' +
+              "</div>" +
+              '<button class="btn btn-primary btn-block" type="submit" id="signup-submit">Criar conta</button>' +
+            "</form>" +
+            '<div class="card-foot">Já tem conta? <a href="#login">Entrar</a></div>' +
+          "</div>" +
+        "</main>" +
+      "</div>"
+    );
+  }
+
+  function bindSignup() {
+    var form = $("#form-signup");
+    if (!form) return;
+
+    maskInput($("#su-phone"), core.formatPhone);
+    maskInput($("#su-document"), core.formatCPF);
+
+    $$("[data-reveal]", form).forEach(function (button) {
+      button.addEventListener("click", function () {
+        var input = $("#" + button.dataset.reveal);
+        var show = input.type === "password";
+        input.type = show ? "text" : "password";
+        button.innerHTML = Icons.icon(show ? "eyeOff" : "eye", 17);
+      });
+    });
+
+    var email = $("#su-email");
+    email.addEventListener("input", function () {
+      var status = core.emailStatus(email.value, store.listEmails());
+      var slot = $("[data-email-check]");
+      slot.className = "field-check " + (status.state === "ok" ? "ok" : status.state === "taken" ? "bad" : "");
+      slot.innerHTML = status.state === "ok" ? Icons.icon("check", 15) : status.state === "taken" ? Icons.icon("xCircle", 15) : "";
+      setError(form, "email", status.state === "taken" ? status.message : "");
+    });
+
+    var password = $("#su-password");
+    password.addEventListener("input", function () {
+      var score = core.passwordScore(password.value);
+      var bar = $("[data-strength]");
+      bar.dataset.score = String(score);
+      $("[data-strength-label]").textContent = password.value ? core.passwordLabel(score) : "";
+      if (val(form, "passwordConfirm")) checkMatch();
+    });
+
+    function checkMatch() {
+      var slot = $("[data-match-check]");
+      var same = val(form, "passwordConfirm") && val(form, "password") === val(form, "passwordConfirm");
+      slot.className = "field-check " + (same ? "ok" : "");
+      slot.innerHTML = same ? Icons.icon("check", 15) : "";
+      if (same) setError(form, "passwordConfirm", "");
+    }
+    $("#su-password-confirm").addEventListener("input", checkMatch);
+
+    form.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      clearErrors(form);
+      var payload = {
+        name: val(form, "name"),
+        email: val(form, "email"),
+        phone: val(form, "phone"),
+        document: val(form, "document"),
+        password: val(form, "password"),
+        passwordConfirm: val(form, "passwordConfirm")
+      };
+      var check = core.validateSignup(payload, store.listEmails());
+      if (!check.valid) return showErrors(form, check.errors);
+
+      var button = $("#signup-submit");
+      setBusy(button, true, "Criando sua conta...");
+      try {
+        var account = await store.signup(payload);
+        toast("Conta criada com sucesso. Bem-vinda, " + account.name.split(" ")[0] + "!", "success");
+        go("perfil");
+        render();
+      } catch (err) {
+        showErrors(form, err.fields || {});
+        if (!err.fields) toast(err.message, "error");
+      } finally {
+        setBusy(button, false);
+      }
+    });
+  }
+
+  /* ================================ PERFIL ================================ */
+
+  function profileView(account) {
+    var age = core.ageFromBirthDate(account.birthDate);
+    var memberSince = core.formatDateBR(account.createdAt);
+    var lastLogin = account.lastLoginAt ? core.relativeTime(account.lastLoginAt) : "agora";
+    var driverLabel = store.driver() === "indexeddb" ? "IndexedDB" : store.driver() === "localstorage" ? "Armazenamento local" : "Memória (temporário)";
+
+    return (
+      '<div class="app">' +
+        '<header class="topbar">' +
+          '<div class="topbar-brand"><span class="brand-mark sm">P</span><span>Palco</span></div>' +
+          '<div class="topbar-right">' +
+            '<span class="save-chip" id="save-chip">' + Icons.icon("check", 14) + "<span>Tudo salvo</span></span>" +
+            '<button class="icon-btn" data-theme-toggle type="button"></button>' +
+            '<div class="account-chip">' + avatarMarkup(account, "sm") +
+              '<div class="account-chip-text"><strong>' + esc(account.name.split(" ")[0]) + "</strong><span>" + esc(account.email) + "</span></div>" +
+            "</div>" +
+            '<button class="btn btn-ghost btn-sm" id="logout-btn" type="button">' + Icons.icon("logout", 16) + "<span>Sair</span></button>" +
+          "</div>" +
+        "</header>" +
+
+        '<main class="view">' +
+          '<section class="hero">' +
+            '<div class="hero-left">' +
+              '<div class="photo-block">' +
+                '<div id="photo-preview">' + avatarMarkup(account, "xl") + "</div>" +
+                '<button class="photo-badge" id="photo-pick" type="button" title="Trocar foto">' + Icons.icon("camera", 16) + "</button>" +
+                '<input type="file" id="photo-file" accept="image/jpeg,image/png,image/webp" hidden>' +
+              "</div>" +
+              "<div class=\"hero-info\">" +
+                "<h1>" + esc(account.name) + "</h1>" +
+                '<p class="hero-email">' + esc(account.email) + "</p>" +
+                '<div class="chips">' +
+                  '<span class="chip">' + Icons.icon("calendar", 13) + " Conta criada em " + esc(memberSince) + "</span>" +
+                  (age !== null ? '<span class="chip">' + Icons.icon("user", 13) + " " + age + " anos</span>" : "") +
+                  (account.city ? '<span class="chip">' + Icons.icon("pin", 13) + " " + esc(account.city) + "</span>" : "") +
+                "</div>" +
+              "</div>" +
+            "</div>" +
+            '<div class="hero-actions">' +
+              '<button class="btn btn-primary" id="photo-pick-2" type="button">' + Icons.icon("camera", 16) + " Trocar foto</button>" +
+              '<button class="btn btn-outline" id="photo-remove" type="button"' + (account.avatar ? "" : " disabled") + ">Remover</button>" +
+            "</div>" +
+          "</section>" +
+
+          '<div class="layout">' +
+            '<section class="col-main">' +
+              /* ----- foto ----- */
+              '<article class="card">' +
+                '<div class="card-title">' + Icons.icon("camera", 17) + "<h2>Foto do perfil</h2>" +
+                  (account.photoUpdatedAt ? '<span class="badge-soft">atualizada ' + esc(core.relativeTime(account.photoUpdatedAt)) + "</span>" : "") +
+                "</div>" +
+                '<div class="card-body">' +
+                  '<div class="dropzone" id="photo-drop" tabindex="0" role="button" aria-label="Enviar foto">' +
+                    Icons.icon("upload", 22) +
+                    "<strong>Arraste uma foto ou clique para escolher</strong>" +
+                    '<span>JPG, PNG ou WEBP · até 15 MB · ajustamos para 512 px automaticamente</span>' +
+                    '<span class="photo-hint" id="photo-hint">Sua foto fica salva neste disposivo e aparece ao entrar.</span>' +
+                  "</div>" +
+                  '<div class="photo-actions hidden" id="photo-actions">' +
+                    '<button class="btn btn-primary" id="photo-save" type="button">' + Icons.icon("check", 16) + " Salvar foto</button>" +
+                    '<button class="btn btn-ghost" id="photo-cancel" type="button">Cancelar</button>' +
+                  "</div>" +
+                "</div>" +
+              "</article>" +
+
+              /* ----- dados ----- */
+              '<article class="card">' +
+                '<div class="card-title">' + Icons.icon("user", 17) + "<h2>Seus dados</h2></div>" +
+                '<div class="card-body">' +
+                  '<form class="form" id="form-profile" novalidate>' +
+                    '<div class="grid-2">' +
+                      field("Nome completo", "name", account.name, "text", "user") +
+                      field("E-mail", "email", account.email, "email", "mail") +
+                    "</div>" +
+                    '<div class="grid-2">' +
+                      field("Telefone", "phone", account.phone ? core.formatPhone(account.phone) : "", "tel", "phone") +
+                      field("CPF", "document", account.document ? core.formatCPF(account.document) : "", "text", "id") +
+                    "</div>" +
+                    '<div class="grid-2">' +
+                      field("Data de nascimento", "birthDate", account.birthDate || "", "date", "calendar") +
+                      field("Cidade", "city", account.city || "", "text", "pin") +
+                    "</div>" +
+                    '<div class="field">' +
+                      '<label for="pf-bio">Sobre você <span class="opt">(opcional)</span></label>' +
+                      '<textarea id="pf-bio" name="bio" maxlength="300" placeholder="Uma frase sobre você...">' + esc(account.bio || "") + "</textarea>" +
+                      '<span class="counter" data-bio-counter>' + (account.bio || "").length + "/300</span>" +
+                    "</div>" +
+                    '<div class="form-actions">' +
+                      '<button class="btn btn-primary" type="submit" id="profile-submit">Salvar alterações</button>' +
+                      '<button class="btn btn-ghost" type="reset" id="profile-reset">Desfazer</button>' +
+                    "</div>" +
+                  "</form>" +
+                "</div>" +
+              "</article>" +
+            "</section>" +
+
+            '<aside class="col-side">' +
+              /* ----- sessão ----- */
+              '<article class="card">' +
+                '<div class="card-title">' + Icons.icon("shield", 17) + "<h2>Sessão e segurança</h2></div>" +
+                '<div class="card-body stack">' +
+                  '<div class="kv"><span>Último acesso</span><strong>' + esc(lastLogin) + "</strong></div>" +
+                  '<div class="kv"><span>Sessão válida por</span><strong>24 horas</strong></div>' +
+                  '<div class="kv"><span>Onde os dados ficam</span><strong>' + esc(driverLabel) + "</strong></div>" +
+                  '<div class="kv"><span>Espaço usado</span><strong>' + esc(store.storageEstimate()) + "</strong></div>" +
+                  '<button class="btn btn-outline btn-block" id="open-password" type="button">' + Icons.icon("lock", 16) + " Alterar senha</button>" +
+                  '<button class="btn btn-ghost btn-block" id="logout-btn-2" type="button">' + Icons.icon("logout", 16) + " Sair da conta</button>" +
+                "</div>" +
+              "</article>" +
+
+              /* ----- senha ----- */
+              '<article class="card hidden" id="password-card">' +
+                '<div class="card-title">' + Icons.icon("lock", 17) + "<h2>Alterar senha</h2></div>" +
+                '<div class="card-body">' +
+                  '<form class="form" id="form-password" novalidate>' +
+                    field("Senha atual", "currentPassword", "", "password", "lock") +
+                    '<div class="field">' +
+                      '<label for="np">Nova senha</label>' +
+                      '<div class="control">' + Icons.icon("lock", 17) +
+                        '<input id="np" name="newPassword" type="password" autocomplete="new-password" placeholder="Mínimo 8 caracteres com número">' +
+                      "</div>" +
+                      '<div class="strength" data-strength><span></span><span></span><span></span><span></span></div>' +
+                      '<span class="error-slot" data-error="newPassword"></span>' +
+                    "</div>" +
+                    field("Confirmar nova senha", "confirmPassword", "", "password", "lock") +
+                    '<div class="form-actions">' +
+                      '<button class="btn btn-primary" type="submit">Salvar nova senha</button>' +
+                      '<button class="btn btn-ghost" type="button" id="close-password">Cancelar</button>' +
+                    "</div>" +
+                  "</form>" +
+                "</div>" +
+              "</article>" +
+
+              /* ----- conta ----- */
+              '<article class="card">' +
+                '<div class="card-title">' + Icons.icon("info", 17) + "<h2>Sobre sua conta</h2></div>" +
+                '<div class="card-body stack">' +
+                  '<div class="kv"><span>Contas neste navegador</span><strong>' + store.accountCount() + "</strong></div>" +
+                  '<div class="kv"><span>Criptografia</span><strong>' + (store.hasSupport() ? "Web Crypto" : "Compatível") + "</strong></div>" +
+                  '<p class="tiny muted">Seus dados não saem deste aparelho. Limpar os dados do navegador apaga a conta.</p>' +
+                  '<button class="btn btn-danger-ghost btn-block" id="delete-account" type="button">' + Icons.icon("trash", 15) + " Excluir minha conta</button>" +
+                "</div>" +
+              "</article>" +
+            "</aside>" +
+          "</div>" +
+        "</main>" +
+      "</div>"
+    );
+  }
+
+  function field(label, name, value, type, icon) {
+    return (
+      '<div class="field">' +
+        '<label for="pf-' + name + '">' + esc(label) + "</label>" +
+        '<div class="control">' + Icons.icon(icon || "user", 17) +
+          '<input id="pf-' + name + '" name="' + name + '" type="' + (type || "text") + '" value="' + esc(value || "") + '">' +
+        "</div>" +
+        '<span class="error-slot" data-error="' + name + '"></span>' +
+      "</div>"
+    );
+  }
+
+  function bindProfile() {
+    var account = store.currentAccount();
+    var form = $("#form-profile");
+    var drop = $("#photo-drop");
+    var fileInput = $("#photo-file");
+
+    function openPicker() { fileInput.click(); }
+    $("#photo-pick").addEventListener("click", openPicker);
+    $("#photo-pick-2").addEventListener("click", openPicker);
+    fileInput.addEventListener("change", function () {
+      if (fileInput.files && fileInput.files[0]) handlePhotoFile(fileInput.files[0]);
+      fileInput.value = "";
+    });
+
+    drop.addEventListener("click", openPicker);
+    drop.addEventListener("keydown", function (event) {
+      if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openPicker(); }
+    });
+    ["dragenter", "dragover"].forEach(function (name) {
+      drop.addEventListener(name, function (event) { event.preventDefault(); drop.classList.add("drag"); });
+    });
+    ["dragleave", "drop"].forEach(function (name) {
+      drop.addEventListener(name, function (event) { event.preventDefault(); drop.classList.remove("drag"); });
+    });
+    drop.addEventListener("drop", function (event) {
+      var file = event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0];
+      if (file) handlePhotoFile(file);
+    });
+
+    $("#photo-save").addEventListener("click", async function () {
+      if (!pendingPhoto) return;
+      var button = $("#photo-save");
+      setBusy(button, true, "Salvando...");
+      try {
+        var result = await store.savePhoto(pendingPhoto);
+        if (!result.saved) throw new Error("Não conseguimos confirmar a gravação. Tente novamente.");
+        pendingPhoto = null;
+        toast("Sua foto foi salva e vai aparecer quando você voltar.", "success", "Foto atualizada");
+        render();
+      } catch (err) {
+        toast(err.message, "error", "Erro ao salvar a foto");
+        setBusy(button, false);
+      }
+    });
+
+    $("#photo-cancel").addEventListener("click", function () {
+      pendingPhoto = null;
+      $("#photo-preview").innerHTML = avatarMarkup(store.currentAccount(), "xl");
+      $("#photo-actions").classList.add("hidden");
+      $("#photo-hint").textContent = "Sua foto fica salva neste disposivo e aparece ao entrar.";
+    });
+
+    $("#photo-remove").addEventListener("click", async function () {
+      if (!store.currentAccount().avatar) return;
+      await store.clearPhoto();
+      toast("Foto removida.", "success");
+      render();
+    });
+
+    // Máscaras e contador
+    maskInput($("#pf-phone"), core.formatPhone);
+    maskInput($("#pf-document"), core.formatCPF);
+    var bio = $("#pf-bio");
+    bio.addEventListener("input", function () {
+      var counter = $("[data-bio-counter]");
+      if (counter) counter.textContent = bio.value.length + "/300";
+    });
+
+    form.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      clearErrors(form);
+      var button = $("#profile-submit");
+      setBusy(button, true, "Salvando...");
+      try {
+        await store.updateProfile({
+          name: val(form, "name"),
+          email: val(form, "email"),
+          phone: val(form, "phone"),
+          document: val(form, "document"),
+          birthDate: val(form, "birthDate"),
+          city: val(form, "city"),
+          bio: val(form, "bio")
+        });
+        flashSaved();
+        toast("Dados atualizados.", "success");
+        render();
+      } catch (err) {
+        showErrors(form, err.fields || {});
+        if (!err.fields) toast(err.message, "error");
+      } finally {
+        setBusy(button, false);
+      }
+    });
+
+    $("#profile-reset").addEventListener("click", function () {
+      setTimeout(function () { render(); }, 10);
+    });
+
+    // Senha
+    var passwordCard = $("#password-card");
+    $("#open-password").addEventListener("click", function () {
+      passwordCard.classList.remove("hidden");
+      reveal(passwordCard);
+      $("#form-password [name='currentPassword']").focus();
+    });
+    $("#close-password").addEventListener("click", function () { passwordCard.classList.add("hidden"); });
+
+    var newPassword = $("#np");
+    newPassword.addEventListener("input", function () {
+      var bar = passwordCard.querySelector("[data-strength]");
+      bar.dataset.score = String(core.passwordScore(newPassword.value));
+    });
+
+    $("#form-password").addEventListener("submit", async function (event) {
+      event.preventDefault();
+      var pwdForm = event.target;
+      clearErrors(pwdForm);
+      try {
+        await store.changePassword(
+          val(pwdForm, "currentPassword"),
+          val(pwdForm, "newPassword"),
+          val(pwdForm, "confirmPassword")
+        );
+        pwdForm.reset();
+        passwordCard.classList.add("hidden");
+        toast("Sua nova senha já está valendo.", "success", "Senha alterada");
+      } catch (err) {
+        showErrors(pwdForm, err.fields || {});
+        if (!err.fields) toast(err.message, "error");
+      }
+    });
+
+    // Sair
+    ["#logout-btn", "#logout-btn-2"].forEach(function (selector) {
+      var btn = $(selector);
+      if (btn) btn.addEventListener("click", doLogout);
+    });
+
+    // Excluir conta
+    $("#delete-account").addEventListener("click", async function () {
+      var passwordCardNode = passwordCard;
+      passwordCardNode.classList.remove("hidden");
+      reveal(passwordCardNode);
+      var confirmInput = pwdFormDelete();
+      if (!confirmInput) return;
+    });
+
+    function pwdFormDelete() {
+      if ($("#delete-confirm")) return $("#delete-confirm");
+      var body = passwordCard.querySelector(".card-body");
+      var box = document.createElement("div");
+      box.className = "danger-box";
+      box.innerHTML =
+        "<p><strong>Excluir a conta apaga seus dados deste navegador.</strong> Não há como desfazer.</p>" +
+        '<div class="control">' + Icons.icon("lock", 17) +
+        '<input id="delete-confirm" type="password" placeholder="Digite sua senha para confirmar">' +
+        "</div>" +
+        '<span class="error-slot" data-error="password"></span>' +
+        '<div class="form-actions"><button class="btn btn-danger" type="button" id="delete-go">Excluir definitivamente</button>' +
+        '<button class="btn btn-ghost" type="button" id="delete-cancel">Cancelar</button></div>';
+      body.appendChild(box);
+      $("#delete-cancel").addEventListener("click", function () { box.remove(); });
+      $("#delete-go").addEventListener("click", async function () {
+        try {
+          await store.deleteAccount($("#delete-confirm").value);
+          toast("Conta excluída deste navegador.", "success");
+          go("login");
+          render();
+        } catch (err) {
+          showErrors(box, err.fields || {});
+          if (!err.fields) toast(err.message, "error");
+        }
+      });
+      return $("#delete-confirm");
+    }
+
+    // Chip "tudo salvo" reflete a última gravação
+    var unsub = store.subscribe(function () {
+      if (photoState.saved) flashSaved();
+    });
+    void unsub;
+    void account;
+  }
+
+  var saveTimer = null;
+  function flashSaved() {
+    var chip = $("#save-chip");
+    if (!chip) return;
+    chip.classList.add("pulse");
+    chip.innerHTML = Icons.icon("check", 14) + "<span>Salvo agora</span>";
+    photoState.saved = true;
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(function () {
+      if (!chip) return;
+      chip.classList.remove("pulse");
+      chip.innerHTML = Icons.icon("check", 14) + "<span>Tudo salvo</span>";
+    }, 2600);
+  }
+
+  async function doLogout() {
+    await store.logout();
+    pendingPhoto = null;
+    toast("Você saiu. Seus dados continuam salvos.", "success", "Até logo");
+    go("login");
+    render();
+  }
+
+  /* ================================ BOOT ================================ */
+
+  async function boot() {
+    bootChrome();
+    db = lib.createDB();
+    await db.init();
+    store = lib.createStore({ db: db, hash: hash, core: core, crypto: window.crypto });
+
+    try {
+      await store.load();
+    } catch (err) {
+      toast("Não conseguimos acessar o armazenamento do navegador.", "error");
+    }
+
+    window.addEventListener("hashchange", render);
+    document.addEventListener("click", function (event) {
+      var toggle = event.target.closest ? event.target.closest("[data-theme-toggle]") : null;
+      if (toggle) { toggleTheme(); return; }
+      var link = event.target.closest ? event.target.closest('a[href^="#"]') : null;
+      if (link) {
+        event.preventDefault();
+        go(link.getAttribute("href").slice(1));
+      }
+    });
+
+    render();
+    document.body.removeAttribute("data-booting");
+
+    // Garante que a interface reflita mudanças de outra aba
+    window.addEventListener("storage", async function (event) {
+      if (event.key && event.key.indexOf("conta:") === 0) {
+        await store.load();
+        render();
+      }
+    });
+    void sleep;
+  }
+
+  window.App = {
+    boot: boot,
+    render: render,
+    store: function () { return store; },
+    go: go
+  };
+
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
+  else boot();
+})();
+
+</script>
+</body>
+</html>
