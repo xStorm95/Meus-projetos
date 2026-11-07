@@ -13,6 +13,8 @@ coverage/
 next-env.d.ts
 tsconfig.tsbuildinfo
 /backups/*.sql
+# bundle gerado pelo web/build.js (web/palco.html é o arquivo publicado)
+web/dist/
 /backups/*.sql.gz
 /public/uploads/*
 !/public/uploads/.gitkeep

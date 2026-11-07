@@ -15,6 +15,29 @@ PostgreSQL + Drizzle ORM · Zod · Recharts · Vitest
 
 ---
 
+---
+
+## 0. Palco — versão em arquivo único (HTML)
+
+Além do ERP completo em Next.js, o repositório traz o **Palco**: a mesma proposta
+de ERP de moda empacotada em **um único arquivo HTML** com cadastro/login reais,
+perfil com foto e persistência no dispositivo — sem servidor, sem build e
+funcionando offline.
+
+**Arquivo para baixar/publicar:** [`web/palco.html`](web/palco.html) (~217 KB)
+
+- Senhas com PBKDF2-HMAC-SHA256 (210 mil iterações) validado contra `node:crypto`
+- Sessão que sobrevive a fechar o navegador
+- Dados em IndexedDB com espelho em localStorage
+- 40 testes automatizados (39 de lógica + 1 de navegador via jsdom)
+
+```bash
+npm run web:build   # gera web/palco.html
+npm run web:test    # roda os testes do app offline
+```
+
+Detalhes, limites e atalhos: [`web/README.md`](web/README.md).
+
 ## 1. Rodar localmente
 
 Pré-requisitos: **Node.js 20+** e um PostgreSQL 14+ (o projeto inclui um
