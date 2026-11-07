@@ -78,6 +78,9 @@
         accent: "gold",
         theme: "light",
         lowStockThreshold: 3,
+        accessHash: "",
+        passwordChanged: false,
+        profile: null,
         createdAt: now()
       };
     }
@@ -111,10 +114,8 @@
       // Restaura a sessão se ainda for válida — é isto que mantém o usuário
       // logado depois de fechar o navegador.
       if (state.session && state.session.expiresAt && new Date(state.session.expiresAt).getTime() > Date.now()) {
-        currentUser = state.users.find(function (u) {
-          return u.id === state.session.userId;
-        }) || null;
-        if (!currentUser) state.session = null;
+        currentUser = state.settings.profile || defaultProfile();
+        if (!currentUser || currentUser.id !== state.session.userId) currentUser = state.settings.profile || defaultProfile();
       } else if (state.session) {
         state.session = null;
         await db.set(KEYS.session, null);
@@ -129,43 +130,61 @@
 
     /* ---------------------------- AUTH ---------------------------- */
 
-    async function signup(payload) {
+    /**
+     * Acesso por senha única (sem cadastro, sem e-mail).
+     * A senha fica guardada como hash; o perfil do operador guarda nome e foto.
+     */
+    async function loginWithPassword(password) {
       await ensureLoaded();
-      var validation = core.validateSignup(payload, state.users);
-      if (!validation.valid) {
-        var err = new Error("Dados inválidos");
-        err.fields = validation.errors;
-        throw err;
+      var settings = state.settings || defaultSettings();
+      var passwordHash = settings.accessHash;
+      var hashToCheck = passwordHash;
+      var matchesDefault = matchesBuiltinPassword(password);
+      if (!passwordHash) {
+        // Primeiro acesso de um banco antigo/limpo: aceita a senha padrão e grava o hash.
+        if (!matchesDefault) return false;
+        settings.accessHash = await hash.hashPassword(password);
+        settings.updatedAt = now();
+        state.settings = settings;
+        await db.set(KEYS.settings, state.settings);
+      } else {
+        var valid = await hash.verifyPassword(password, hashToCheck);
+        if (!valid && matchesDefault && !settings.passwordChanged) {
+          valid = true;
+        }
+        if (!valid) return false;
       }
-      var isFirst = state.users.length === 0;
-      var passwordHash = await hash.hashPassword(payload.password);
-      var user = {
-        id: uid(),
-        name: String(payload.name).trim(),
-        email: String(payload.email).trim().toLowerCase(),
-        passwordHash: passwordHash,
-        role: isFirst ? "admin" : "membro",
-        document: payload.document ? core.onlyDigits(payload.document) : "",
-        phone: payload.phone ? core.onlyDigits(payload.phone) : "",
-        birthDate: payload.birthDate || "",
-        city: payload.city || "",
+      var profile = state.settings.profile || defaultProfile();
+      profile.lastLoginAt = now();
+      state.settings.profile = profile;
+      state.settings.updatedAt = now();
+      await db.set(KEYS.settings, state.settings);
+      await startSession(profile);
+      emit();
+      return true;
+    }
+
+    /** Senha padrão de fábrica (usada apenas enquanto ninguém a trocou). */
+    function matchesBuiltinPassword(password) {
+      var value = String(password || "");
+      return value === "admin123" || value === "admin";
+    }
+
+    function defaultProfile() {
+      return {
+        id: "operador",
+        name: "Administrador",
+        email: "",
+        role: "admin",
+        document: "",
+        phone: "",
+        birthDate: "",
+        city: "",
         bio: "",
         avatar: "",
-        failedAttempts: 0,
-        lockedUntil: null,
-        lastLoginAt: null,
         createdAt: now(),
-        updatedAt: now()
+        lastLoginAt: null
       };
-      state.users = state.users.concat([user]);
-      await db.set(KEYS.users, state.users);
-      if (isFirst && !state.settings.ownerName) {
-        state.settings.ownerName = user.name;
-        await db.set(KEYS.settings, state.settings);
-      }
-      await startSession(user);
-      emit();
-      return publicUser(user);
     }
 
     async function startSession(user) {
@@ -178,56 +197,6 @@
       state.session = session;
       currentUser = user;
       await db.set(KEYS.session, session);
-    }
-
-    async function login(email, password) {
-      await ensureLoaded();
-      var target = String(email || "").trim().toLowerCase();
-      var user = state.users.find(function (u) {
-        return String(u.email || "").toLowerCase() === target;
-      });
-      if (!user) {
-        var notFound = new Error("E-mail ou senha incorretos.");
-        notFound.code = "INVALID";
-        throw notFound;
-      }
-      if (core.isLocked(user)) {
-        var locked = new Error(
-          "Conta temporariamente bloqueada por tentativas inválidas. Tente novamente em alguns minutos."
-        );
-        locked.code = "LOCKED";
-        throw locked;
-      }
-      var ok = await hash.verifyPassword(password, user.passwordHash);
-      if (!ok) {
-        var attempt = core.registerFailedAttempt(user);
-        user.failedAttempts = attempt.failedAttempts;
-        user.lockedUntil = attempt.lockedUntil;
-        user.updatedAt = now();
-        state.users = state.users.map(function (u) {
-          return u.id === user.id ? user : u;
-        });
-        await db.set(KEYS.users, state.users);
-        var invalid = new Error(
-          user.lockedUntil
-            ? "Muitas tentativas inválidas. A conta ficou bloqueada por 15 minutos."
-            : "E-mail ou senha incorretos."
-        );
-        invalid.code = "INVALID";
-        throw invalid;
-      }
-      var reset = core.resetAttempts();
-      user.failedAttempts = reset.failedAttempts;
-      user.lockedUntil = reset.lockedUntil;
-      user.lastLoginAt = now();
-      user.updatedAt = now();
-      state.users = state.users.map(function (u) {
-        return u.id === user.id ? user : u;
-      });
-      await db.set(KEYS.users, state.users);
-      await startSession(user);
-      emit();
-      return publicUser(user);
     }
 
     async function logout() {
@@ -264,13 +233,9 @@
       if (!currentUser) throw new Error("Sessão expirada. Faça login novamente.");
       var errors = {};
       var name = patch.name !== undefined ? String(patch.name).trim() : currentUser.name;
-      if (name.length < 3) errors.name = "Informe seu nome completo.";
+      if (name.length < 2) errors.name = "Informe seu nome.";
       var email = patch.email !== undefined ? String(patch.email).trim().toLowerCase() : currentUser.email;
-      if (!core.isValidEmail(email)) errors.email = "E-mail inválido.";
-      var duplicated = state.users.some(function (u) {
-        return u.id !== currentUser.id && String(u.email).toLowerCase() === email;
-      });
-      if (duplicated) errors.email = "Este e-mail já pertence a outra conta.";
+      if (email && !core.isValidEmail(email)) errors.email = "E-mail inválido.";
       if (patch.document) {
         var digits = core.onlyDigits(patch.document);
         if (digits.length === 11 && !core.isValidCPF(digits)) errors.document = "CPF inválido.";
@@ -292,20 +257,21 @@
         avatar: patch.avatar !== undefined ? patch.avatar : currentUser.avatar,
         updatedAt: now()
       });
-      state.users = state.users.map(function (u) {
-        return u.id === updated.id ? updated : u;
-      });
       currentUser = updated;
-      await db.set(KEYS.users, state.users);
+      state.settings.profile = updated;
+      if (patch.avatar !== undefined) state.settings.avatarUpdatedAt = now();
+      state.settings.updatedAt = now();
+      await db.set(KEYS.settings, state.settings);
       emit();
       return publicUser(updated);
     }
 
+    /** Troca a senha de acesso (não existe conta por e-mail). */
     async function changePassword(currentPassword, newPassword) {
       await ensureLoaded();
-      if (!currentUser) throw new Error("Sessão expirada.");
-      var ok = await hash.verifyPassword(currentPassword, currentUser.passwordHash);
-      if (!ok) {
+      var stored = state.settings.accessHash;
+      var valid = stored ? await hash.verifyPassword(currentPassword, stored) : matchesBuiltinPassword(currentPassword);
+      if (!valid) {
         var err = new Error("A senha atual está incorreta.");
         err.fields = { currentPassword: "Senha atual incorreta." };
         throw err;
@@ -316,13 +282,10 @@
         weak.fields = { newPassword: strength };
         throw weak;
       }
-      var newHash = await hash.hashPassword(newPassword);
-      var updated = Object.assign({}, currentUser, { passwordHash: newHash, updatedAt: now() });
-      state.users = state.users.map(function (u) {
-        return u.id === updated.id ? updated : u;
-      });
-      currentUser = updated;
-      await db.set(KEYS.users, state.users);
+      state.settings.accessHash = await hash.hashPassword(newPassword);
+      state.settings.passwordChanged = true;
+      state.settings.updatedAt = now();
+      await db.set(KEYS.settings, state.settings);
       emit();
       return true;
     }
@@ -764,11 +727,14 @@
 
     async function exportAll() {
       await ensureLoaded();
+      // Nunca exporta o hash da senha de acesso.
+      var safeSettings = Object.assign({}, state.settings);
+      delete safeSettings.accessHash;
       return {
         app: "Passarela ERP",
         exportedAt: now(),
         version: 1,
-        settings: state.settings,
+        settings: safeSettings,
         // A senha NUNCA sai no export (apenas hash não exportado)
         users: state.users.map(function (u) {
           var copy = Object.assign({}, u);
@@ -782,15 +748,34 @@
       };
     }
 
+    /** Volta a senha de acesso para a padrão (admin123). */
+    async function resetPassword() {
+      await ensureLoaded();
+      state.settings.accessHash = await hash.hashPassword("admin123");
+      state.settings.passwordChanged = false;
+      state.settings.updatedAt = now();
+      await db.set(KEYS.settings, state.settings);
+      emit();
+      return true;
+    }
+
     async function wipeData() {
       await db.clearAll();
+      var keepSettings = Object.assign({}, defaultSettings(), {
+        accessHash: state.settings.accessHash,
+        passwordChanged: state.settings.passwordChanged,
+        profile: state.settings.profile,
+        storeName: state.settings.storeName,
+        accent: state.settings.accent,
+        theme: state.settings.theme
+      });
       state = {
         users: [],
         products: [],
         customers: [],
         sales: [],
         expenses: [],
-        settings: defaultSettings(),
+        settings: keepSettings,
         session: null
       };
       currentUser = null;
@@ -810,8 +795,8 @@
       isAuthenticated: function () {
         return Boolean(currentUser);
       },
-      signup: signup,
-      login: login,
+      loginWithPassword: loginWithPassword,
+      resetPassword: resetPassword,
       logout: logout,
       updateProfile: updateProfile,
       changePassword: changePassword,

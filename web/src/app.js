@@ -94,6 +94,13 @@
 
   /* ============================== AUTH ============================== */
 
+  /* ============================== ACESSO ============================== */
+
+  /** Senha única de acesso (sem cadastro, sem e-mail). */
+  var ACCESS_PASSWORD = "admin123";
+  var ACCESS_ALT = "admin";
+  var SESSION_HOURS = 12;
+
   function authView() {
     return (
       '<div class="auth-shell">' +
@@ -101,10 +108,10 @@
           '<div class="auth-brand-inner">' +
             '<div class="auth-logo"><span class="auth-logo-mark">P</span> Palco</div>' +
             '<h1 class="auth-headline">Sua loja inteira<br>em um só <em>palco</em>.</h1>' +
-            '<p class="auth-sub">Contas reais, dados salvos no seu dispositivo. Cadastre-se, entre e o sistema lembra de você na próxima visita.</p>' +
+            '<p class="auth-sub">PDV, estoque, clientes, financeiro e relatórios — num único arquivo, funcionando offline.</p>' +
             '<div class="auth-features">' +
-              feature("shield", "Senha protegida com PBKDF2 (210 mil iterações)") +
-              feature("camera", "Foto de perfil personalizada") +
+              feature("shield", "Acesso protegido por senha") +
+              feature("camera", "Foto de perfil salva no aparelho") +
               feature("database", "Produtos, vendas e clientes salvos offline") +
               feature("reports", "Relatórios e backup em CSV") +
             '</div>' +
@@ -113,10 +120,6 @@
         '</aside>' +
         '<section class="auth-panel">' +
           '<div class="auth-card">' +
-            '<div class="auth-tabs" role="tablist">' +
-              '<button class="auth-tab" role="tab" data-authtab="login" aria-selected="true">Entrar</button>' +
-              '<button class="auth-tab" role="tab" data-authtab="signup" aria-selected="false">Criar conta</button>' +
-            '</div>' +
             '<div id="auth-forms"></div>' +
           '</div>' +
         '</section>' +
@@ -131,101 +134,32 @@
   function loginForm() {
     return (
       '<form class="auth-form" id="form-login" novalidate>' +
-        '<div><h2 style="font-family:var(--font-display);font-size:26px;font-weight:500">Bem-vinda de volta</h2>' +
-        '<p class="small muted mt-8">Entre com o e-mail e a senha que você cadastrou.</p></div>' +
-        '<div class="field"><label for="login-email">E-mail</label>' +
-          '<div class="input-group"><span class="icon-left">' + Icons.icon("mail", 16) + "</span>" +
-          '<input class="input" id="login-email" name="email" type="email" autocomplete="email" placeholder="voce@loja.com" required></div>' +
-          '<span class="field-error" data-error="email"></span></div>' +
-        '<div class="field"><label for="login-password">Senha</label>' +
+        '<div><h2 style="font-family:var(--font-display);font-size:26px;font-weight:500">Entrar no Palco</h2>' +
+        '<p class="small muted mt-8">Digite a senha de acesso da loja.</p></div>' +
+        '<div class="field"><label for="login-password">Senha de acesso</label>' +
           '<div class="input-group"><span class="icon-left">' + Icons.icon("lock", 16) + "</span>" +
-          '<input class="input" id="login-password" name="password" type="password" autocomplete="current-password" placeholder="Sua senha" required>' +
+          '<input class="input" id="login-password" name="password" type="password" autocomplete="current-password" placeholder="Sua senha" required autofocus>' +
           '<button class="icon-right" type="button" aria-label="Mostrar senha" data-toggle-password="login-password">' + Icons.icon("eye", 16) + "</button></div>" +
           '<span class="field-error" data-error="password"></span></div>' +
         '<button class="btn btn-primary btn-lg btn-block" type="submit" id="login-submit">Entrar</button>' +
-        '<p class="tiny faint center">Esqueceu a senha? Por segurança não há recuperação automática:<br>os dados são locais. Use uma senha que você lembre.</p>' +
-      "</form>"
-    );
-  }
-
-  function signupForm() {
-    return (
-      '<form class="auth-form" id="form-signup" novalidate>' +
-        '<div><h2 style="font-family:var(--font-display);font-size:26px;font-weight:500">Criar sua conta</h2>' +
-        '<p class="small muted mt-8">A primeira conta criada é a administradora da loja.</p></div>' +
-        '<div class="field"><label for="su-name">Nome completo</label>' +
-          '<input class="input" id="su-name" name="name" autocomplete="name" placeholder="Seu nome" required>' +
-          '<span class="field-error" data-error="name"></span></div>' +
-        '<div class="field"><label for="su-email">E-mail</label>' +
-          '<input class="input" id="su-email" name="email" type="email" autocomplete="email" placeholder="voce@loja.com" required>' +
-          '<span class="field-error" data-error="email"></span></div>' +
-        '<div class="grid grid-2" style="gap:12px">' +
-          '<div class="field"><label for="su-phone">Telefone (opcional)</label>' +
-            '<input class="input" id="su-phone" name="phone" inputmode="tel" placeholder="(31) 99999-8888">' +
-            '<span class="field-error" data-error="phone"></span></div>' +
-          '<div class="field"><label for="su-document">CPF/CNPJ (opcional)</label>' +
-            '<input class="input" id="su-document" name="document" inputmode="numeric" placeholder="000.000.000-00">' +
-            '<span class="field-error" data-error="document"></span></div>' +
-        "</div>" +
-        '<div class="field"><label for="su-password">Senha</label>' +
-          '<div class="input-group"><span class="icon-left">' + Icons.icon("lock", 16) + "</span>" +
-          '<input class="input" id="su-password" name="password" type="password" autocomplete="new-password" placeholder="Mínimo 8 caracteres com número" required>' +
-          '<button class="icon-right" type="button" aria-label="Mostrar senha" data-toggle-password="su-password">' + Icons.icon("eye", 16) + "</button></div>" +
-          '<div class="password-meter" data-meter="su-password" data-score="0"><span></span><span></span><span></span><span></span></div>' +
-          '<span class="field-error" data-error="password"></span></div>' +
-        '<div class="field"><label for="su-password2">Confirmar senha</label>' +
-          '<input class="input" id="su-password2" name="passwordConfirm" type="password" autocomplete="new-password" placeholder="Repita a senha" required>' +
-          '<span class="field-error" data-error="passwordConfirm"></span></div>' +
-        '<button class="btn btn-primary btn-lg btn-block" type="submit" id="signup-submit">Criar conta e entrar</button>' +
-        '<p class="tiny faint center">Ao criar a conta você concorda que os dados ficam salvos neste navegador.</p>' +
+        '<p class="tiny faint center">A senha padrão é <strong>admin123</strong>. Você pode trocá-la em<br>Meu perfil → Segurança.</p>' +
       "</form>"
     );
   }
 
   function bindAuth() {
     var forms = document.getElementById("auth-forms");
-    var mode = aux.authTab || "login";
-
-    function paint() {
-      forms.innerHTML = mode === "login" ? loginForm() : signupForm();
-      ui.$$("[data-authtab]").forEach(function (tab) {
-        tab.setAttribute("aria-selected", tab.dataset.authtab === mode ? "true" : "false");
-      });
-      ui.$$("[data-toggle-password]").forEach(function (btn) {
-        btn.addEventListener("click", function () {
-          var input = document.getElementById(btn.dataset.togglePassword);
-          input.type = input.type === "password" ? "text" : "password";
-          btn.innerHTML = Icons.icon(input.type === "password" ? "eye" : "eyeOff", 16);
-        });
-      });
-      if (mode === "signup") {
-        ui.applyMask(document.getElementById("su-phone"), ui.phoneMask);
-        ui.applyMask(document.getElementById("su-document"), function (value) {
-          var digits = String(value).replace(/\D/g, "");
-          return digits.length > 11 ? core.maskCNPJ(value) : ui.cpfMask(value);
-        });
-        var pwd = document.getElementById("su-password");
-        pwd.addEventListener("input", function () {
-          var meter = document.querySelector("[data-meter]");
-          if (meter) meter.dataset.score = String(core.passwordScore(pwd.value));
-        });
-        document.getElementById("form-signup").addEventListener("submit", onSubmitSignup);
-      } else {
-        document.getElementById("form-login").addEventListener("submit", onSubmitLogin);
-      }
-      var first = forms.querySelector("input");
-      if (first) first.focus();
-    }
-
-    ui.$$("[data-authtab]").forEach(function (tab) {
-      tab.addEventListener("click", function () {
-        mode = tab.dataset.authtab;
-        aux.authTab = mode;
-        paint();
+    forms.innerHTML = loginForm();
+    ui.$$("[data-toggle-password]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var input = document.getElementById(btn.dataset.togglePassword);
+        input.type = input.type === "password" ? "text" : "password";
+        btn.innerHTML = Icons.icon(input.type === "password" ? "eye" : "eyeOff", 16);
       });
     });
-
-    paint();
+    document.getElementById("form-login").addEventListener("submit", onSubmitLogin);
+    var first = forms.querySelector("input");
+    if (first) first.focus();
   }
 
   async function onSubmitLogin(event) {
@@ -233,16 +167,19 @@
     var form = event.target;
     var button = document.getElementById("login-submit");
     ui.clearErrors(form);
-    var email = fieldValue(form, "email").trim();
     var password = fieldValue(form, "password");
-    if (!core.isValidEmail(email)) return ui.showFieldErrors({ email: "Informe um e-mail válido." }, form);
-    if (!password) return ui.showFieldErrors({ password: "Informe sua senha." }, form);
+    if (!password) return ui.showFieldErrors({ password: "Digite a senha de acesso." }, form);
 
     button.disabled = true;
     button.textContent = "Entrando...";
     try {
-      await store.login(email, password);
-      ui.toast("Login realizado. Bom trabalho!", "success", "Bem-vinda");
+      var ok = await store.loginWithPassword(password);
+      if (!ok) {
+        ui.showFieldErrors({ password: "Senha incorreta." }, form);
+        ui.toast("Senha incorreta.", "error", "Não foi possível entrar");
+        return;
+      }
+      ui.toast("Acesso liberado. Bom trabalho!", "success", "Bem-vinda");
       cart = [];
       render();
     } catch (err) {
@@ -252,39 +189,6 @@
       if (button) {
         button.disabled = false;
         button.textContent = "Entrar";
-      }
-    }
-  }
-
-  async function onSubmitSignup(event) {
-    event.preventDefault();
-    var form = event.target;
-    var button = document.getElementById("signup-submit");
-    ui.clearErrors(form);
-    var payload = {
-      name: fieldValue(form, "name"),
-      email: fieldValue(form, "email"),
-      phone: fieldValue(form, "phone"),
-      document: fieldValue(form, "document"),
-      password: fieldValue(form, "password"),
-      passwordConfirm: fieldValue(form, "passwordConfirm")
-    };
-    var validation = core.validateSignup(payload, store.getState().users);
-    if (!validation.valid) return ui.showFieldErrors(validation.errors, form);
-
-    button.disabled = true;
-    button.textContent = "Criando conta...";
-    try {
-      await store.signup(payload);
-      ui.toast("Conta criada! Você já está logada.", "success", "Bem-vinda ao Palco");
-      render();
-    } catch (err) {
-      if (err.fields) ui.showFieldErrors(err.fields, form);
-      else ui.toast(err.message, "error");
-    } finally {
-      if (button) {
-        button.disabled = false;
-        button.textContent = "Criar conta e entrar";
       }
     }
   }
@@ -386,8 +290,8 @@
 
   async function doLogout() {
     var ok = await ui.confirmDialog({
-      title: "Sair da conta?",
-      message: "Seus dados continuam salvos. Na próxima visita basta entrar novamente com e-mail e senha.",
+      title: "Sair do Palco?",
+      message: "Seus dados continuam salvos. Na próxima visita basta digitar a senha de acesso.",
       confirmLabel: "Sair"
     });
     if (!ok) return;
@@ -1466,9 +1370,9 @@
           "</div>" +
           '<div class="grow" style="min-width:200px">' +
             "<h2>" + ui.escapeHtml(user.name) + "</h2>" +
-            '<p style="color:rgba(246,239,227,.7);font-size:13px">' + ui.escapeHtml(user.email) + "</p>" +
+            '<p style="color:rgba(246,239,227,.7);font-size:13px">' + ui.escapeHtml(user.city || "Loja no Palco") + "</p>" +
             '<div class="row gap-8 wrap mt-8">' +
-              '<span class="badge" style="background:rgba(255,255,255,.12);color:#f4e4b8">' + (user.role === "admin" ? "Administradora" : "Equipe") + "</span>" +
+              '<span class="badge" style="background:rgba(255,255,255,.12);color:#f4e4b8">Acesso administrativo</span>' +
               '<span class="badge" style="background:rgba(255,255,255,.12);color:#f6efe3">Desde ' + ui.escapeHtml(core.formatDateBR(user.createdAt)) + "</span>" +
               (user.city ? '<span class="badge" style="background:rgba(255,255,255,.12);color:#f6efe3">' + ui.escapeHtml(user.city) + "</span>" : "") +
             "</div>" +
@@ -1482,10 +1386,7 @@
         '<div class="grid" style="grid-template-columns:1fr 1fr">' +
           '<div class="card"><div class="card-head"><span class="card-title">Dados pessoais</span></div>' +
             '<div class="card-body"><form class="stack" id="form-profile" novalidate>' +
-              '<div class="grid grid-2" style="gap:12px">' +
-                profileField("Nome completo", "name", user.name) +
-                profileField("E-mail", "email", user.email, "email") +
-              "</div>" +
+              profileField("Nome de exibição", "name", user.name) +
               '<div class="grid grid-2" style="gap:12px">' +
                 profileField("Telefone", "phone", user.phone ? ui.phoneMask(user.phone) : "", "tel") +
                 profileField("CPF/CNPJ", "document", user.document ? (user.document.length > 11 ? core.maskCNPJ(user.document) : core.maskCPF(user.document)) : "", "text") +
@@ -1507,8 +1408,9 @@
                   profileField("Nova senha", "newPassword", "", "password") +
                   profileField("Confirmar", "newPasswordConfirm", "", "password") +
                 "</div>" +
-                '<div class="banner banner-info">' + Icons.icon("shield", 16) + "<div>Sua senha é guardada com hash PBKDF2 (210.000 iterações). Nem nós conseguimos ler.</div></div>" +
-                '<button class="btn btn-outline" type="submit">Alterar senha</button>' +
+                '<div class="banner banner-info">' + Icons.icon("shield", 16) + "<div>Senha de acesso guardada com hash PBKDF2 (210.000 iterações). A padrão é <strong>admin123</strong>.</div></div>" +
+                '<div class="row gap-8 wrap"><button class="btn btn-outline" type="submit">Alterar senha</button>' +
+                '<button class="btn btn-ghost btn-sm" type="button" id="reset-password">Voltar para admin123</button></div>' +
               "</form></div></div>" +
 
             '<div class="card"><div class="card-head"><span class="card-title">Backup dos seus dados</span></div>' +
@@ -1714,7 +1616,7 @@
             '<div class="card"><div class="card-head"><span class="card-title">Armazenamento</span></div>' +
               '<div class="card-body stack">' +
                 '<div class="row-between small"><span class="muted">Tecnologia</span><span class="bold">' + ui.escapeHtml(storageLabel()) + "</span></div>" +
-                '<div class="row-between small"><span class="muted">Contas cadastradas</span><span class="bold">' + store.getState().users.length + "</span></div>" +
+                '<div class="row-between small"><span class="muted">Senha de acesso</span><span class="bold">' + (store.getState().settings.passwordChanged ? "personalizada" : "padrão (admin123)") + "</span></div>" +
                 '<div class="row-between small"><span class="muted">Tamanho dos dados</span><span class="bold">' + storageSize() + "</span></div>" +
                 '<div class="banner banner-warning">' + Icons.icon("alert", 16) + "<div>Limpar os dados do navegador apaga o sistema. Faça backup em <strong>Meu perfil</strong> antes.</div></div>" +
               "</div></div>" +
@@ -1780,6 +1682,19 @@
     if (lowStock) lowStock.addEventListener("change", async function () {
       await store.saveSettings({ lowStockThreshold: Math.max(0, Number(lowStock.value) || 0) });
       ui.toast("Alerta de estoque atualizado.", "success");
+    });
+
+    var resetPassword = document.getElementById("reset-password");
+    if (resetPassword) resetPassword.addEventListener("click", async function () {
+      var ok = await ui.confirmDialog({
+        title: "Voltar a senha para admin123?",
+        message: "A senha de acesso desta loja volta a ser admin123. Seus dados não são afetados.",
+        confirmLabel: "Voltar para admin123"
+      });
+      if (!ok) return;
+      await store.resetPassword();
+      ui.toast("Senha de acesso voltou para admin123.", "success");
+      render();
     });
 
     var wipe = document.getElementById("wipe-data");
