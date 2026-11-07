@@ -1,0 +1,20 @@
+node_modules/
+.next/
+out/
+build/
+dist/
+coverage/
+.env
+.env.local
+.env*.local
+.pgdata/
+*.log
+.DS_Store
+next-env.d.ts
+tsconfig.tsbuildinfo
+/backups/*.sql
+# bundle gerado pelo web/build.js (web/palco.html é o arquivo publicado)
+web/dist/
+/backups/*.sql.gz
+/public/uploads/*
+!/public/uploads/.gitkeep
