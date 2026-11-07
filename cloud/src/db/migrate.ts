@@ -84,6 +84,11 @@ export function ensureSchema(): Promise<string[]> {
   return schemaPromise;
 }
 
+/** Esquece o cache (usado quando o banco é recriado). */
+export function resetSchemaCache(): void {
+  schemaPromise = null;
+}
+
 /** Executa como script: npm run db:migrate */
 if (process.argv[1] && /migrate\.(ts|js|mjs|cjs)$/.test(process.argv[1])) {
   migrate()

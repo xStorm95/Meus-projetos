@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { accounts } from "@/db/schema";
 import { hashPassword } from "@/lib/auth";
-import { ensureSchema } from "@/db/migrate";
+import { withSchema } from "@/db/guard";
 import { fail, ok } from "@/lib/api";
 import { startSession, toSessionAccount } from "@/lib/session";
 import { hasErrors, normalizeEmail, normalizeName, onlyDigits, validateSignup } from "@/lib/validation";
@@ -36,32 +36,32 @@ export async function POST(request: Request) {
   const email = normalizeEmail(payload.email);
 
   try {
-    await ensureSchema();
+    return await withSchema(async () => {
+      const existing = await db.select({ id: accounts.id }).from(accounts).where(eq(accounts.emailNormalized, email)).limit(1);
+      if (existing.length) {
+        return fail("Este e-mail já tem conta. Faça login.", 409, { email: "Este e-mail já tem conta. Faça login." });
+      }
 
-    const existing = await db.select({ id: accounts.id }).from(accounts).where(eq(accounts.emailNormalized, email)).limit(1);
-    if (existing.length) {
-      return fail("Este e-mail já tem conta. Faça login.", 409, { email: "Este e-mail já tem conta. Faça login." });
-    }
+      const total = await db.select({ id: accounts.id }).from(accounts).limit(1);
+      const [created] = await db
+        .insert(accounts)
+        .values({
+          name: normalizeName(payload.name),
+          email: payload.email.trim(),
+          emailNormalized: email,
+          passwordHash: await hashPassword(payload.password),
+          role: total.length === 0 ? "owner" : "member",
+          phone: payload.phone ? onlyDigits(payload.phone) : null,
+          document: payload.document ? onlyDigits(payload.document) : null,
+          birthDate: payload.birthDate || null,
+          city: payload.city ? normalizeName(payload.city) : null,
+          lastLoginAt: new Date(),
+        })
+        .returning();
 
-    const total = await db.select({ id: accounts.id }).from(accounts).limit(1);
-    const [created] = await db
-      .insert(accounts)
-      .values({
-        name: normalizeName(payload.name),
-        email: payload.email.trim(),
-        emailNormalized: email,
-        passwordHash: await hashPassword(payload.password),
-        role: total.length === 0 ? "owner" : "member",
-        phone: payload.phone ? onlyDigits(payload.phone) : null,
-        document: payload.document ? onlyDigits(payload.document) : null,
-        birthDate: payload.birthDate || null,
-        city: payload.city ? normalizeName(payload.city) : null,
-        lastLoginAt: new Date(),
-      })
-      .returning();
-
-    await startSession(created.id, request);
-    return ok({ account: toSessionAccount(created) }, { status: 201 });
+      await startSession(created.id, request);
+      return ok({ account: toSessionAccount(created) }, { status: 201 });
+    });
   } catch (err) {
     const message = (err as Error).message;
     if (/accounts_email_idx|duplicate key/.test(message)) {
