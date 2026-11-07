@@ -38,6 +38,28 @@ npm run web:test    # roda os testes do app offline
 
 Detalhes, limites e atalhos: [`web/README.md`](web/README.md).
 
+---
+
+## 0.1 Palco Conta — banco na nuvem, pronto para Vercel
+
+A versão da conta (cadastro, login e **perfil com foto**) que **não fica presa a um
+computador**: os dados vivem em PostgreSQL na nuvem e a mesma conta abre em qualquer
+aparelho. É o app em [`cloud/`](cloud/), feito para a Vercel.
+
+**Para publicar:** <https://vercel.com/new> → importe `xStorm95/Meus-projetos` →
+*Root Directory* `cloud` → variável `DATABASE_URL` (Neon/Postgres) → *Deploy*.
+Passo a passo completo: [`cloud/README.md`](cloud/README.md).
+
+```bash
+cd cloud && npm install && npm run db:migrate && npm run dev   # http://localhost:3001
+cd cloud && npm test                                           # 12 testes de integração
+```
+
+- senha com **scrypt** no servidor, sessão em cookie HttpOnly de 24 h
+- foto redimensionada no navegador e salva no banco (`accounts.avatar`)
+- login em outro aparelho mostra os mesmos dados e a mesma foto
+- build de produção e migração idempotente validados
+
 ## 1. Rodar localmente
 
 Pré-requisitos: **Node.js 20+** e um PostgreSQL 14+ (o projeto inclui um
