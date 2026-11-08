@@ -187,6 +187,16 @@ const server = http.createServer((req, res) => {
     return fs.createReadStream(FILE).pipe(res);
   }
 
+  // /codigo — mostra o HTML como TEXTO na página (pode dar Ctrl+A, Ctrl+C e salvar).
+  if (route === "/codigo" || route === "/codigo.txt") {
+    if (!fs.existsSync(FILE)) {
+      res.writeHead(503, { "content-type": "text/plain; charset=utf-8" });
+      return res.end("Rode npm run web:build");
+    }
+    res.writeHead(200, { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" });
+    return fs.createReadStream(FILE).pipe(res);
+  }
+
   if (route === "/logo.svg" || route === "/mark.svg") {
     const file = route === "/logo.svg" ? LOGO : MARK;
     res.writeHead(200, { "content-type": "image/svg+xml; charset=utf-8", "cache-control": "public, max-age=3600" });
