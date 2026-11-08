@@ -24,7 +24,11 @@ function wrapIIFE(code) {
 
 function main() {
   const template = read("template.html");
+  // Fontes embutidas (subset em base64) — geradas por `node web/fonts.js`.
+  const fontsFile = path.join(SRC, "fonts.css");
+  const fonts = fs.existsSync(fontsFile) ? fs.readFileSync(fontsFile, "utf8") : "";
   const parts = {
+    FONTS: fonts,
     CSS: read("styles.css"),
     CORE: wrapIIFE(read("core.js")),
     HASH: wrapIIFE(read("hash.js")),
@@ -42,7 +46,7 @@ function main() {
   for (const [key, value] of Object.entries(parts)) {
     const marker = `/*__${key}__*/`;
     if (!html.includes(marker)) throw new Error(`Marcador ausente no template: ${marker}`);
-    const safe = key === "CSS" ? value : value.replace(/<\/script/gi, "<\\/script");
+    const safe = key === "CSS" || key === "FONTS" ? value : value.replace(/<\/script/gi, "<\\/script");
     html = html.replace(marker, () => safe);
   }
 
@@ -50,6 +54,10 @@ function main() {
   const outFile = path.join(DIST, "palco.html");
   fs.writeFileSync(outFile, html, "utf8");
   fs.writeFileSync(path.join(ROOT, "palco.html"), html, "utf8");
+
+  // Arquivo pronto para o usuário: um único HTML, abre com dois cliques.
+  fs.writeFileSync(path.join(ROOT, "..", "Passarela-da-Moda.html"), html, "utf8");
+  console.log("[build] Passarela-da-Moda.html (raiz do repositório)");
 
   const kb = (Buffer.byteLength(html, "utf8") / 1024).toFixed(1);
   console.log(`[build] dist/palco.html — ${kb} KB (arquivo único, offline)`);

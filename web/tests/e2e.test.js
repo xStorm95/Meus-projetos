@@ -93,28 +93,14 @@ function click(win, selector) {
 
 test("fluxo completo no navegador (jsdom)", async (t) => {
   const { win, errors } = createWindow();
-  await waitFor(() => win.document.querySelector('[data-authtab="signup"]'), "tela de login");
+  await waitFor(() => win.document.querySelector(".app-shell"), "app abrindo direto");
 
-  // ---------- cadastro ----------
-  click(win, '[data-authtab="signup"]');
-  await waitFor(() => win.document.querySelector("#form-signup"), "formulário de cadastro");
-
-  typeInto(win, "#su-name", "Ana Beatriz Lopes");
-  typeInto(win, "#su-email", "ana@palco.com");
-  typeInto(win, "#su-phone", "31999887766");
-  typeInto(win, "#su-document", "52998224725");
-  typeInto(win, "#su-password", "Palco@2026");
-  typeInto(win, "#su-password2", "Palco@2026");
-  submit(win, "#form-signup");
-
-  await waitFor(() => win.document.querySelector(".app-shell"), "painel após cadastro", 12000);
-  assert.match(win.document.querySelector(".topbar-sub").textContent, /Ana/);
-  assert.match(win.document.querySelector(".sidebar-store").textContent, /Minha [Ll]oja/);
-
-  const store = win.App.store();
-  assert.equal(store.getState().users.length, 1);
-  assert.equal(store.getUser().role, "admin");
-  assert.ok(store.getState().users[0].passwordHash.startsWith("pbkdf2$"));
+  // ---------- sem login, sem cadastro ----------
+  assert.equal(win.document.querySelector("#form-login"), null, "não existe tela de login");
+  assert.equal(win.document.querySelector("#auth-forms"), null, "não existe cadastro");
+  assert.match(win.document.querySelector(".sidebar-logo-text").textContent, /Passarela/i);
+  assert.ok(win.document.querySelector(".brand-mark-img"), "logo na lateral");
+  assert.equal(win.App.store().isAuthenticated(), true, "abre já utilizável");
 
   // ---------- produto ----------
   win.App.navigate("products");
@@ -159,6 +145,8 @@ test("fluxo completo no navegador (jsdom)", async (t) => {
   // ---------- perfil: foto + dados ----------
   win.App.navigate("profile");
   await waitFor(() => win.document.querySelector("#form-profile"), "formulário de perfil");
+  assert.equal(win.document.querySelector("#form-profile [name='email']"), null, "perfil não pede e-mail");
+  assert.equal(win.document.querySelector("#form-password"), null, "perfil não pede senha");
   typeInto(win, "#form-profile [name='city']", "Ipatinga");
   typeInto(win, "#form-profile [name='bio']", "Dona da loja");
   submit(win, "#form-profile");
@@ -172,30 +160,25 @@ test("fluxo completo no navegador (jsdom)", async (t) => {
   assert.equal(win.App.store().getUser().avatar, fakePhoto);
 
   // ---------- "fechar e abrir o site" ----------
+  await waitFor(() => JSON.stringify(snapshotStorage(win)).includes("operador"), "perfil no storage", 4000);
   const backup = snapshotStorage(win);
-  assert.ok(Object.keys(backup).some((k) => k.includes("users")), "usuários devem estar no storage");
-  assert.ok(JSON.stringify(backup).includes("ana@palco.com"));
-  assert.ok(!JSON.stringify(backup).includes("Palco@2026"), "senha em texto puro nunca é salva");
+  assert.ok(Object.keys(backup).some((k) => k.includes("settings")), "configurações/perfil devem estar no storage");
+  const settingsKey = Object.keys(backup).find((k) => k.endsWith("settings"));
+  assert.ok(settingsKey, "as configurações devem estar no storage");
+  const savedSettings = JSON.parse(backup[settingsKey]);
+  assert.equal(savedSettings.profile.id, "operador", "o perfil do operador deve estar salvo");
+  assert.equal(savedSettings.profile.avatar, fakePhoto, "a foto de perfil deve estar salva");
+  assert.equal(JSON.stringify(backup).includes("admin123"), false, "nada de senha no programa");
 
   const second = createWindow(backup);
   await waitFor(() => second.win.document.querySelector(".app-shell"), "sessão restaurada ao reabrir", 12000);
-  assert.equal(second.win.App.store().getUser().email, "ana@palco.com");
+  assert.equal(second.win.App.store().getUser().id, "operador");
   assert.equal(second.win.App.store().listProducts().length, 1);
   assert.equal(second.win.App.store().listSales().length, 1);
   assert.equal(second.win.App.store().getUser().avatar, fakePhoto);
 
-  // ---------- logout e login de novo ----------
-  await second.win.App.store().logout();
-  second.win.App.render();
-  await waitFor(() => second.win.document.querySelector("#form-login"), "tela de login após sair");
-  typeInto(second.win, "#login-email", "ana@palco.com");
-  typeInto(second.win, "#login-password", "senha-errada");
-  submit(second.win, "#form-login");
-  await waitFor(() => /incorret/i.test(second.win.document.body.textContent), "mensagem de senha incorreta");
-
-  typeInto(second.win, "#login-password", "Palco@2026");
-  submit(second.win, "#form-login");
-  await waitFor(() => second.win.document.querySelector(".app-shell"), "login com a senha correta", 12000);
+  // ---------- reabrir não pede nada ----------
+  assert.equal(second.win.document.querySelector("#form-login"), null, "nunca pede login");
 
   // ---------- dashboard e financeiro renderizam ----------
   second.win.App.navigate("dashboard");

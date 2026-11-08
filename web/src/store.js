@@ -10,6 +10,7 @@
   "use strict";
 
   var KEYS = {
+    cashSessions: "cashSessions",
     users: "users",
     session: "session",
     products: "products",
@@ -41,6 +42,7 @@
       customers: [],
       sales: [],
       expenses: [],
+      cashSessions: [],
       settings: {},
       session: null
     };
@@ -67,9 +69,29 @@
       };
     }
 
+    /* ==================== OPERADOR (SEM LOGIN) ==================== */
+
+    /** Não existe conta: o app abre direto e registra quem está usando. */
+    function defaultProfile() {
+      return {
+        id: "operador",
+        name: "Passarela da Moda",
+        role: "admin",
+        createdAt: now(),
+      };
+    }
+
+    function currentProfile() {
+      if (!state.settings.profile) {
+        state.settings.profile = defaultProfile();
+      }
+      return state.settings.profile;
+    }
+
     function defaultSettings() {
       return {
-        storeName: "Minha Loja",
+        storeName: "Passarela da Moda",
+        slogan: "Moda & estilo",
         ownerName: "",
         document: "",
         phone: "",
@@ -78,6 +100,7 @@
         accent: "gold",
         theme: "light",
         lowStockThreshold: 3,
+        profile: null,
         createdAt: now()
       };
     }
@@ -90,35 +113,24 @@
 
     async function load() {
       var results = await Promise.all([
-        db.get(KEYS.users, []),
         db.get(KEYS.products, []),
         db.get(KEYS.customers, []),
         db.get(KEYS.sales, []),
         db.get(KEYS.expenses, []),
-        db.get(KEYS.settings, null),
-        db.get(KEYS.session, null)
+        db.get(KEYS.cashSessions, []),
+        db.get(KEYS.settings, null)
       ]);
-      state.users = results[0] || [];
-      state.products = results[1] || [];
-      state.customers = results[2] || [];
-      state.sales = results[3] || [];
-      state.expenses = results[4] || [];
+      state.products = results[0] || [];
+      state.customers = results[1] || [];
+      state.sales = results[2] || [];
+      state.expenses = results[3] || [];
+      state.cashSessions = results[4] || [];
       state.settings = results[5] || defaultSettings();
-      state.session = results[6] || null;
       if (!results[5]) await db.set(KEYS.settings, state.settings);
+      currentUser = currentProfile();
+      state.users = [currentUser];
+      state.session = null;
       loaded = true;
-
-      // Restaura a sessão se ainda for válida — é isto que mantém o usuário
-      // logado depois de fechar o navegador.
-      if (state.session && state.session.expiresAt && new Date(state.session.expiresAt).getTime() > Date.now()) {
-        currentUser = state.users.find(function (u) {
-          return u.id === state.session.userId;
-        }) || null;
-        if (!currentUser) state.session = null;
-      } else if (state.session) {
-        state.session = null;
-        await db.set(KEYS.session, null);
-      }
       emit();
       return state;
     }
@@ -128,114 +140,6 @@
     }
 
     /* ---------------------------- AUTH ---------------------------- */
-
-    async function signup(payload) {
-      await ensureLoaded();
-      var validation = core.validateSignup(payload, state.users);
-      if (!validation.valid) {
-        var err = new Error("Dados inválidos");
-        err.fields = validation.errors;
-        throw err;
-      }
-      var isFirst = state.users.length === 0;
-      var passwordHash = await hash.hashPassword(payload.password);
-      var user = {
-        id: uid(),
-        name: String(payload.name).trim(),
-        email: String(payload.email).trim().toLowerCase(),
-        passwordHash: passwordHash,
-        role: isFirst ? "admin" : "membro",
-        document: payload.document ? core.onlyDigits(payload.document) : "",
-        phone: payload.phone ? core.onlyDigits(payload.phone) : "",
-        birthDate: payload.birthDate || "",
-        city: payload.city || "",
-        bio: "",
-        avatar: "",
-        failedAttempts: 0,
-        lockedUntil: null,
-        lastLoginAt: null,
-        createdAt: now(),
-        updatedAt: now()
-      };
-      state.users = state.users.concat([user]);
-      await db.set(KEYS.users, state.users);
-      if (isFirst && !state.settings.ownerName) {
-        state.settings.ownerName = user.name;
-        await db.set(KEYS.settings, state.settings);
-      }
-      await startSession(user);
-      emit();
-      return publicUser(user);
-    }
-
-    async function startSession(user) {
-      var session = {
-        token: hash.randomToken(),
-        userId: user.id,
-        createdAt: now(),
-        expiresAt: new Date(Date.now() + SESSION_HOURS * 60 * 60 * 1000).toISOString()
-      };
-      state.session = session;
-      currentUser = user;
-      await db.set(KEYS.session, session);
-    }
-
-    async function login(email, password) {
-      await ensureLoaded();
-      var target = String(email || "").trim().toLowerCase();
-      var user = state.users.find(function (u) {
-        return String(u.email || "").toLowerCase() === target;
-      });
-      if (!user) {
-        var notFound = new Error("E-mail ou senha incorretos.");
-        notFound.code = "INVALID";
-        throw notFound;
-      }
-      if (core.isLocked(user)) {
-        var locked = new Error(
-          "Conta temporariamente bloqueada por tentativas inválidas. Tente novamente em alguns minutos."
-        );
-        locked.code = "LOCKED";
-        throw locked;
-      }
-      var ok = await hash.verifyPassword(password, user.passwordHash);
-      if (!ok) {
-        var attempt = core.registerFailedAttempt(user);
-        user.failedAttempts = attempt.failedAttempts;
-        user.lockedUntil = attempt.lockedUntil;
-        user.updatedAt = now();
-        state.users = state.users.map(function (u) {
-          return u.id === user.id ? user : u;
-        });
-        await db.set(KEYS.users, state.users);
-        var invalid = new Error(
-          user.lockedUntil
-            ? "Muitas tentativas inválidas. A conta ficou bloqueada por 15 minutos."
-            : "E-mail ou senha incorretos."
-        );
-        invalid.code = "INVALID";
-        throw invalid;
-      }
-      var reset = core.resetAttempts();
-      user.failedAttempts = reset.failedAttempts;
-      user.lockedUntil = reset.lockedUntil;
-      user.lastLoginAt = now();
-      user.updatedAt = now();
-      state.users = state.users.map(function (u) {
-        return u.id === user.id ? user : u;
-      });
-      await db.set(KEYS.users, state.users);
-      await startSession(user);
-      emit();
-      return publicUser(user);
-    }
-
-    async function logout() {
-      state.session = null;
-      currentUser = null;
-      await db.set(KEYS.session, null);
-      emit();
-    }
 
     function publicUser(user) {
       if (!user) return null;
@@ -256,21 +160,24 @@
     }
 
     function getUser() {
+      if (!currentUser) currentUser = currentProfile();
       return publicUser(currentUser);
+    }
+
+    /** Sempre "logado": quem usa o programa é o operador da loja. */
+    function isAuthenticated() {
+      return true;
     }
 
     async function updateProfile(patch) {
       await ensureLoaded();
-      if (!currentUser) throw new Error("Sessão expirada. Faça login novamente.");
+      if (!currentUser) currentUser = currentProfile();
+
       var errors = {};
       var name = patch.name !== undefined ? String(patch.name).trim() : currentUser.name;
-      if (name.length < 3) errors.name = "Informe seu nome completo.";
+      if (name.length < 2) errors.name = "Informe a identificação da loja.";
       var email = patch.email !== undefined ? String(patch.email).trim().toLowerCase() : currentUser.email;
-      if (!core.isValidEmail(email)) errors.email = "E-mail inválido.";
-      var duplicated = state.users.some(function (u) {
-        return u.id !== currentUser.id && String(u.email).toLowerCase() === email;
-      });
-      if (duplicated) errors.email = "Este e-mail já pertence a outra conta.";
+      if (email && !core.isValidEmail(email)) errors.email = "E-mail inválido.";
       if (patch.document) {
         var digits = core.onlyDigits(patch.document);
         if (digits.length === 11 && !core.isValidCPF(digits)) errors.document = "CPF inválido.";
@@ -292,39 +199,13 @@
         avatar: patch.avatar !== undefined ? patch.avatar : currentUser.avatar,
         updatedAt: now()
       });
-      state.users = state.users.map(function (u) {
-        return u.id === updated.id ? updated : u;
-      });
       currentUser = updated;
-      await db.set(KEYS.users, state.users);
+      state.settings.profile = updated;
+      if (patch.avatar !== undefined) state.settings.avatarUpdatedAt = now();
+      state.settings.updatedAt = now();
+      await db.set(KEYS.settings, state.settings);
       emit();
       return publicUser(updated);
-    }
-
-    async function changePassword(currentPassword, newPassword) {
-      await ensureLoaded();
-      if (!currentUser) throw new Error("Sessão expirada.");
-      var ok = await hash.verifyPassword(currentPassword, currentUser.passwordHash);
-      if (!ok) {
-        var err = new Error("A senha atual está incorreta.");
-        err.fields = { currentPassword: "Senha atual incorreta." };
-        throw err;
-      }
-      var strength = core.validatePasswordStrength(newPassword);
-      if (strength) {
-        var weak = new Error(strength);
-        weak.fields = { newPassword: strength };
-        throw weak;
-      }
-      var newHash = await hash.hashPassword(newPassword);
-      var updated = Object.assign({}, currentUser, { passwordHash: newHash, updatedAt: now() });
-      state.users = state.users.map(function (u) {
-        return u.id === updated.id ? updated : u;
-      });
-      currentUser = updated;
-      await db.set(KEYS.users, state.users);
-      emit();
-      return true;
     }
 
     /* -------------------------- PRODUTOS -------------------------- */
@@ -338,7 +219,7 @@
         err.fields = { name: "Informe o nome do produto." };
         throw err;
       }
-      var price = Number(payload.price);
+      var price = core.parseMoneyInput(payload.price);
       if (!isFinite(price) || price < 0) {
         var priceErr = new Error("Preço inválido.");
         priceErr.fields = { price: "Informe um preço válido." };
@@ -363,7 +244,7 @@
           color: payload.color || "",
           size: payload.size || "",
           price: core.round2(price),
-          cost: core.round2(Number(payload.cost) || 0),
+          cost: core.round2(core.parseMoneyInput(payload.cost)),
           stock: Math.round(stock),
           photo: payload.photo !== undefined ? payload.photo : existing.photo,
           description: payload.description !== undefined ? payload.description : existing.description,
@@ -384,7 +265,7 @@
         color: payload.color || "",
         size: payload.size || "",
         price: core.round2(price),
-        cost: core.round2(Number(payload.cost) || 0),
+        cost: core.round2(core.parseMoneyInput(payload.cost)),
         stock: Math.round(stock),
         photo: payload.photo || "",
         description: payload.description || "",
@@ -548,6 +429,7 @@
         paymentMethod: payload.paymentMethod || "DINHEIRO",
         status: "CONCLUIDA",
         notes: payload.notes || "",
+        cashSessionId: activeCashSession() ? activeCashSession().id : null,
         soldBy: currentUser.id,
         soldByName: currentUser.name,
         createdAt: now()
@@ -762,42 +644,250 @@
       };
     }
 
+    /* ---------------------------- CAIXA ---------------------------- */
+
+    /** Caixa aberto no momento (ou null). */
+    function activeCashSession() {
+      var open = (state.cashSessions || []).filter(function (c) {
+        return c.status === "ABERTO";
+      });
+      return open.length ? open[open.length - 1] : null;
+    }
+
+    function cashTotals(session) {
+      var sales = state.sales.filter(function (s) {
+        return s.cashSessionId === session.id && s.status === "CONCLUIDA";
+      });
+      var byMethod = {};
+      var received = 0;
+      var change = 0;
+      var debt = 0;
+
+      sales.forEach(function (sale) {
+        var paid = Number(sale.paid) || 0;
+        var troco = Number(sale.change) || 0;
+        var saldo = Number(sale.balance) || 0;
+        var method = sale.paymentMethod || "DINHEIRO";
+        byMethod[method] = (byMethod[method] || 0) + (paid - troco);
+        received += paid - troco;
+        change += troco;
+        debt += saldo;
+      });
+
+      var retiradas = (session.withdrawals || []).reduce(function (acc, w) {
+        return acc + (Number(w.amount) || 0);
+      }, 0);
+      var suprimentos = (session.supplies || []).reduce(function (acc, w) {
+        return acc + (Number(w.amount) || 0);
+      }, 0);
+
+      var opening = Number(session.openingAmount) || 0;
+      var cashInDrawer = opening + (byMethod.DINHEIRO || 0) + suprimentos - retiradas;
+
+      return {
+        salesCount: sales.length,
+        sales,
+        byMethod: byMethod,
+        received: core.round2(received),
+        change: core.round2(change),
+        debt: core.round2(debt),
+        withdrawals: core.round2(retiradas),
+        supplies: core.round2(suprimentos),
+        opening: core.round2(opening),
+        cashInDrawer: core.round2(cashInDrawer),
+        expected: core.round2(cashInDrawer),
+      };
+    }
+
+    async function openCashSession(payload) {
+      await ensureLoaded();
+      if (activeCashSession()) throw new Error("Já existe um caixa aberto. Feche-o antes de abrir outro.");
+      var opening = core.round2(core.parseMoneyInput(payload && payload.openingAmount));
+      if (!isFinite(opening) || opening < 0) throw new Error("Valor de abertura inválido.");
+
+      var session = {
+        id: uid(),
+        openedAt: now(),
+        openedBy: currentUser ? currentUser.name : "Operador",
+        openingAmount: opening,
+        note: String((payload && payload.note) || "").slice(0, 200),
+        status: "ABERTO",
+        closedAt: null,
+        countedAmount: null,
+        difference: null,
+        withdrawals: [],
+        supplies: [],
+      };
+      state.cashSessions = state.cashSessions.concat([session]);
+      await persist("cashSessions", state.cashSessions);
+      return session;
+    }
+
+    async function closeCashSession(payload) {
+      await ensureLoaded();
+      var session = activeCashSession();
+      if (!session) throw new Error("Não há caixa aberto.");
+      var counted = core.round2(core.parseMoneyInput(payload && payload.countedAmount));
+      if (!isFinite(counted) || counted < 0) throw new Error("Informe o valor contado na gaveta.");
+
+      var totals = cashTotals(session);
+      var closed = Object.assign({}, session, {
+        status: "FECHADO",
+        closedAt: now(),
+        countedAmount: counted,
+        expectedAmount: totals.expected,
+        difference: core.round2(counted - totals.expected),
+        closingNote: String((payload && payload.note) || "").slice(0, 200),
+        summary: {
+          salesCount: totals.salesCount,
+          received: totals.received,
+          byMethod: totals.byMethod,
+          debt: totals.debt,
+          withdrawals: totals.withdrawals,
+          supplies: totals.supplies,
+        },
+      });
+      state.cashSessions = state.cashSessions.map(function (c) {
+        return c.id === closed.id ? closed : c;
+      });
+      await persist("cashSessions", state.cashSessions);
+      return closed;
+    }
+
+    /** Sangria (retirada) ou suprimento (entrada) de dinheiro no caixa. */
+    async function cashMovement(kind, payload) {
+      await ensureLoaded();
+      var session = activeCashSession();
+      if (!session) throw new Error("Abra o caixa para registrar movimentações.");
+      var amount = core.round2(core.parseMoneyInput(payload && payload.amount));
+      if (!isFinite(amount) || amount <= 0) throw new Error("Informe um valor maior que zero.");
+      var entry = {
+        id: uid(),
+        amount: amount,
+        reason: String((payload && payload.reason) || "").slice(0, 120),
+        at: now(),
+      };
+      var updated = Object.assign({}, session);
+      if (kind === "sangria") {
+        updated.withdrawals = (session.withdrawals || []).concat([entry]);
+      } else {
+        updated.supplies = (session.supplies || []).concat([entry]);
+      }
+      state.cashSessions = state.cashSessions.map(function (c) {
+        return c.id === updated.id ? updated : c;
+      });
+      await persist("cashSessions", state.cashSessions);
+      return updated;
+    }
+
+    function listCashSessions(filter) {
+      var from = filter && filter.from;
+      var to = filter && filter.to;
+      return (state.cashSessions || [])
+        .filter(function (c) {
+          if (!from && !to) return true;
+          return core.withinPeriod(c.openedAt, from, to);
+        })
+        .slice()
+        .sort(function (a, b) {
+          return String(b.openedAt).localeCompare(String(a.openedAt));
+        });
+    }
+
+    /** Resumo de um dia específico (para o calendário). */
+    function cashDaySummary(dateKey) {
+      var sessions = (state.cashSessions || []).filter(function (c) {
+        return String(c.openedAt).slice(0, 10) === dateKey;
+      });
+      var sales = state.sales.filter(function (s) {
+        return s.status === "CONCLUIDA" && String(s.createdAt).slice(0, 10) === dateKey;
+      });
+      var revenue = sales.reduce(function (acc, s) {
+        return acc + (Number(s.total) || 0);
+      }, 0);
+      var cash = sales.reduce(function (acc, s) {
+        return acc + (Number(s.paid) - Number(s.change) || 0);
+      }, 0);
+      return {
+        date: dateKey,
+        sessions: sessions,
+        salesCount: sales.length,
+        revenue: core.round2(revenue),
+        received: core.round2(cash),
+        open: sessions.some(function (c) {
+          return c.status === "ABERTO";
+        }),
+      };
+    }
+
+    /** Conteúdo do backup baixado/gravado pelo usuário. */
     async function exportAll() {
       await ensureLoaded();
       return {
-        app: "Passarela ERP",
+        app: "Passarela da Moda",
+        format: "passarela-backup",
         exportedAt: now(),
         version: 1,
         settings: state.settings,
-        // A senha NUNCA sai no export (apenas hash não exportado)
-        users: state.users.map(function (u) {
-          var copy = Object.assign({}, u);
-          delete copy.passwordHash;
-          return copy;
-        }),
         products: state.products,
         customers: state.customers,
         sales: state.sales,
-        expenses: state.expenses
+        expenses: state.expenses,
+        cashSessions: state.cashSessions
       };
     }
 
     async function wipeData() {
       await db.clearAll();
-      state = {
-        users: [],
-        products: [],
-        customers: [],
-        sales: [],
-        expenses: [],
-        settings: defaultSettings(),
-        session: null
-      };
-      currentUser = null;
+      var keepSettings = Object.assign({}, defaultSettings(), {
+        profile: state.settings.profile,
+        storeName: state.settings.storeName,
+        accent: state.settings.accent,
+        theme: state.settings.theme
+      });
+      state.products = [];
+      state.customers = [];
+      state.sales = [];
+      state.expenses = [];
+      state.cashSessions = [];
+      state.settings = keepSettings;
+      currentUser = currentProfile();
+      state.users = [currentUser];
       loaded = true;
       await db.set(KEYS.settings, state.settings);
       emit();
       return true;
+    }
+
+    /** Importa um backup .json (substitui os dados atuais). */
+    async function restoreBackup(payload) {
+      await ensureLoaded();
+      var data = payload && payload.data ? payload.data : payload;
+      if (!data || typeof data !== "object") throw new Error("Arquivo de backup inválido.");
+      state.products = Array.isArray(data.products) ? data.products : [];
+      state.customers = Array.isArray(data.customers) ? data.customers : [];
+      state.sales = Array.isArray(data.sales) ? data.sales : [];
+      state.expenses = Array.isArray(data.expenses) ? data.expenses : [];
+      state.cashSessions = Array.isArray(data.cashSessions) ? data.cashSessions : [];
+      if (data.settings) {
+        state.settings = Object.assign({}, defaultSettings(), data.settings);
+      }
+      currentUser = currentProfile();
+      state.users = [currentUser];
+      await Promise.all([
+        db.set(KEYS.products, state.products),
+        db.set(KEYS.customers, state.customers),
+        db.set(KEYS.sales, state.sales),
+        db.set(KEYS.expenses, state.expenses),
+        db.set(KEYS.cashSessions, state.cashSessions),
+        db.set(KEYS.settings, state.settings),
+      ]);
+      emit();
+      return {
+        products: state.products.length,
+        customers: state.customers.length,
+        sales: state.sales.length,
+      };
     }
 
     return {
@@ -807,14 +897,10 @@
         return state;
       },
       getUser: getUser,
-      isAuthenticated: function () {
-        return Boolean(currentUser);
-      },
-      signup: signup,
-      login: login,
-      logout: logout,
+      isAuthenticated: isAuthenticated,
+      refresh: load,
+      restoreBackup: restoreBackup,
       updateProfile: updateProfile,
-      changePassword: changePassword,
       saveProduct: saveProduct,
       deleteProduct: deleteProduct,
       adjustStock: adjustStock,
@@ -832,6 +918,13 @@
       listSales: listSales,
       listExpenses: listExpenses,
       dashboard: dashboard,
+      activeCashSession: activeCashSession,
+      cashTotals: cashTotals,
+      openCashSession: openCashSession,
+      closeCashSession: closeCashSession,
+      cashMovement: cashMovement,
+      listCashSessions: listCashSessions,
+      cashDaySummary: cashDaySummary,
       exportAll: exportAll,
       wipeData: wipeData,
       KEYS: KEYS

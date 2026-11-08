@@ -17,26 +17,31 @@ PostgreSQL + Drizzle ORM · Zod · Recharts · Vitest
 
 ---
 
-## 0. Palco — versão em arquivo único (HTML)
+## 0. Passarela da Moda — programa offline (arquivo único)
 
-Além do ERP completo em Next.js, o repositório traz o **Palco**: a mesma proposta
-de ERP de moda empacotada em **um único arquivo HTML** com cadastro/login reais,
-perfil com foto e persistência no dispositivo — sem servidor, sem build e
-funcionando offline.
+Sistema de gestão para loja de moda que roda **no seu computador, sem internet, sem instalação,
+sem login e sem cadastro**.
 
-**Arquivo para baixar/publicar:** [`web/palco.html`](web/palco.html) (~217 KB)
+**Baixar o programa** (download direto, sem mostrar código):
 
-- Senhas com PBKDF2-HMAC-SHA256 (210 mil iterações) validado contra `node:crypto`
-- Sessão que sobrevive a fechar o navegador
-- Dados em IndexedDB com espelho em localStorage
-- 40 testes automatizados (39 de lógica + 1 de navegador via jsdom)
+- **Link do GitHub:** <https://github.com/xStorm95/Meus-projetos/raw/main/Passarela-da-Moda.html>
+- **Página de download** (com botão): rode `npm run web:serve` e abra <http://localhost:8080>
+
+Baixe, dê dois cliques no arquivo e o programa abre no navegador.
+
+- **Sem login / sem cadastro**: abre direto no painel.
+- **Salva no computador**: escolha um arquivo (ex.: `Documentos\Passarela\passarela-da-moda.json`)
+  e tudo — produtos, **fotos**, vendas, clientes, despesas — é gravado nele automaticamente.
+- Leve esse arquivo para outro computador ou pen drive e continue de onde parou.
+- Backup manual em um clique (`.json`) e exportação em CSV nos relatórios.
 
 ```bash
-npm run web:build   # gera web/palco.html
-npm run web:test    # roda os testes do app offline
+npm run web:build   # gera Passarela-da-Moda.html
+npm run web:test    # 30 testes de lógica + 1 de navegador + 2 de gravação em arquivo
+npm run web:serve   # página de download em http://localhost:8080
 ```
 
-Detalhes, limites e atalhos: [`web/README.md`](web/README.md).
+Detalhes: [`web/README.md`](web/README.md) · Logo em [`web/brand/`](web/brand).
 
 ## 1. Rodar localmente
 
