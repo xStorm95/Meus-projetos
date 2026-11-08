@@ -22,8 +22,12 @@ PostgreSQL + Drizzle ORM · Zod · Recharts · Vitest
 Sistema de gestão para loja de moda que roda **no seu computador, sem internet, sem instalação,
 sem login e sem cadastro**.
 
-**Arquivo para baixar:** [`Passarela-da-Moda.html`](Passarela-da-Moda.html) (~224 KB)
-Baixe, dê dois cliques e o programa abre no navegador.
+**Baixar o programa** (download direto, sem mostrar código):
+
+- **Link do GitHub:** <https://github.com/xStorm95/Meus-projetos/raw/main/Passarela-da-Moda.html>
+- **Página de download** (com botão): rode `npm run web:serve` e abra <http://localhost:8080>
+
+Baixe, dê dois cliques no arquivo e o programa abre no navegador.
 
 - **Sem login / sem cadastro**: abre direto no painel.
 - **Salva no computador**: escolha um arquivo (ex.: `Documentos\Passarela\passarela-da-moda.json`)
@@ -34,6 +38,7 @@ Baixe, dê dois cliques e o programa abre no navegador.
 ```bash
 npm run web:build   # gera Passarela-da-Moda.html
 npm run web:test    # 30 testes de lógica + 1 de navegador + 2 de gravação em arquivo
+npm run web:serve   # página de download em http://localhost:8080
 ```
 
 Detalhes: [`web/README.md`](web/README.md) · Logo em [`web/brand/`](web/brand).

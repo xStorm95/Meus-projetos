@@ -3,7 +3,15 @@
 Sistema de gestão para loja de moda — **um único arquivo que roda no seu computador**, sem internet,
 sem instalação, **sem login e sem cadastro**.
 
-**Arquivo para baixar:** [`Passarela-da-Moda.html`](../Passarela-da-Moda.html) (≈ 224 KB)
+**Baixar:** <https://github.com/xStorm95/Meus-projetos/raw/main/Passarela-da-Moda.html>
+(link direto — o navegador baixa o arquivo em vez de mostrar o código)
+
+Ou, no seu computador:
+
+```bash
+npm run web:build && npm run web:serve   # http://localhost:8080
+```
+
 Baixe → dê dois cliques → o programa abre no navegador. Pronto.
 
 ## O que ele faz
