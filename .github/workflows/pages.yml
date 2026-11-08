@@ -1,12 +1,8 @@
 name: Publicar página de download
 
+# Só roda manualmente: o Pages precisa estar ligado em
+# Settings → Pages → Source: "GitHub Actions" antes da primeira execução.
 on:
-  push:
-    branches: [main]
-    paths:
-      - "docs/**"
-      - "Passarela-da-Moda.html"
-      - ".github/workflows/pages.yml"
   workflow_dispatch:
 
 permissions:
