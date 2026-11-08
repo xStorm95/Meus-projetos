@@ -154,12 +154,15 @@ function landing() {
 
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, "http://" + (req.headers.host || "localhost"));
-  const route = url.pathname.replace(/\/+$/, "") || "/";
+  let route = url.pathname.replace(/\/+$/, "") || "/";
 
   if (route === "/" || route === "/index.html") {
     res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
     return res.end(landing());
   }
+
+  // /arquivo — mesmo download, caminho curto para compartilhar como link.
+  if (route === "/arquivo" || route === "/arquivo.html") route = "/baixar";
 
   if (route === "/baixar" || route === "/download") {
     if (!fs.existsSync(FILE)) {
