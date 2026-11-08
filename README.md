@@ -19,6 +19,15 @@ PostgreSQL + Drizzle ORM · Zod · Recharts · Vitest
 
 ## 0. Passarela da Moda — programa offline (arquivo único)
 
+> ### ⬇️ Baixar
+> **Página de download (GitHub Pages):** https://xstorm95.github.io/Meus-projetos/
+>
+> **Arquivo direto:** [Passarela-da-Moda.html](./Passarela-da-Moda.html) — clique no ícone de download (⤓) na página do GitHub para salvar.
+>
+> Se o GitHub Pages ainda não estiver ativo, veja em **Settings → Pages** e escolha
+> *Source: GitHub Actions* (o workflow `.github/workflows/pages.yml` já está pronto).
+
+
 Sistema de gestão para loja de moda que roda **no seu computador, sem internet, sem instalação,
 sem login e sem cadastro**.
 

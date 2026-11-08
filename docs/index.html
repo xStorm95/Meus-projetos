@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Baixar · Passarela da Moda</title>
+<meta name="description" content="Baixe o sistema Passarela da Moda: um único arquivo HTML que funciona offline no seu computador.">
+<link rel="icon" href="logo.svg">
+<style>
+  :root {
+    --bg: #f7f3ea; --surface: #fffdf8; --ink: #211f1c; --soft: #5f5a51;
+    --gold: #b08d3c; --line: rgba(33,31,28,.12);
+    --shadow: 0 24px 60px -28px rgba(33,31,28,.42), 0 2px 10px rgba(33,31,28,.06);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 28px 18px;
+    background:
+      radial-gradient(1200px 600px at 15% -10%, #f1e3bf 0%, transparent 60%),
+      radial-gradient(900px 500px at 100% 0%, #efe6d3 0%, transparent 55%),
+      var(--bg);
+    font-family: "Inter", -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink);
+  }
+  .card {
+    width: 100%; max-width: 660px; background: var(--surface); border: 1px solid var(--line);
+    border-radius: 28px; box-shadow: var(--shadow); overflow: hidden;
+    animation: up .6s cubic-bezier(.22,1,.36,1) both;
+  }
+  @keyframes up { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+  .top { padding: 34px 34px 0; text-align: center; }
+  .top img { width: 118px; height: auto; display: block; margin: 0 auto 18px; }
+  h1 { font-family: Georgia, "Times New Roman", serif; font-size: clamp(25px, 4.4vw, 33px); margin: 0 0 8px; letter-spacing: -.01em; }
+  .sub { margin: 0 auto; max-width: 46ch; color: var(--soft); font-size: 15px; line-height: 1.6; }
+  .badges { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 20px 0 0; }
+  .badge {
+    font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
+    padding: 5px 11px; border-radius: 999px; border: 1px solid var(--line); color: var(--soft); background: #fff;
+  }
+  .badge.gold { color: #7a5f16; border-color: rgba(176,141,60,.35); background: rgba(232,199,102,.16); }
+  .body { padding: 26px 34px 34px; }
+  .btn {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    width: 100%; padding: 18px 22px; border-radius: 16px; border: 0; cursor: pointer;
+    font-size: 16.5px; font-weight: 800; text-decoration: none; color: #241a06;
+    background: linear-gradient(135deg, #ecd292, #d9b45f 55%, #c39c46);
+    box-shadow: 0 16px 30px -16px rgba(176,141,60,.85);
+    transition: transform .16s ease, box-shadow .2s ease;
+  }
+  .btn:hover { transform: translateY(-2px); box-shadow: 0 20px 36px -16px rgba(176,141,60,.9); }
+  .btn:active { transform: scale(.99); }
+  .btn svg { width: 20px; height: 20px; }
+  .alt { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+  .alt a {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 13px 14px; border-radius: 13px; border: 1px solid var(--line); background: #fff;
+    color: var(--ink); font-size: 13.5px; font-weight: 650; text-decoration: none;
+    transition: background .16s ease, transform .16s ease, border-color .16s ease;
+  }
+  .alt a:hover { background: #faf6ec; border-color: rgba(176,141,60,.4); transform: translateY(-1px); }
+  .steps { margin: 26px 0 0; padding: 0; list-style: none; counter-reset: s; display: grid; gap: 12px; }
+  .steps li { position: relative; padding-left: 40px; font-size: 13.5px; line-height: 1.55; color: var(--soft); counter-increment: s; }
+  .steps li::before {
+    content: counter(s); position: absolute; left: 0; top: -1px; width: 27px; height: 27px;
+    display: grid; place-items: center; border-radius: 9px; background: rgba(176,141,60,.14);
+    color: #7a5f16; font-weight: 800; font-size: 12.5px;
+  }
+  .steps strong { color: var(--ink); }
+  .note {
+    margin-top: 22px; padding: 13px 15px; border-radius: 13px; font-size: 12.5px; line-height: 1.6;
+    background: rgba(232,199,102,.14); border: 1px solid rgba(176,141,60,.28); color: #6b5518;
+  }
+  .note strong { color: #4d3c0e; }
+  .meta { margin-top: 18px; text-align: center; font-size: 11.5px; color: #9a9288; }
+  .meta code { background: #f2ece1; border-radius: 5px; padding: 1px 5px; font-size: 11px; }
+  @media (max-width: 520px) {
+    .top, .body { padding-left: 22px; padding-right: 22px; }
+    .alt { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+  <main class="card">
+    <div class="top">
+      <img src="logo.svg" alt="Passarela da Moda">
+      <h1>Passarela da Moda</h1>
+      <p class="sub">O sistema inteiro da sua loja em <strong>um único arquivo</strong>. Abre com dois cliques, funciona sem internet e salva tudo no seu computador.</p>
+      <div class="badges">
+        <span class="badge gold">offline</span>
+        <span class="badge">sem login</span>
+        <span class="badge">sem cadastro</span>
+        <span class="badge">1 arquivo</span>
+      </div>
+    </div>
+
+    <div class="body">
+      <a class="btn" id="baixar" href="Passarela-da-Moda.html" download="Passarela-da-Moda.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 3v12"/><path d="m7 11 5 5 5-5"/><path d="M4 20h16"/>
+        </svg>
+        Baixar o programa (.html)
+      </a>
+
+      <div class="alt">
+        <a href="Passarela-da-Moda.html" target="_blank" rel="noopener">▶ Abrir sem baixar</a>
+        <a href="Passarela-da-Moda.html" download="Passarela-da-Moda.html" id="baixar2">⤓ Salvar arquivo</a>
+      </div>
+
+      <ol class="steps">
+        <li><strong>Baixe</strong> o arquivo <code>Passarela-da-Moda.html</code> — ele vai para a pasta <strong>Downloads</strong>.</li>
+        <li><strong>Dê dois cliques</strong> no arquivo. Abre no Chrome ou Edge, direto no painel (não pede senha).</li>
+        <li>Clique em <strong>“Gravar dados no computador”</strong> e escolha a pasta/arquivo onde quer guardar. A partir daí tudo é salvo sozinho: produtos, fotos, vendas, clientes, financeiro e caixas.</li>
+        <li>Para usar em outro computador, leve esse arquivo <code>.json</code> — ou use <strong>Backup / Restaurar</strong> dentro do sistema.</li>
+      </ol>
+
+      <p class="note">
+        <strong>Dica:</strong> se o navegador avisar que “este tipo de arquivo pode ser perigoso”, clique em <strong>Manter</strong>.
+        Ele é perigoso só de nome: é o seu sistema, sem nenhuma conexão com a internet.
+      </p>
+
+      <p class="meta" id="meta">Arquivo único · offline · dados no seu computador</p>
+    </div>
+  </main>
+
+  <script>
+    // Se o arquivo existir, mostra o tamanho real no rodapé.
+    fetch("Passarela-da-Moda.html", { method: "HEAD" })
+      .then(function (r) { return r.headers.get("content-length"); })
+      .then(function (size) {
+        if (!size) return;
+        document.getElementById("meta").textContent =
+          "Arquivo único · " + (Number(size) / 1024).toFixed(0) + " KB · offline · dados no seu computador";
+      })
+      .catch(function () {});
+  </script>
+</body>
+</html>

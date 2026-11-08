@@ -59,6 +59,13 @@ function main() {
   fs.writeFileSync(path.join(ROOT, "..", "Passarela-da-Moda.html"), html, "utf8");
   console.log("[build] Passarela-da-Moda.html (raiz do repositório)");
 
+  // Cópia publicada na página do GitHub Pages (docs/).
+  const docsDir = path.join(ROOT, "..", "docs");
+  if (fs.existsSync(docsDir)) {
+    fs.writeFileSync(path.join(docsDir, "Passarela-da-Moda.html"), html, "utf8");
+    console.log("[build] docs/Passarela-da-Moda.html (página de download)");
+  }
+
   const kb = (Buffer.byteLength(html, "utf8") / 1024).toFixed(1);
   console.log(`[build] dist/palco.html — ${kb} KB (arquivo único, offline)`);
 }
