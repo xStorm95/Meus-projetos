@@ -25,7 +25,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "next lint",
     "web:build": "node web/build.js",
-    "web:test": "node --test web/tests/core.test.js web/tests/store.test.js && node web/tests/e2e.test.js && node web/tests/file.test.js"
+    "web:test": "node --test web/tests/core.test.js web/tests/store.test.js && node web/tests/e2e.test.js && node web/tests/file.test.js",
+    "web:serve": "node web/serve.js"
   },
   "dependencies": {
     "@electric-sql/pglite": "0.5.15",
