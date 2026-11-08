@@ -61,7 +61,10 @@ test("máscaras de documento e telefone", () => {
 test("dinheiro: centavos sem erro de ponto flutuante", () => {
   assert.equal(core.toCents(0.1) + core.toCents(0.2), core.toCents(0.3));
   assert.equal(core.brl("1234.5"), "R$ 1.234,50");
-  assert.equal(core.brl(-25), "-R$ 0,25");
+  assert.equal(core.brl(-25), "-R$ 25,00");
+  assert.equal(core.brl(-0.25), "-R$ 0,25");
+  assert.equal(core.brl(189.9), "R$ 189,90");
+  assert.equal(core.brl(1299.9), "R$ 1.299,90");
   assert.equal(core.brl("0"), "R$ 0,00");
   assert.equal(core.parseMoneyInput("R$ 1.234,56"), 1234.56);
   assert.equal(core.parseMoneyInput("89,90"), 89.9);

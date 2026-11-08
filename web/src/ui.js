@@ -292,6 +292,117 @@
     return html;
   }
 
+  /** Gráfico de área suave (SVG) — tendência de faturamento. */
+  function areaChart(rows, options) {
+    var opts = options || {};
+    var data = (rows || []).map(function (r) {
+      return { label: r.label, value: Number(r.value) || 0 };
+    });
+    if (data.length < 2) {
+      return '<div class="empty" style="padding:26px"><p>Registre vendas para ver a curva.</p></div>';
+    }
+    var w = 620;
+    var h = 150;
+    var pad = 8;
+    var max = Math.max.apply(null, data.map(function (d) { return d.value; }).concat([1]));
+    var stepX = (w - pad * 2) / (data.length - 1);
+    var points = data.map(function (d, i) {
+      var x = pad + i * stepX;
+      var y = h - pad - (d.value / max) * (h - pad * 2);
+      return { x: x, y: y, d: d };
+    });
+
+    // curva suave (Catmull-Rom → Bézier)
+    var path = "M" + points[0].x.toFixed(1) + " " + points[0].y.toFixed(1);
+    for (var i = 0; i < points.length - 1; i++) {
+      var p0 = points[i - 1] || points[i];
+      var p1 = points[i];
+      var p2 = points[i + 1];
+      var p3 = points[i + 2] || p2;
+      var c1x = p1.x + (p2.x - p0.x) / 6;
+      var c1y = p1.y + (p2.y - p0.y) / 6;
+      var c2x = p2.x - (p3.x - p1.x) / 6;
+      var c2y = p2.y - (p3.y - p1.y) / 6;
+      path += " C" + c1x.toFixed(1) + " " + c1y.toFixed(1) + ", " + c2x.toFixed(1) + " " + c2y.toFixed(1) + ", " + p2.x.toFixed(1) + " " + p2.y.toFixed(1);
+    }
+    var area = path + " L" + points[points.length - 1].x.toFixed(1) + " " + (h - pad) + " L" + points[0].x.toFixed(1) + " " + (h - pad) + " Z";
+    var id = "grad" + Math.random().toString(36).slice(2, 8);
+
+    var html = '<svg class="area-chart" viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none" role="img" aria-label="Tendência de faturamento">' +
+      '<defs><linearGradient id="' + id + '" x1="0" y1="0" x2="0" y2="1">' +
+      '<stop offset="0%" stop-color="#c9a44f" stop-opacity=".42"/><stop offset="100%" stop-color="#c9a44f" stop-opacity="0"/></linearGradient></defs>' +
+      '<path class="area-fill" d="' + area + '" fill="url(#' + id + ')"/>' +
+      '<path class="area-line" d="' + path + '" fill="none" stroke="#b08d3f" stroke-width="2.4" stroke-linecap="round"/>';
+
+    points.forEach(function (p, index) {
+      if (index % Math.ceil(points.length / 8) !== 0 && index !== points.length - 1) return;
+      html += '<circle class="area-dot" cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="3.2">' +
+        '<title>' + escapeHtml(p.d.label + ": " + (opts.format ? opts.format(p.d.value) : p.d.value)) + "</title></circle>";
+    });
+    html += "</svg>";
+
+    html += '<div class="area-labels">';
+    data.forEach(function (d, i) {
+      if (i % Math.ceil(data.length / 7) !== 0 && i !== data.length - 1) return;
+      html += '<span>' + escapeHtml(d.label) + "</span>";
+    });
+    html += "</div>";
+    return html;
+  }
+
+  /**
+   * Calendário mensal com marcação de dias (caixa aberto, vendas, faturamento).
+   * summaryFn(dateKey) → { open, salesCount, revenue }
+   */
+  function calendar(monthKey, summaryFn, options) {
+    var opts = options || {};
+    var parts = String(monthKey).split("-");
+    var year = Number(parts[0]);
+    var month = Number(parts[1]) - 1;
+    var first = new Date(year, month, 1);
+    var daysInMonth = new Date(year, month + 1, 0).getDate();
+    var startWeekday = first.getDay();
+    var todayKey = new Date().toISOString().slice(0, 10);
+    var selected = opts.selected || null;
+
+    var monthNames = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+    var html = '<div class="cal-head"><button class="cal-nav" data-cal="prev" aria-label="Mês anterior">‹</button>' +
+      '<strong>' + monthNames[month] + " de " + year + "</strong>" +
+      '<button class="cal-nav" data-cal="next" aria-label="Próximo mês">›</button></div>';
+
+    html += '<div class="cal-week">' + ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"].map(function (d) {
+      return "<span>" + d + "</span>";
+    }).join("") + "</div>";
+
+    html += '<div class="cal-grid">';
+    for (var i = 0; i < startWeekday; i++) html += '<span class="cal-empty"></span>';
+
+    for (var day = 1; day <= daysInMonth; day++) {
+      var key = year + "-" + String(month + 1).padStart(2, "0") + "-" + String(day).padStart(2, "0");
+      var summary = summaryFn ? summaryFn(key) : null;
+      var classes = ["cal-day"];
+      if (key === todayKey) classes.push("is-today");
+      if (key === selected) classes.push("is-selected");
+      if (summary && summary.open) classes.push("has-open");
+      if (summary && summary.salesCount > 0) classes.push("has-sales");
+      if (summary && summary.revenue > 0) classes.push("has-money");
+
+      var title = key;
+      if (summary && summary.salesCount) {
+        title += " · " + summary.salesCount + " venda(s) · " + (opts.format ? opts.format(summary.revenue) : summary.revenue);
+      }
+      if (summary && summary.open) title += " · caixa aberto";
+
+      html += '<button class="' + classes.join(" ") + '" data-cal-day="' + key + '" title="' + escapeHtml(title) + '">' +
+        '<span class="cal-num">' + day + "</span>" +
+        (summary && summary.open ? '<span class="cal-flag">aberto</span>' : "") +
+        (summary && summary.revenue > 0 ? '<span class="cal-dot"></span>' : "") +
+        "</button>";
+    }
+    html += "</div>";
+    return html;
+  }
+
   /* ---------------------------- MÁSCARAS ---------------------------- */
 
   function applyMask(input, maskFn) {
@@ -408,6 +519,8 @@
     avatarHtml: avatarHtml,
     readImageFile: readImageFile,
     barsChart: barsChart,
+    areaChart: areaChart,
+    calendar: calendar,
     donut: donut,
     applyMask: applyMask,
     phoneMask: phoneMask,

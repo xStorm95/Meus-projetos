@@ -10,6 +10,7 @@
   "use strict";
 
   var KEYS = {
+    cashSessions: "cashSessions",
     users: "users",
     session: "session",
     products: "products",
@@ -41,6 +42,7 @@
       customers: [],
       sales: [],
       expenses: [],
+      cashSessions: [],
       settings: {},
       session: null
     };
@@ -88,7 +90,8 @@
 
     function defaultSettings() {
       return {
-        storeName: "Minha Loja",
+        storeName: "Passarela da Moda",
+        slogan: "Moda & estilo",
         ownerName: "",
         document: "",
         phone: "",
@@ -114,14 +117,16 @@
         db.get(KEYS.customers, []),
         db.get(KEYS.sales, []),
         db.get(KEYS.expenses, []),
+        db.get(KEYS.cashSessions, []),
         db.get(KEYS.settings, null)
       ]);
       state.products = results[0] || [];
       state.customers = results[1] || [];
       state.sales = results[2] || [];
       state.expenses = results[3] || [];
-      state.settings = results[4] || defaultSettings();
-      if (!results[4]) await db.set(KEYS.settings, state.settings);
+      state.cashSessions = results[4] || [];
+      state.settings = results[5] || defaultSettings();
+      if (!results[5]) await db.set(KEYS.settings, state.settings);
       currentUser = currentProfile();
       state.users = [currentUser];
       state.session = null;
@@ -214,7 +219,7 @@
         err.fields = { name: "Informe o nome do produto." };
         throw err;
       }
-      var price = Number(payload.price);
+      var price = core.parseMoneyInput(payload.price);
       if (!isFinite(price) || price < 0) {
         var priceErr = new Error("Preço inválido.");
         priceErr.fields = { price: "Informe um preço válido." };
@@ -239,7 +244,7 @@
           color: payload.color || "",
           size: payload.size || "",
           price: core.round2(price),
-          cost: core.round2(Number(payload.cost) || 0),
+          cost: core.round2(core.parseMoneyInput(payload.cost)),
           stock: Math.round(stock),
           photo: payload.photo !== undefined ? payload.photo : existing.photo,
           description: payload.description !== undefined ? payload.description : existing.description,
@@ -260,7 +265,7 @@
         color: payload.color || "",
         size: payload.size || "",
         price: core.round2(price),
-        cost: core.round2(Number(payload.cost) || 0),
+        cost: core.round2(core.parseMoneyInput(payload.cost)),
         stock: Math.round(stock),
         photo: payload.photo || "",
         description: payload.description || "",
@@ -424,6 +429,7 @@
         paymentMethod: payload.paymentMethod || "DINHEIRO",
         status: "CONCLUIDA",
         notes: payload.notes || "",
+        cashSessionId: activeCashSession() ? activeCashSession().id : null,
         soldBy: currentUser.id,
         soldByName: currentUser.name,
         createdAt: now()
@@ -638,6 +644,182 @@
       };
     }
 
+    /* ---------------------------- CAIXA ---------------------------- */
+
+    /** Caixa aberto no momento (ou null). */
+    function activeCashSession() {
+      var open = (state.cashSessions || []).filter(function (c) {
+        return c.status === "ABERTO";
+      });
+      return open.length ? open[open.length - 1] : null;
+    }
+
+    function cashTotals(session) {
+      var sales = state.sales.filter(function (s) {
+        return s.cashSessionId === session.id && s.status === "CONCLUIDA";
+      });
+      var byMethod = {};
+      var received = 0;
+      var change = 0;
+      var debt = 0;
+
+      sales.forEach(function (sale) {
+        var paid = Number(sale.paid) || 0;
+        var troco = Number(sale.change) || 0;
+        var saldo = Number(sale.balance) || 0;
+        var method = sale.paymentMethod || "DINHEIRO";
+        byMethod[method] = (byMethod[method] || 0) + (paid - troco);
+        received += paid - troco;
+        change += troco;
+        debt += saldo;
+      });
+
+      var retiradas = (session.withdrawals || []).reduce(function (acc, w) {
+        return acc + (Number(w.amount) || 0);
+      }, 0);
+      var suprimentos = (session.supplies || []).reduce(function (acc, w) {
+        return acc + (Number(w.amount) || 0);
+      }, 0);
+
+      var opening = Number(session.openingAmount) || 0;
+      var cashInDrawer = opening + (byMethod.DINHEIRO || 0) + suprimentos - retiradas;
+
+      return {
+        salesCount: sales.length,
+        sales,
+        byMethod: byMethod,
+        received: core.round2(received),
+        change: core.round2(change),
+        debt: core.round2(debt),
+        withdrawals: core.round2(retiradas),
+        supplies: core.round2(suprimentos),
+        opening: core.round2(opening),
+        cashInDrawer: core.round2(cashInDrawer),
+        expected: core.round2(cashInDrawer),
+      };
+    }
+
+    async function openCashSession(payload) {
+      await ensureLoaded();
+      if (activeCashSession()) throw new Error("Já existe um caixa aberto. Feche-o antes de abrir outro.");
+      var opening = core.round2(core.parseMoneyInput(payload && payload.openingAmount));
+      if (!isFinite(opening) || opening < 0) throw new Error("Valor de abertura inválido.");
+
+      var session = {
+        id: uid(),
+        openedAt: now(),
+        openedBy: currentUser ? currentUser.name : "Operador",
+        openingAmount: opening,
+        note: String((payload && payload.note) || "").slice(0, 200),
+        status: "ABERTO",
+        closedAt: null,
+        countedAmount: null,
+        difference: null,
+        withdrawals: [],
+        supplies: [],
+      };
+      state.cashSessions = state.cashSessions.concat([session]);
+      await persist("cashSessions", state.cashSessions);
+      return session;
+    }
+
+    async function closeCashSession(payload) {
+      await ensureLoaded();
+      var session = activeCashSession();
+      if (!session) throw new Error("Não há caixa aberto.");
+      var counted = core.round2(core.parseMoneyInput(payload && payload.countedAmount));
+      if (!isFinite(counted) || counted < 0) throw new Error("Informe o valor contado na gaveta.");
+
+      var totals = cashTotals(session);
+      var closed = Object.assign({}, session, {
+        status: "FECHADO",
+        closedAt: now(),
+        countedAmount: counted,
+        expectedAmount: totals.expected,
+        difference: core.round2(counted - totals.expected),
+        closingNote: String((payload && payload.note) || "").slice(0, 200),
+        summary: {
+          salesCount: totals.salesCount,
+          received: totals.received,
+          byMethod: totals.byMethod,
+          debt: totals.debt,
+          withdrawals: totals.withdrawals,
+          supplies: totals.supplies,
+        },
+      });
+      state.cashSessions = state.cashSessions.map(function (c) {
+        return c.id === closed.id ? closed : c;
+      });
+      await persist("cashSessions", state.cashSessions);
+      return closed;
+    }
+
+    /** Sangria (retirada) ou suprimento (entrada) de dinheiro no caixa. */
+    async function cashMovement(kind, payload) {
+      await ensureLoaded();
+      var session = activeCashSession();
+      if (!session) throw new Error("Abra o caixa para registrar movimentações.");
+      var amount = core.round2(core.parseMoneyInput(payload && payload.amount));
+      if (!isFinite(amount) || amount <= 0) throw new Error("Informe um valor maior que zero.");
+      var entry = {
+        id: uid(),
+        amount: amount,
+        reason: String((payload && payload.reason) || "").slice(0, 120),
+        at: now(),
+      };
+      var updated = Object.assign({}, session);
+      if (kind === "sangria") {
+        updated.withdrawals = (session.withdrawals || []).concat([entry]);
+      } else {
+        updated.supplies = (session.supplies || []).concat([entry]);
+      }
+      state.cashSessions = state.cashSessions.map(function (c) {
+        return c.id === updated.id ? updated : c;
+      });
+      await persist("cashSessions", state.cashSessions);
+      return updated;
+    }
+
+    function listCashSessions(filter) {
+      var from = filter && filter.from;
+      var to = filter && filter.to;
+      return (state.cashSessions || [])
+        .filter(function (c) {
+          if (!from && !to) return true;
+          return core.withinPeriod(c.openedAt, from, to);
+        })
+        .slice()
+        .sort(function (a, b) {
+          return String(b.openedAt).localeCompare(String(a.openedAt));
+        });
+    }
+
+    /** Resumo de um dia específico (para o calendário). */
+    function cashDaySummary(dateKey) {
+      var sessions = (state.cashSessions || []).filter(function (c) {
+        return String(c.openedAt).slice(0, 10) === dateKey;
+      });
+      var sales = state.sales.filter(function (s) {
+        return s.status === "CONCLUIDA" && String(s.createdAt).slice(0, 10) === dateKey;
+      });
+      var revenue = sales.reduce(function (acc, s) {
+        return acc + (Number(s.total) || 0);
+      }, 0);
+      var cash = sales.reduce(function (acc, s) {
+        return acc + (Number(s.paid) - Number(s.change) || 0);
+      }, 0);
+      return {
+        date: dateKey,
+        sessions: sessions,
+        salesCount: sales.length,
+        revenue: core.round2(revenue),
+        received: core.round2(cash),
+        open: sessions.some(function (c) {
+          return c.status === "ABERTO";
+        }),
+      };
+    }
+
     /** Conteúdo do backup baixado/gravado pelo usuário. */
     async function exportAll() {
       await ensureLoaded();
@@ -650,7 +832,8 @@
         products: state.products,
         customers: state.customers,
         sales: state.sales,
-        expenses: state.expenses
+        expenses: state.expenses,
+        cashSessions: state.cashSessions
       };
     }
 
@@ -666,6 +849,7 @@
       state.customers = [];
       state.sales = [];
       state.expenses = [];
+      state.cashSessions = [];
       state.settings = keepSettings;
       currentUser = currentProfile();
       state.users = [currentUser];
@@ -684,6 +868,7 @@
       state.customers = Array.isArray(data.customers) ? data.customers : [];
       state.sales = Array.isArray(data.sales) ? data.sales : [];
       state.expenses = Array.isArray(data.expenses) ? data.expenses : [];
+      state.cashSessions = Array.isArray(data.cashSessions) ? data.cashSessions : [];
       if (data.settings) {
         state.settings = Object.assign({}, defaultSettings(), data.settings);
       }
@@ -694,6 +879,7 @@
         db.set(KEYS.customers, state.customers),
         db.set(KEYS.sales, state.sales),
         db.set(KEYS.expenses, state.expenses),
+        db.set(KEYS.cashSessions, state.cashSessions),
         db.set(KEYS.settings, state.settings),
       ]);
       emit();
@@ -732,6 +918,13 @@
       listSales: listSales,
       listExpenses: listExpenses,
       dashboard: dashboard,
+      activeCashSession: activeCashSession,
+      cashTotals: cashTotals,
+      openCashSession: openCashSession,
+      closeCashSession: closeCashSession,
+      cashMovement: cashMovement,
+      listCashSessions: listCashSessions,
+      cashDaySummary: cashDaySummary,
       exportAll: exportAll,
       wipeData: wipeData,
       KEYS: KEYS

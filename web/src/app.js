@@ -16,12 +16,13 @@
   var session = { user: null };
   var view = "dashboard";
   var cart = [];
-  var aux = {};
+  var aux = { cashMonth: new Date().toISOString().slice(0, 7), cashDay: null, cashTab: "atual" };
 
   var NAV = [
     { group: "Operação", items: [
       { id: "dashboard", label: "Painel", icon: "dashboard" },
       { id: "pos", label: "PDV", icon: "pos" },
+      { id: "cash", label: "Caixa", icon: "wallet" },
       { id: "sales", label: "Vendas", icon: "sales" },
       { id: "products", label: "Produtos", icon: "products" },
       { id: "customers", label: "Clientes", icon: "customers" }
@@ -212,7 +213,7 @@
       '<div class="app-shell">' +
         '<aside class="sidebar">' +
           '<div class="sidebar-logo"><img class="brand-mark-img" src="' + LOGO_MARK + '" alt=""><span class="sidebar-logo-text">Passarela<small>da Moda</small></span></div>' +
-          '<div class="sidebar-store">' + ui.escapeHtml(settings.storeName || "Minha loja") + "</div>" +
+          '<div class="sidebar-store">' + ui.escapeHtml(settings.storeName || "Passarela da Moda") + "</div>" +
           '<nav class="nav">' + nav + "</nav>" +
           '<div class="sidebar-foot">' +
             fileChip() +
@@ -258,6 +259,7 @@
     var map = {
       dashboard: "Painel",
       pos: "PDV — Ponto de venda",
+      cash: "Caixa",
       sales: "Vendas",
       products: "Produtos",
       customers: "Clientes",
@@ -289,6 +291,7 @@
   function renderView() {
     switch (view) {
       case "pos": return posView();
+      case "cash": return cashView();
       case "sales": return salesView();
       case "products": return productsView();
       case "customers": return customersView();
@@ -303,6 +306,7 @@
   function bindView() {
     switch (view) {
       case "pos": return bindPos();
+      case "cash": return bindCash();
       case "sales": return bindSimple();
       case "products": return bindSimple();
       case "customers": return bindSimple();
@@ -327,10 +331,25 @@
       kpi("Vendas", String(data.salesCount), "ticket médio " + core.brl(data.ticket), "sales", "info") +
       kpi("A receber (fiado)", core.brl(data.openDebt), "saldo em aberto", "wallet", data.openDebt > 0 ? "danger" : "");
 
-    var chart = ui.barsChart(
-      data.byDay.slice(-12),
+    var chart = ui.areaChart(
+      data.byDay.slice(-14),
       { format: function (value) { return core.brl(value); } }
     );
+
+    var cash = store.activeCashSession();
+    var cashTotalsNow = cash ? store.cashTotals(cash) : null;
+    var cashStrip =
+      '<div class="cash-strip ' + (cash ? "is-open" : "is-closed") + '">' +
+        '<div class="cash-strip-icon">' + Icons.icon(cash ? "wallet" : "lock", 18) + "</div>" +
+        '<div class="cash-strip-body">' +
+          "<strong>" + (cash ? "Caixa aberto desde " + ui.escapeHtml(core.formatTimeBR(cash.openedAt)) : "Caixa fechado") + "</strong>" +
+          '<span class="tiny faint">' + (cash
+            ? "gaveta com " + core.brl(cashTotalsNow.cashInDrawer) + " · " + cashTotalsNow.salesCount + " venda(s) neste caixa"
+            : "abrir o caixa deixa as vendas em dinheiro organizadas por turno") + "</span>" +
+        "</div>" +
+        '<button class="btn btn-sm ' + (cash ? "btn-outline" : "btn-primary") + '" data-nav="cash">' +
+          (cash ? "Ver caixa" : "Abrir caixa") + "</button>" +
+      "</div>";
 
     var recent = data.recentSales.length
       ? data.recentSales.map(function (sale) {
@@ -380,9 +399,10 @@
         '<div class="row gap-8 mt-8"><button class="btn btn-primary btn-sm" data-nav="products">Cadastrar produto</button>' +
         '<button class="btn btn-outline btn-sm" data-nav="customers">Cadastrar cliente</button></div></div></div>') +
       '<div class="grid grid-4">' + kpis + "</div>" +
+      cashStrip +
       '<div class="grid mt-16" style="grid-template-columns:1.6fr 1fr">' +
         '<div class="card"><div class="card-head"><span class="card-title">Faturamento por dia</span>' +
-          '<span class="badge badge-accent">' + ui.escapeHtml(settings.storeName || "Minha loja") + "</span></div>" +
+          '<span class="badge badge-accent">' + ui.escapeHtml(settings.storeName || "Passarela da Moda") + "</span></div>" +
           '<div class="card-body">' + chart + "</div></div>" +
         '<div class="card"><div class="card-head"><span class="card-title">Mais vendidos</span></div>' +
           '<div class="card-body">' + topList + "</div></div>" +
@@ -1583,7 +1603,7 @@
             '<div class="card-body"><form class="stack" id="form-settings" novalidate>' +
               '<div class="grid grid-2" style="gap:12px">' +
                 profileField("Nome da loja", "storeName", settings.storeName) +
-                profileField("Responsável", "ownerName", settings.ownerName) +
+                profileField("Assinatura (recibo)", "slogan", settings.slogan || "Moda & estilo") +
               "</div>" +
               '<div class="grid grid-3" style="gap:12px">' +
                 profileField("CNPJ / CPF", "document", settings.document) +
@@ -1650,7 +1670,8 @@
     if (form) form.addEventListener("submit", async function (event) {
       event.preventDefault();
       await store.saveSettings({
-        storeName: fieldValue(form, "storeName").trim() || "Minha loja",
+        storeName: fieldValue(form, "storeName").trim() || "Passarela da Moda",
+        slogan: fieldValue(form, "slogan").trim() || "Moda & estilo",
         ownerName: fieldValue(form, "ownerName"),
         document: fieldValue(form, "document"),
         phone: fieldValue(form, "phone"),
@@ -1698,76 +1719,702 @@
     });
   }
 
-  /* ============================== RECIBO ============================== */
+  /* ============================== CAIXA ============================== */
 
-  function openReceipt(saleId) {
-    var sale = store.getState().sales.find(function (s) { return s.id === saleId; });
-    if (!sale) return;
-    var settings = store.getState().settings || {};
-    var customer = sale.customerId ? store.getState().customers.find(function (c) { return c.id === sale.customerId; }) : null;
+  function cashView() {
+    var session = store.activeCashSession();
+    var tab = aux.cashTab || "atual";
+    var head =
+      '<div class="page-head">' +
+        '<div>' +
+          "<h1>Caixa</h1>" +
+          '<p class="muted">' + (session
+            ? "Aberto em " + ui.escapeHtml(core.formatDateTimeBR(session.openedAt)) + " por " + ui.escapeHtml(session.openedBy)
+            : "Nenhum caixa aberto no momento.") + "</p>" +
+        "</div>" +
+        '<div class="row gap-8 wrap">' +
+          (session
+            ? '<button class="btn btn-primary" data-cash="close">' + Icons.icon("lock", 15) + " Fechar caixa</button>" +
+              '<button class="btn btn-outline" data-cash="sangria">' + Icons.icon("trendDown", 15) + " Sangria</button>" +
+              '<button class="btn btn-outline" data-cash="suprimento">' + Icons.icon("trendUp", 15) + " Suprimento</button>"
+            : '<button class="btn btn-primary" data-cash="open">' + Icons.icon("plus", 15) + " Abrir novo caixa</button>") +
+        "</div>" +
+      "</div>";
 
-    var body = ui.el("div", { id: "receipt" });
-    body.innerHTML =
-      '<div style="text-align:center;padding-bottom:12px;border-bottom:1px dashed var(--border-strong)">' +
-        '<div style="font-family:var(--font-display);font-size:22px">' + ui.escapeHtml(settings.storeName || "Minha loja") + "</div>" +
-        '<div class="tiny faint">' + ui.escapeHtml(settings.address || "") + "</div>" +
-        '<div class="tiny faint">' + ui.escapeHtml(settings.phone ? ui.phoneMask(settings.phone) : "") + "</div>" +
+    var tabs =
+      '<div class="segmented mb-16" id="cash-tabs">' +
+        '<button data-cashtab="atual" aria-pressed="' + (tab === "atual") + '">Caixa atual</button>' +
+        '<button data-cashtab="historico" aria-pressed="' + (tab === "historico") + '">Histórico</button>' +
+        '<button data-cashtab="calendario" aria-pressed="' + (tab === "calendario") + '">Calendário</button>' +
+      "</div>";
+
+    if (tab === "historico") return head + tabs + cashHistoryView();
+    if (tab === "calendario") return head + tabs + cashCalendarView();
+    return head + tabs + cashCurrentView();
+  }
+
+  function cashCurrentView() {
+    var session = store.activeCashSession();
+    if (!session) {
+      var last = store.listCashSessions()[0];
+      return '<div class="card"><div class="empty" style="padding:48px 24px">' +
+        Icons.icon("wallet", 30) +
+        "<h3>Abrir um novo caixa</h3>" +
+        '<p class="muted">Informe o dinheiro que já está na gaveta (fundo de troco) para começar o dia.</p>' +
+        '<div class="row gap-8" style="justify-content:center;margin-top:16px">' +
+          '<button class="btn btn-primary" data-cash="open">' + Icons.icon("plus", 15) + " Abrir caixa</button>" +
+          (last ? '<button class="btn btn-outline" data-cashtab="historico">Ver caixa anterior</button>' : "") +
+        "</div>" +
+      "</div></div>";
+    }
+
+    var t = store.cashTotals(session);
+    var sales = store.listSales().filter(function (s) {
+      return s.cashSessionId === session.id;
+    });
+    var methods = Object.keys(t.byMethod).map(function (key) {
+      return { key: key, value: t.byMethod[key] };
+    }).filter(function (m) {
+      return m.value > 0;
+    });
+
+    var kpis =
+      '<div class="grid grid-4 gap-12 mb-16">' +
+        kpi("Fundo de abertura", core.brl(t.opening), "dinheiro inicial", "wallet", "") +
+        kpi("Vendido no caixa", core.brl(t.received), t.salesCount + " venda(s)", "sales", "info") +
+        kpi("Dinheiro na gaveta", core.brl(t.cashInDrawer), "esperado ao fechar", "finance", "success") +
+        kpi("A receber (fiado)", core.brl(t.debt), "saldo em aberto", "alert", t.debt > 0 ? "warning" : "") +
+      "</div>";
+
+    var chart = '<div class="card"><div class="card-head"><span class="card-title">Vendas deste caixa</span>' +
+      '<span class="tiny faint">' + sales.length + " venda(s)</span></div>" +
+      '<div class="card-body">' +
+      (sales.length
+        ? ui.areaChart(sales.slice().reverse().map(function (sale, index) {
+            return { label: "V" + (index + 1), value: Number(sale.paid) - Number(sale.change) };
+          }), { format: core.brl })
+        : '<div class="empty" style="padding:26px"><p>Nenhuma venda neste caixa ainda.</p>' +
+          '<button class="btn btn-primary btn-sm mt-8" data-nav="pos">Abrir PDV</button></div>') +
+      "</div></div>";
+
+    var side =
+      '<div class="stack">' +
+        '<div class="card"><div class="card-head"><span class="card-title">Por forma de pagamento</span></div>' +
+          '<div class="card-body">' + (methods.length
+            ? ui.donut(methods.map(function (m) { return { label: PAYMENT_LABELS[m.key] || m.key, value: m.value }; }))
+            : '<p class="tiny faint">Ainda sem recebimentos.</p>') + "</div></div>" +
+
+        '<div class="card"><div class="card-head"><span class="card-title">Movimentações</span></div>' +
+          '<div class="card-body stack gap-8">' +
+            (session.supplies || []).map(function (m) {
+              return cashMovementRow(m, "suprimento");
+            }).join("") +
+            (session.withdrawals || []).map(function (m) {
+              return cashMovementRow(m, "sangria");
+            }).join("") +
+            (!(session.supplies || []).length && !(session.withdrawals || []).length
+              ? '<p class="tiny faint">Nenhuma sangria ou suprimento.</p>' : "") +
+            '<div class="row-between small" style="border-top:1px dashed var(--border);padding-top:10px">' +
+              "<span>Sangrias</span><span class=\"mono\" style=\"color:var(--danger)\">− " + core.brl(t.withdrawals) + "</span></div>" +
+            '<div class="row-between small"><span>Suprimentos</span><span class="mono" style="color:var(--success)">+ ' + core.brl(t.supplies) + "</span></div>" +
+          "</div></div>" +
+      "</div>";
+
+    return kpis + '<div class="grid" style="grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:16px">' + chart + side + "</div>";
+  }
+
+  function cashMovementRow(movement, kind) {
+    return '<div class="row-between small">' +
+      "<span>" + (kind === "sangria" ? "−" : "+") + " " + ui.escapeHtml(movement.reason || (kind === "sangria" ? "Sangria" : "Suprimento")) +
+      '<span class="tiny faint"> · ' + ui.escapeHtml(core.relativeTime(movement.at)) + "</span></span>" +
+      '<span class="mono ' + (kind === "sangria" ? "" : "bold") + '" style="color:' + (kind === "sangria" ? "var(--danger)" : "var(--success)") + '">' +
+      core.brl(movement.amount) + "</span></div>";
+  }
+
+  function cashHistoryView() {
+    var sessions = store.listCashSessions();
+    var fechados = sessions.filter(function (c) { return c.status === "FECHADO"; });
+    var totalDiferenca = fechados.reduce(function (acc, c) {
+      return acc + (Number(c.difference) || 0);
+    }, 0);
+
+    if (!sessions.length) {
+      return '<div class="card"><div class="empty" style="padding:44px 24px">' + Icons.icon("sales", 28) +
+        "<h3>Nenhum caixa registrado</h3><p class=\"muted\">Abra o primeiro caixa para começar a controlar.</p>" +
+        '<button class="btn btn-primary mt-8" data-cash="open">Abrir caixa</button></div></div>';
+    }
+
+    var rows = sessions.map(function (c) {
+      var totals = c.status === "FECHADO" && c.summary ? c.summary : store.cashTotals(c);
+      var diff = Number(c.difference) || 0;
+      return "<tr>" +
+        '<td><strong>' + ui.escapeHtml(core.formatDateBR(c.openedAt)) + "</strong>" +
+          '<div class="tiny faint">' + ui.escapeHtml(core.formatTimeBR(c.openedAt)) + " → " +
+          (c.closedAt ? ui.escapeHtml(core.formatTimeBR(c.closedAt)) : "<span class=\"badge badge-warning\">aberto</span>") + "</div></td>" +
+        '<td class="right mono">' + core.brl(c.openingAmount) + "</td>" +
+        '<td class="right mono">' + core.brl(totals.received) + '<div class="tiny faint">' + (totals.salesCount || 0) + " venda(s)</div></td>" +
+        '<td class="right mono">' + core.brl(c.expectedAmount !== undefined && c.expectedAmount !== null ? c.expectedAmount : store.cashTotals(c).expected) + "</td>" +
+        '<td class="right mono">' + (c.countedAmount === null || c.countedAmount === undefined ? "—" : core.brl(c.countedAmount)) + "</td>" +
+        '<td class="right mono" style="color:' + (diff === 0 ? "var(--text-soft)" : diff > 0 ? "var(--success)" : "var(--danger)") + '">' +
+          (c.status === "FECHADO" ? (diff > 0 ? "+" : "") + core.brl(diff) : "—") + "</td>" +
+        '<td class="right"><button class="btn btn-ghost btn-icon" data-cash-detail="' + c.id + '" title="Detalhes">' + Icons.icon("eye", 15) + "</button></td>" +
+        "</tr>";
+    }).join("");
+
+    return '<div class="grid grid-3 gap-12 mb-16">' +
+        kpi("Caixas fechados", String(fechados.length), "no histórico", "check", "success") +
+        kpi("Diferença acumulada", core.brl(totalDiferenca), "contado − esperado", "alert", Math.abs(totalDiferenca) < 0.01 ? "success" : "warning") +
+        kpi("Caixa aberto", store.activeCashSession() ? "sim" : "não", store.activeCashSession() ? "em operação" : "nenhum", "wallet", store.activeCashSession() ? "info" : "") +
       "</div>" +
-      '<div class="row-between tiny" style="padding:10px 0"><span>' + ui.escapeHtml(sale.code) + "</span>" +
-        "<span>" + ui.escapeHtml(core.formatDateTimeBR(sale.createdAt)) + "</span></div>" +
-      '<div class="tiny" style="padding-bottom:8px">Cliente: <strong>' + ui.escapeHtml(customer ? customer.name : "Consumidor final") + "</strong></div>" +
-      '<table class="data" style="font-size:12px"><thead><tr><th>Item</th><th class="right">Qtd</th><th class="right">Valor</th></tr></thead><tbody>' +
-        sale.items.map(function (item) {
-          return "<tr><td>" + ui.escapeHtml(item.name) + '<div class="tiny faint">' + ui.escapeHtml(item.sku) + "</div></td>" +
-            '<td class="right">' + item.quantity + "</td>" +
-            '<td class="right mono">' + core.brl(item.quantity * item.unitPrice) + "</td></tr>";
-        }).join("") +
-      "</tbody></table>" +
-      '<div class="stack gap-4" style="padding-top:10px">' +
-        '<div class="row-between small"><span>Subtotal</span><span class="mono">' + core.brl(sale.subtotal) + "</span></div>" +
-        (Number(sale.discount) > 0 ? '<div class="row-between small"><span>Desconto</span><span class="mono">− ' + core.brl(sale.discount) + "</span></div>" : "") +
-        '<div class="row-between bold" style="font-size:16px;padding-top:4px;border-top:1px dashed var(--border-strong)"><span>Total</span><span class="mono">' + core.brl(sale.total) + "</span></div>" +
-        '<div class="row-between small"><span>' + ui.escapeHtml(PAYMENT_LABELS[sale.paymentMethod] || sale.paymentMethod) + "</span><span class=\"mono\">" + core.brl(sale.paid) + "</span></div>" +
-        (Number(sale.change) > 0 ? '<div class="row-between small"><span>Troco</span><span class="mono">' + core.brl(sale.change) + "</span></div>" : "") +
-        (Number(sale.balance) > 0 ? '<div class="row-between small" style="color:var(--warning)"><span>Saldo em aberto</span><span class="mono">' + core.brl(sale.balance) + "</span></div>" : "") +
-      "</div>" +
-      '<p class="tiny faint center" style="padding-top:14px;border-top:1px dashed var(--border-strong);margin-top:12px">Obrigada pela preferência! 💛<br>' +
-        ui.escapeHtml(settings.ownerName || "") + "</p>" +
-      (sale.status === "CANCELADA" ? '<div class="banner banner-danger mt-8">' + Icons.icon("xCircle", 16) + "<div>Venda cancelada" + (sale.cancelReason ? ": " + ui.escapeHtml(sale.cancelReason) : "") + "</div></div>" : "");
+      '<div class="card"><div class="card-head"><span class="card-title">Fechamentos anteriores</span>' +
+        '<button class="btn btn-outline btn-sm" id="cash-print-history">' + Icons.icon("printer", 14) + " Imprimir</button></div>" +
+        '<div class="table-wrap"><table class="data"><thead><tr>' +
+          "<th>Dia</th><th class=\"right\">Abertura</th><th class=\"right\">Recebido</th>" +
+          "<th class=\"right\">Esperado</th><th class=\"right\">Contado</th><th class=\"right\">Diferença</th><th></th>" +
+        "</tr></thead><tbody>" + rows + "</tbody></table></div></div>";
+  }
+
+  function cashCalendarView() {
+    var month = aux.cashMonth || new Date().toISOString().slice(0, 7);
+    var day = aux.cashDay;
+    var grid = ui.calendar(month, function (key) {
+      return store.cashDaySummary(key);
+    }, { selected: day, format: core.brl });
+
+    var detail = "";
+    if (day) {
+      var summary = store.cashDaySummary(day);
+      detail = '<div class="card mt-16"><div class="card-head">' +
+        '<span class="card-title">' + ui.escapeHtml(core.formatDateBR(day)) + "</span>" +
+        '<div class="row gap-8">' +
+          kpiMini("Faturamento", core.brl(summary.revenue)) +
+          kpiMini("Vendas", String(summary.salesCount)) +
+          kpiMini("Recebido", core.brl(summary.received)) +
+        "</div></div>" +
+        '<div class="card-body stack gap-8">' +
+        (summary.sessions.length
+          ? summary.sessions.map(function (c) {
+              var totals = c.status === "FECHADO" && c.summary ? c.summary : store.cashTotals(c);
+              return '<div class="row-between" style="padding:10px 0;border-bottom:1px dashed var(--border)">' +
+                "<div><strong>" + ui.escapeHtml(core.formatTimeBR(c.openedAt)) + "</strong>" +
+                (c.closedAt ? " → " + ui.escapeHtml(core.formatTimeBR(c.closedAt)) : ' <span class="badge badge-warning">aberto</span>') +
+                '<div class="tiny faint">abertura ' + core.brl(c.openingAmount) + " · " + (totals.salesCount || 0) + " venda(s)</div></div>" +
+                '<div class="right"><div class="mono bold">' + core.brl(totals.received) + "</div>" +
+                (c.countedAmount !== null && c.countedAmount !== undefined
+                  ? '<div class="tiny ' + (Number(c.difference) === 0 ? "faint" : "") + '" style="color:' +
+                    (Number(c.difference) === 0 ? "" : Number(c.difference) > 0 ? "var(--success)" : "var(--danger)") + '">diferença ' + core.brl(c.difference) + "</div>"
+                  : "") +
+                "</div></div>";
+            }).join("")
+          : '<p class="tiny faint">Nenhum caixa aberto neste dia.</p>') +
+        "</div></div>";
+    } else {
+      detail = '<p class="tiny faint mt-16" style="text-align:center">Toque num dia para ver o caixa e as vendas daquele dia.</p>';
+    }
+
+    return '<div class="grid" style="grid-template-columns:minmax(0,420px) minmax(0,1fr);gap:16px;align-items:start">' +
+      '<div class="card"><div class="card-body">' + grid + "</div></div>" +
+      "<div>" + detail + "</div></div>";
+  }
+
+  function kpiMini(label, value) {
+    return '<div style="text-align:right"><div class="tiny faint">' + ui.escapeHtml(label) + "</div>" +
+      '<div class="mono bold small">' + ui.escapeHtml(value) + "</div></div>";
+  }
+
+  function bindCash() {
+    ui.$$("[data-cashtab]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        aux.cashTab = btn.dataset.cashtab;
+        render();
+      });
+    });
+
+    ui.$$("[data-cash]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var action = btn.dataset.cash;
+        if (action === "open") return openCashDialog();
+        if (action === "close") return closeCashDialog();
+        if (action === "sangria") return movementDialog("sangria");
+        if (action === "suprimento") return movementDialog("suprimento");
+      });
+    });
+
+    ui.$$("[data-cash-detail]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        return openCashDetail(btn.dataset.cashDetail);
+      });
+    });
+
+    ui.$$("[data-cal]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var parts = (aux.cashMonth || new Date().toISOString().slice(0, 7)).split("-");
+        var date = new Date(Number(parts[0]), Number(parts[1]) - 1 + (btn.dataset.cal === "next" ? 1 : -1), 1);
+        aux.cashMonth = date.toISOString().slice(0, 7);
+        aux.cashDay = null;
+        render();
+      });
+    });
+
+    ui.$$("[data-cal-day]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        aux.cashDay = btn.dataset.calDay;
+        render();
+      });
+    });
+
+    var printHistory = document.getElementById("cash-print-history");
+    if (printHistory) printHistory.addEventListener("click", function () {
+      printCashReport();
+    });
+  }
+
+  function openCashDialog() {
+    var body = ui.el("div", { class: "stack" });
+    body.appendChild(ui.el("div", { class: "banner banner-info" }, [
+      ui.el("div", { html: Icons.icon("info", 16) + "<div>O valor de abertura é o dinheiro que já está na gaveta para dar troco. Ele não é faturamento.</div>" })
+    ]));
+    var amount = field("Valor de abertura (R$)", "openingAmount", "input", { inputmode: "decimal", placeholder: "200,00", value: "" });
+    var note = field("Observação (opcional)", "note", "input", { placeholder: "Turno da manhã, por exemplo" });
+    body.appendChild(amount);
+    body.appendChild(note);
 
     ui.openModal({
-      title: "Recibo " + sale.code,
-      size: "small",
+      title: "Abrir novo caixa",
+      description: "Comece um turno e acompanhe tudo que entrar e sair da gaveta.",
       body: body,
       footer: [
-        ui.el("button", { class: "btn btn-outline", type: "button", text: "Fechar", onclick: function () { ui.closeModal(); } }),
+        ui.el("button", { class: "btn btn-outline", type: "button", text: "Cancelar", onclick: function () { ui.closeModal(); } }),
         ui.el("button", {
-          class: "btn btn-primary", type: "button", text: "Imprimir",
-          onclick: function () {
-            printNode(body.innerHTML, "Recibo " + sale.code);
+          class: "btn btn-primary", type: "button", text: "Abrir caixa",
+          onclick: async function () {
+            var value = body.querySelector('[name="openingAmount"]').value;
+            try {
+              var session = await store.openCashSession({ openingAmount: value, note: body.querySelector('[name="note"]').value });
+              ui.closeModal();
+              ui.toast("Caixa aberto com " + core.brl(session.openingAmount) + " de fundo.", "success", "Bom trabalho!");
+              render();
+            } catch (err) {
+              ui.toast(err.message, "error");
+            }
           }
         })
       ]
     });
   }
 
-  function printNode(innerHtml, title) {
-    var win = window.open("", "_blank", "width=420,height=640");
-    if (!win) {
-      ui.toast("Permita pop-ups para imprimir o recibo.", "warning");
+  function movementDialog(kind) {
+    var sangria = kind === "sangria";
+    var body = ui.el("div", { class: "stack" });
+    body.appendChild(ui.el("p", { class: "small muted", text: sangria
+      ? "Sangria é a retirada de dinheiro da gaveta (pagamento de fornecedor, depósito no banco...)."
+      : "Suprimento é a entrada de dinheiro na gaveta (troco extra, por exemplo)." }));
+    body.appendChild(field("Valor (R$)", "amount", "input", { inputmode: "decimal", placeholder: "100,00" }));
+    body.appendChild(field("Motivo", "reason", "input", { placeholder: sangria ? "Depósito no banco" : "Troco extra" }));
+
+    ui.openModal({
+      title: sangria ? "Sangria de caixa" : "Suprimento de caixa",
+      body: body,
+      footer: [
+        ui.el("button", { class: "btn btn-outline", type: "button", text: "Cancelar", onclick: function () { ui.closeModal(); } }),
+        ui.el("button", {
+          class: "btn " + (sangria ? "btn-danger" : "btn-primary"), type: "button", text: sangria ? "Registrar sangria" : "Registrar suprimento",
+          onclick: async function () {
+            try {
+              await store.cashMovement(kind, {
+                amount: body.querySelector('[name="amount"]').value,
+                reason: body.querySelector('[name="reason"]').value
+              });
+              ui.closeModal();
+              ui.toast(sangria ? "Sangria registrada." : "Suprimento registrado.", "success");
+              render();
+            } catch (err) {
+              ui.toast(err.message, "error");
+            }
+          }
+        })
+      ]
+    });
+  }
+
+  function closeCashDialog() {
+    var session = store.activeCashSession();
+    if (!session) return;
+    var totals = store.cashTotals(session);
+
+    var body = ui.el("div", { class: "stack" });
+    body.appendChild(ui.el("div", { class: "cash-close-summary" }, [
+      ui.el("div", { html:
+        '<div class="row-between small"><span>Fundo de abertura</span><span class="mono">' + core.brl(totals.opening) + "</span></div>" +
+        '<div class="row-between small"><span>Dinheiro recebido</span><span class="mono">' + core.brl(totals.byMethod.DINHEIRO || 0) + "</span></div>" +
+        '<div class="row-between small"><span>Sangrias</span><span class="mono">− ' + core.brl(totals.withdrawals) + "</span></div>" +
+        '<div class="row-between small"><span>Suprimentos</span><span class="mono">+ ' + core.brl(totals.supplies) + "</span></div>" +
+        '<div class="row-between bold" style="border-top:1px dashed var(--border-strong);padding-top:8px;margin-top:6px"><span>Esperado na gaveta</span><span class="mono">' + core.brl(totals.expected) + "</span></div>"
+      })
+    ]));
+    var counted = field("Dinheiro contado na gaveta (R$)", "countedAmount", "input", { inputmode: "decimal", placeholder: "0,00" });
+    body.appendChild(counted);
+    var diffBox = ui.el("div", { class: "alert alert-line", style: "display:none" });
+    body.appendChild(diffBox);
+    var note = field("Observação (opcional)", "note", "input", { placeholder: "Sobra de R$ 5,00 no caixa" });
+    body.appendChild(note);
+
+    var input = body.querySelector('[name="countedAmount"]');
+    input.addEventListener("input", function () {
+      var value = core.parseMoneyInput(input.value);
+      var diff = core.round2(value - totals.expected);
+      if (!input.value) {
+        diffBox.style.display = "none";
+        return;
+      }
+      diffBox.style.display = "";
+      diffBox.className = "alert " + (Math.abs(diff) < 0.01 ? "alert-success" : diff > 0 ? "alert-info" : "alert-danger");
+      diffBox.innerHTML = Math.abs(diff) < 0.01
+        ? Icons.icon("check", 16) + "<div>Caixa batendo certinho. 🎉</div>"
+        : Icons.icon("alert", 16) + "<div>" + (diff > 0 ? "Sobra de " : "Falta de ") + core.brl(Math.abs(diff)) +
+          " em relação ao esperado (" + core.brl(totals.expected) + ").</div>";
+    });
+
+    ui.openModal({
+      title: "Fechar caixa",
+      description: "Conte o dinheiro da gaveta e confira a diferença antes de fechar.",
+      body: body,
+      footer: [
+        ui.el("button", { class: "btn btn-outline", type: "button", text: "Cancelar", onclick: function () { ui.closeModal(); } }),
+        ui.el("button", {
+          class: "btn btn-primary", type: "button", text: "Fechar caixa",
+          onclick: async function () {
+            try {
+              var closed = await store.closeCashSession({
+                countedAmount: input.value,
+                note: body.querySelector('[name="note"]').value
+              });
+              ui.closeModal();
+              ui.toast("Caixa fechado. Diferença: " + core.brl(closed.difference), "success", "Fechamento concluído");
+              render();
+              openCashReceipt(closed.id);
+            } catch (err) {
+              ui.toast(err.message, "error");
+            }
+          }
+        })
+      ]
+    });
+  }
+
+  function field(label, name, tag, attrs) {
+    var input = ui.el(tag || "input", Object.assign({ class: "input", name: name }, attrs || {}));
+    var wrap = ui.el("div", { class: "field" }, [ui.el("label", { text: label }), input]);
+    wrap.input = input;
+    return wrap;
+  }
+
+  function openCashDetail(id) {
+    var session = store.listCashSessions().find(function (c) { return c.id === id; });
+    if (!session) return;
+    var totals = session.status === "FECHADO" && session.summary
+      ? Object.assign({}, session.summary, { expected: session.expectedAmount })
+      : store.cashTotals(session);
+
+    var body = ui.el("div", { class: "stack" });
+    body.innerHTML =
+      '<div class="row-between small"><span>Abertura</span><span class="mono">' + core.brl(session.openingAmount) + "</span></div>" +
+      '<div class="row-between small"><span>Vendas</span><span class="mono">' + (totals.salesCount || 0) + "</span></div>" +
+      '<div class="row-between small"><span>Recebido</span><span class="mono">' + core.brl(totals.received) + "</span></div>" +
+      Object.keys(totals.byMethod || {}).map(function (key) {
+        return '<div class="row-between tiny faint"><span>' + ui.escapeHtml(PAYMENT_LABELS[key] || key) + '</span><span class="mono">' + core.brl(totals.byMethod[key]) + "</span></div>";
+      }).join("") +
+      '<div class="row-between small"><span>Sangrias</span><span class="mono">− ' + core.brl(totals.withdrawals || 0) + "</span></div>" +
+      '<div class="row-between small"><span>Esperado</span><span class="mono">' + core.brl(totals.expected) + "</span></div>" +
+      (session.countedAmount !== null && session.countedAmount !== undefined
+        ? '<div class="row-between small"><span>Contado</span><span class="mono">' + core.brl(session.countedAmount) + "</span></div>" +
+          '<div class="row-between bold"><span>Diferença</span><span class="mono">' + core.brl(session.difference) + "</span></div>"
+        : "");
+
+    ui.openModal({
+      title: "Caixa de " + core.formatDateBR(session.openedAt),
+      size: "small",
+      body: body,
+      footer: [
+        ui.el("button", { class: "btn btn-outline", type: "button", text: "Fechar", onclick: function () { ui.closeModal(); } }),
+        ui.el("button", { class: "btn btn-primary", type: "button", text: "Ver comprovante", onclick: function () {
+          ui.closeModal();
+          openCashReceipt(session.id);
+        } })
+      ]
+    });
+  }
+
+  /* ============================== RECIBO ============================== */
+
+  function openReceipt(saleId) {
+    var sale = store.getState().sales.find(function (s) { return s.id === saleId; });
+    if (!sale) return;
+    var body = ui.el("div", { class: "receipt-preview" });
+    body.innerHTML = saleReceiptHtml(sale);
+    ui.openModal({
+      title: "Cupom " + sale.code,
+      size: "small",
+      body: body,
+      footer: [
+        ui.el("button", { class: "btn btn-outline", type: "button", text: "Fechar", onclick: function () { ui.closeModal(); } }),
+        ui.el("button", {
+          class: "btn btn-primary", type: "button", text: "Imprimir cupom",
+          onclick: function () { printThermal(saleReceiptHtml(sale), "Cupom " + sale.code); }
+        })
+      ]
+    });
+  }
+
+  /* ---------------------- comprovantes para impressão ---------------------- */
+
+  /** Logo em SVG (para o cupom). */
+  var RECEIPT_LOGO =
+    '<svg width="46" height="46" viewBox="16 0 208 208" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
+    '<rect x="34" y="16" width="172" height="172" rx="5" fill="none" stroke="#8d8779" stroke-width="6"/>' +
+    '<path d="M66 46 L106 60 L106 172 L66 158 Z" fill="#c2a469"/>' +
+    '<g fill="none" stroke="#26231f" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">' +
+    '<path d="M106 60 L106 172"/><path d="M106 72 L134 72 C158 72 158 118 134 118 L106 118"/>' +
+    '<path d="M134 118 L134 172"/><path d="M150 172 L188 46"/></g></svg>';
+
+  /**
+   * Abre a janela de impressão com um cupom térmico (80 mm) bem acabado.
+   * Recebe um HTML interno já formatado.
+   */
+  /** Monta o documento completo do cupom (usado na janela e no modo iframe). */
+  function thermalDocument(innerHtml, title) {
+    var css = thermalCss();
+    return "<!DOCTYPE html><html lang='pt-BR'><head><meta charset='utf-8'><title>" +
+      ui.escapeHtml(title) + "</title><style>" + css + "</style></head><body><div class='sheet'>" +
+      innerHtml + "</div></body></html>";
+  }
+
+  function printThermal(innerHtml, title) {
+    var doc = thermalDocument(innerHtml, title);
+    var win = null;
+    try {
+      win = window.open("", "_blank", "width=460,height=720");
+    } catch (err) {
+      win = null;
+    }
+
+    // Pop-up bloqueado → imprime por um iframe escondido (funciona igual).
+    if (!win || !win.document) {
+      var frame = document.createElement("iframe");
+      frame.setAttribute("aria-hidden", "true");
+      frame.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;opacity:0;";
+      document.body.appendChild(frame);
+      var fdoc = frame.contentWindow.document;
+      fdoc.open();
+      fdoc.write(doc);
+      fdoc.close();
+      setTimeout(function () {
+        try {
+          frame.contentWindow.focus();
+          frame.contentWindow.print();
+        } catch (err) {
+          ui.toast("Não foi possível abrir a impressão neste navegador.", "error");
+        }
+        setTimeout(function () {
+          if (frame.parentNode) frame.parentNode.removeChild(frame);
+        }, 60000);
+      }, 400);
       return;
     }
-    win.document.write(
-      "<!DOCTYPE html><html lang='pt-BR'><head><meta charset='utf-8'><title>" + ui.escapeHtml(title) + "</title>" +
-      "<style>body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-size:12px;color:#1b1a1f;padding:16px;max-width:340px;margin:0 auto}" +
-      "table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:4px 0;border-bottom:1px dotted #ddd;font-size:11px}" +
-      ".right{text-align:right}.row-between{display:flex;justify-content:space-between}.tiny{font-size:10px;color:#777}" +
-      ".bold{font-weight:700}.stack>*{margin-bottom:4px}.mono{font-variant-numeric:tabular-nums}</style></head><body>" +
-      innerHtml + "</body></html>"
-    );
+
+    win.document.write(doc);
     win.document.close();
     win.focus();
-    setTimeout(function () { win.print(); }, 250);
+    setTimeout(function () { if (win.print) win.print(); }, 350);
+  }
+
+  function thermalCss() {
+    return "@page{size:80mm auto;margin:4mm}" +
+      "*{box-sizing:border-box}" +
+      "body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:11px;line-height:1.45;color:#111;margin:0;padding:0 2mm;-webkit-print-color-adjust:exact;print-color-adjust:exact}" +
+      ".sheet{max-width:76mm;margin:0 auto}" +
+      ".brand{text-align:center;padding:2mm 0 3mm}" +
+      ".logo{display:block;margin:0 auto 1.5mm}" +
+      ".brand-name{font-family:Georgia,'Times New Roman',serif;font-size:14px;letter-spacing:.14em;text-transform:uppercase;color:#1b1a17}" +
+      ".brand-sub{font-size:8.5px;letter-spacing:.28em;text-transform:uppercase;color:#9a8b62;margin-top:.5mm}" +
+      ".brand-info{font-size:9px;color:#5d5950;margin-top:1.5mm;line-height:1.4}" +
+      ".rule{border:0;border-top:1px dashed #b3ada1;margin:2.5mm 0}" +
+      ".rule-strong{border-top:1.5px solid #1b1a17}" +
+      ".doc-title{text-align:center;font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:#6c665b;margin:1mm 0 1mm}" +
+      ".meta{display:flex;justify-content:space-between;font-size:9.5px;color:#4a463f;gap:2mm}" +
+      "table{width:100%;border-collapse:collapse}" +
+      ".items th{font-size:8px;text-transform:uppercase;letter-spacing:.08em;color:#8a8377;text-align:left;padding-bottom:1mm;border-bottom:1px solid #d8d2c6}" +
+      ".items td{font-size:10px;padding:1.4mm 0;border-bottom:1px dotted #ded8cc;vertical-align:top}" +
+      ".items .name{font-weight:600}" +
+      ".items .sku{font-size:8px;color:#938c80;letter-spacing:.03em}" +
+      ".right{text-align:right}" +
+      ".mono{font-variant-numeric:tabular-nums;font-feature-settings:'tnum'}" +
+      ".totals{margin-top:2mm}" +
+      ".totals .line{display:flex;justify-content:space-between;font-size:10px;padding:.6mm 0;color:#33302b}" +
+      ".totals .line.muted{color:#7a7469}" +
+      ".totals .grand{display:flex;justify-content:space-between;font-size:14px;font-weight:800;border-top:1.5px solid #1b1a17;margin-top:2mm;padding-top:2mm}" +
+      ".pay{display:flex;justify-content:space-between;font-size:10px;padding:1mm 0}" +
+      ".pay .tag{font-size:8px;text-transform:uppercase;letter-spacing:.1em;color:#8a8377;display:block}" +
+      ".thx{text-align:center;font-size:9px;color:#5d5950;margin-top:3mm;line-height:1.5}" +
+      ".thx strong{color:#1b1a17}" +
+      ".stamp{display:inline-block;border:1.4px solid #b4472f;color:#b4472f;font-size:8px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;padding:.8mm 2mm;border-radius:1mm;transform:rotate(-2deg)}" +
+      ".kv{display:flex;justify-content:space-between;font-size:10px;padding:.5mm 0}" +
+      ".kv .k{color:#7a7469}" +
+      ".footer-note{text-align:center;font-size:8px;color:#a29c90;margin-top:2mm;letter-spacing:.04em}" +
+      "@media screen{body{background:#f4f1ea;padding:6mm 0}.sheet{background:#fff;padding:6mm 4mm;box-shadow:0 10px 30px rgba(0,0,0,.12);border-radius:1mm}}" +
+      "@media print{body{background:#fff}.sheet{box-shadow:none;padding:0}}";
+  }
+
+  function storeHeader(settings, docTitle) {
+    return '<div class="brand">' +
+      '<span class="logo">' + RECEIPT_LOGO + "</span>" +
+      '<div class="brand-name">' + ui.escapeHtml(settings.storeName || "Passarela da Moda") + "</div>" +
+      '<div class="brand-sub">' + ui.escapeHtml(settings.slogan || "Moda & estilo") + "</div>" +
+      '<div class="brand-info">' +
+        (settings.address ? ui.escapeHtml(settings.address) + "<br>" : "") +
+        (settings.phone ? ui.escapeHtml(settings.phone) : "") +
+        (settings.document ? (settings.phone ? " · " : "") + "CNPJ/CPF " + ui.escapeHtml(settings.document) : "") +
+      "</div>" +
+      "</div>" +
+      '<div class="doc-title">' + ui.escapeHtml(docTitle) + "</div>";
+  }
+
+  /** Cupom de venda (80 mm). */
+  function saleReceiptHtml(sale) {
+    var settings = store.getState().settings || {};
+    var customer = sale.customerId ? store.getState().customers.find(function (c) { return c.id === sale.customerId; }) : null;
+    var cash = store.listCashSessions().find(function (c) { return c.id === sale.cashSessionId; });
+
+    var items = sale.items.map(function (item) {
+      return "<tr><td>" +
+        '<div class="name">' + ui.escapeHtml(item.name) + "</div>" +
+        '<div class="sku">' + ui.escapeHtml(item.sku || "") + " · " + item.quantity + " × " + core.brl(item.unitPrice) + "</div>" +
+        '</td><td class="right mono">' + core.brl(item.quantity * item.unitPrice) + "</td></tr>";
+    }).join("");
+
+    return storeHeader(settings, "Cupom não fiscal") +
+      '<hr class="rule">' +
+      '<div class="meta"><span><strong>' + ui.escapeHtml(sale.code) + "</strong></span><span>" +
+        ui.escapeHtml(core.formatDateTimeBR(sale.createdAt)) + "</span></div>" +
+      '<div class="meta" style="margin-top:1mm"><span>Cliente: ' + ui.escapeHtml(customer ? customer.name : "Consumidor final") + "</span>" +
+        (cash ? "<span>Caixa " + ui.escapeHtml(core.formatDateBR(cash.openedAt)) + "</span>" : "") + "</div>" +
+      '<hr class="rule">' +
+      '<table class="items"><thead><tr><th>Item</th><th class="right">Valor</th></tr></thead><tbody>' + items + "</tbody></table>" +
+      '<div class="totals">' +
+        '<div class="line muted"><span>Subtotal</span><span class="mono">' + core.brl(sale.subtotal) + "</span></div>" +
+        (Number(sale.discount) > 0 ? '<div class="line muted"><span>Desconto</span><span class="mono">− ' + core.brl(sale.discount) + "</span></div>" : "") +
+        '<div class="grand"><span>TOTAL</span><span class="mono">' + core.brl(sale.total) + "</span></div>" +
+      "</div>" +
+      '<div class="pay"><div><span class="tag">Pagamento</span>' + ui.escapeHtml(PAYMENT_LABELS[sale.paymentMethod] || sale.paymentMethod) + "</div>" +
+        '<div class="mono right"><span class="tag">Recebido</span>' + core.brl(sale.paid) + "</div></div>" +
+      (Number(sale.change) > 0 ? '<div class="pay"><div></div><div class="mono right"><span class="tag">Troco</span>' + core.brl(sale.change) + "</div></div>" : "") +
+      (Number(sale.balance) > 0 ? '<div class="pay"><div style="color:#b4472f"><span class="tag">Saldo em aberto</span>Fiado</div>' +
+        '<div class="mono right" style="color:#b4472f">' + core.brl(sale.balance) + "</div></div>" : "") +
+      '<hr class="rule">' +
+      '<div class="kv"><span class="k">Atendente</span><span>' + ui.escapeHtml(sale.soldByName || "") + "</span></div>" +
+      (sale.status === "CANCELADA" ? '<div style="text-align:center;margin:2mm 0"><span class="stamp">Cancelada</span></div>' : "") +
+      '<div class="thx"><strong>Obrigado pela preferência!</strong><br>Trocas em até 7 dias com este cupom.</div>' +
+      '<div class="footer-note">' + ui.escapeHtml(core.formatDateTimeBR(new Date().toISOString())) + "</div>";
+  }
+
+  /** Comprovante de fechamento de caixa (80 mm). */
+  function cashReceiptHtml(session) {
+    var settings = store.getState().settings || {};
+    var summary = session.summary || {};
+    var totals = session.summary ? session.summary : store.cashTotals(session);
+    var expected = session.expectedAmount !== undefined && session.expectedAmount !== null ? session.expectedAmount : totals.expected;
+
+    var methods = Object.keys(summary.byMethod || totals.byMethod || {}).map(function (key) {
+      var value = (summary.byMethod || totals.byMethod)[key];
+      return '<div class="kv"><span class="k">' + ui.escapeHtml(PAYMENT_LABELS[key] || key) + '</span><span class="mono">' + core.brl(value) + "</span></div>";
+    }).join("");
+
+    return storeHeader(settings, "Fechamento de caixa") +
+      '<hr class="rule">' +
+      '<div class="meta"><span><strong>' + ui.escapeHtml(core.formatDateBR(session.openedAt)) + "</strong></span>" +
+        "<span>" + ui.escapeHtml(core.formatTimeBR(session.openedAt)) + " → " +
+        (session.closedAt ? ui.escapeHtml(core.formatTimeBR(session.closedAt)) : "em aberto") + "</span></div>" +
+      '<div class="kv"><span class="k">Operador</span><span>' + ui.escapeHtml(session.openedBy || "") + "</span></div>" +
+      '<hr class="rule">' +
+      '<div class="kv"><span class="k">Fundo de abertura</span><span class="mono">' + core.brl(session.openingAmount) + "</span></div>" +
+      '<div class="kv"><span class="k">Vendas</span><span class="mono">' + (summary.salesCount || totals.salesCount || 0) + "</span></div>" +
+      '<div class="kv"><span class="k">Recebido</span><span class="mono">' + core.brl(summary.received || totals.received || 0) + "</span></div>" +
+      methods +
+      '<hr class="rule">' +
+      '<div class="kv"><span class="k">Sangrias</span><span class="mono">− ' + core.brl(summary.withdrawals || 0) + "</span></div>" +
+      '<div class="kv"><span class="k">Suprimentos</span><span class="mono">+ ' + core.brl(summary.supplies || 0) + "</span></div>" +
+      '<div class="kv"><span class="k">A receber (fiado)</span><span class="mono">' + core.brl(summary.debt || totals.debt || 0) + "</span></div>" +
+      '<div class="totals"><div class="grand"><span>ESPERADO</span><span class="mono">' + core.brl(expected) + "</span></div></div>" +
+      (session.countedAmount !== null && session.countedAmount !== undefined
+        ? '<div class="kv" style="margin-top:2mm"><span class="k">Contado na gaveta</span><span class="mono">' + core.brl(session.countedAmount) + "</span></div>" +
+          '<div class="kv"><span class="k">Diferença</span><span class="mono" style="font-weight:700">' + core.brl(session.difference) + "</span></div>"
+        : "") +
+      (session.closingNote ? '<hr class="rule"><div class="kv"><span class="k">Observação</span><span>' + ui.escapeHtml(session.closingNote) + "</span></div>" : "") +
+      '<hr class="rule">' +
+      '<div class="thx">Assinatura do responsável</div>' +
+      '<div style="height:8mm;border-bottom:1px solid #b3ada1;margin:2mm 6mm 0"></div>' +
+      '<div class="footer-note">' + ui.escapeHtml(core.formatDateTimeBR(new Date().toISOString())) + "</div>";
+  }
+
+  function openCashReceipt(sessionId) {
+    var session = store.listCashSessions().find(function (c) { return c.id === sessionId; });
+    if (!session) return;
+    var body = ui.el("div", { class: "receipt-preview" });
+    body.innerHTML = cashReceiptHtml(session);
+    ui.openModal({
+      title: "Comprovante de caixa",
+      size: "small",
+      body: body,
+      footer: [
+        ui.el("button", { class: "btn btn-outline", type: "button", text: "Fechar", onclick: function () { ui.closeModal(); } }),
+        ui.el("button", { class: "btn btn-primary", type: "button", text: "Imprimir", onclick: function () {
+          printThermal(cashReceiptHtml(session), "Fechamento de caixa");
+        } })
+      ]
+    });
+  }
+
+  /** Relatório de caixas (impressão em A4). */
+  function printCashReport() {
+    var settings = store.getState().settings || {};
+    var sessions = store.listCashSessions();
+    var rows = sessions.map(function (c) {
+      var totals = c.status === "FECHADO" && c.summary ? c.summary : store.cashTotals(c);
+      var expected = c.expectedAmount !== undefined && c.expectedAmount !== null ? c.expectedAmount : store.cashTotals(c).expected;
+      return "<tr><td>" + ui.escapeHtml(core.formatDateBR(c.openedAt)) +
+        '<div class="tiny">' + ui.escapeHtml(core.formatTimeBR(c.openedAt)) + (c.closedAt ? " → " + ui.escapeHtml(core.formatTimeBR(c.closedAt)) : "") + "</div></td>" +
+        '<td class="right">' + core.brl(c.openingAmount) + "</td>" +
+        '<td class="right">' + (totals.salesCount || 0) + "</td>" +
+        '<td class="right">' + core.brl(totals.received) + "</td>" +
+        '<td class="right">' + core.brl(expected) + "</td>" +
+        '<td class="right">' + (c.countedAmount === null || c.countedAmount === undefined ? "—" : core.brl(c.countedAmount)) + "</td>" +
+        '<td class="right">' + (c.difference === null || c.difference === undefined ? "—" : core.brl(c.difference)) + "</td></tr>";
+    }).join("");
+
+    var win = window.open("", "_blank", "width=900,height=700");
+    if (!win) return ui.toast("Permita pop-ups para imprimir.", "warning");
+    win.document.write("<!DOCTYPE html><html lang='pt-BR'><head><meta charset='utf-8'><title>Relatório de caixas</title><style>" +
+      "@page{size:A4;margin:14mm}" +
+      "body{font-family:Helvetica,Arial,sans-serif;font-size:11px;color:#1b1a17}" +
+      "header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #1b1a17;padding-bottom:4mm;margin-bottom:5mm}" +
+      "h1{font-family:Georgia,serif;font-size:17px;margin:0 0 1mm;letter-spacing:.04em}" +
+      ".sub{font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:#9a8b62}" +
+      "table{width:100%;border-collapse:collapse;margin-top:4mm}" +
+      "th{font-size:8.5px;text-transform:uppercase;letter-spacing:.08em;color:#7a7469;text-align:left;border-bottom:1px solid #ccc;padding:2mm 1mm}" +
+      "td{padding:1.8mm 1mm;border-bottom:1px solid #eee;font-size:10.5px}" +
+      ".right{text-align:right}.tiny{font-size:8.5px;color:#8a8377}" +
+      "footer{margin-top:6mm;font-size:8.5px;color:#8a8377;text-align:center}" +
+      "</style></head><body>" +
+      "<header><div><h1>" + ui.escapeHtml(settings.storeName || "Passarela da Moda") + "</h1>" +
+      '<div class="sub">Relatório de caixas</div></div><div class="tiny">Emitido em ' +
+      ui.escapeHtml(core.formatDateTimeBR(new Date().toISOString())) + "</div></header>" +
+      "<table><thead><tr><th>Dia</th><th class='right'>Abertura</th><th class='right'>Vendas</th>" +
+      "<th class='right'>Recebido</th><th class='right'>Esperado</th><th class='right'>Contado</th><th class='right'>Diferença</th></tr></thead>" +
+      "<tbody>" + rows + "</tbody></table>" +
+      "<footer>Passarela da Moda · documento gerado pelo próprio sistema</footer></body></html>");
+    win.document.close();
+    win.focus();
+    setTimeout(function () { win.print(); }, 350);
   }
 
   /* ============================== LISTENERS GLOBAIS ============================== */

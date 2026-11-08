@@ -23,8 +23,18 @@
     return (Number(cents || 0) / 100).toFixed(2);
   }
 
+  /**
+   * Formata dinheiro em reais.
+   * - número  → já está em REAIS (ex.: 189.9 → "R$ 189,90")
+   * - texto   → aceita "189,90", "189.90" ou "1.299,90"
+   */
   function brl(value) {
-    var cents = typeof value === "string" ? toCents(value) : Math.round(Number(value) || 0);
+    var cents;
+    if (typeof value === "string") {
+      cents = toCents(parseMoneyInput(value));
+    } else {
+      cents = Math.round((Number(value) || 0) * 100);
+    }
     var negative = cents < 0;
     var abs = Math.abs(cents);
     var reais = String(Math.floor(abs / 100));
@@ -173,6 +183,13 @@
     var d = new Date(raw);
     if (isNaN(d.getTime())) return "—";
     return String(d.getDate()).padStart(2, "0") + "/" + String(d.getMonth() + 1).padStart(2, "0") + "/" + d.getFullYear();
+  }
+
+  function formatTimeBR(value) {
+    if (!value) return "--:--";
+    var d = new Date(value);
+    if (isNaN(d.getTime())) return "--:--";
+    return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
   }
 
   function formatDateTimeBR(value) {
@@ -469,6 +486,7 @@
     nowIso: nowIso,
     formatDateBR: formatDateBR,
     formatDateTimeBR: formatDateTimeBR,
+    formatTimeBR: formatTimeBR,
     computeSaleTotals: computeSaleTotals,
     stockIssues: stockIssues,
     nextCode: nextCode,
