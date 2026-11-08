@@ -275,13 +275,19 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
   background: var(--bg-sidebar); color: #e9e3d9; padding: 20px 14px;
   display: flex; flex-direction: column; gap: 22px; position: sticky; top: 0; height: 100dvh;
 }
-.sidebar-logo { display: flex; align-items: center; gap: 10px; padding: 4px 8px 0; }
-.sidebar-logo-mark {
-  width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center;
-  background: linear-gradient(140deg, #e8c766, #b08d3f); color: #1b1408; font-weight: 700; font-size: 14px;
-  flex-shrink: 0;
+.sidebar-logo { display: flex; align-items: center; gap: 11px; padding: 4px 8px 0; }
+.brand-mark-img {
+  width: 40px; height: 40px; flex-shrink: 0; border-radius: 11px;
+  background: #f6f2e9; padding: 3px; box-shadow: 0 1px 3px rgba(0,0,0,.28);
 }
-.sidebar-logo-text { font-family: var(--font-display); font-size: 17px; letter-spacing: 0.14em; text-transform: uppercase; }
+.sidebar-logo-text {
+  font-family: var(--font-display); font-size: 15px; letter-spacing: 0.06em;
+  text-transform: uppercase; line-height: 1.1; color: #f2e7cf;
+}
+.sidebar-logo-text small {
+  display: block; font-family: var(--font-body, inherit); font-size: 9.5px;
+  letter-spacing: 0.28em; color: rgba(232, 199, 102, 0.85); text-transform: uppercase; margin-top: 2px;
+}
 .sidebar-store { font-size: 10.5px; color: rgba(233, 227, 217, 0.45); letter-spacing: 0.04em; padding: 0 10px; margin-top: -14px; }
 .nav { display: grid; gap: 3px; }
 .nav-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: rgba(233, 227, 217, 0.34); padding: 10px 10px 4px; }
@@ -302,10 +308,19 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
 }
 .sidebar-foot { margin-top: auto; display: grid; gap: 8px; }
 .storage-chip {
-  font-size: 10.5px; color: rgba(233, 227, 217, 0.5); background: rgba(255, 255, 255, 0.05);
-  border-radius: 9px; padding: 9px 11px; line-height: 1.5;
+  font-size: 10.5px; color: rgba(233, 227, 217, 0.62); background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: 9px; padding: 9px 11px; line-height: 1.45; cursor: pointer;
+  display: flex; align-items: center; gap: 7px; text-align: left; width: 100%;
+  transition: background .16s, border-color .16s, transform .16s;
 }
+.storage-chip:hover { background: rgba(255, 255, 255, 0.09); transform: translateY(-1px); }
+.storage-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.storage-chip svg { flex-shrink: 0; }
 .storage-chip strong { color: rgba(233, 227, 217, 0.85); font-weight: 600; }
+.storage-chip.chip-ok { border-color: rgba(126, 200, 150, 0.35); color: rgba(190, 235, 200, 0.92); background: rgba(126,200,150,.1); }
+.storage-chip.chip-warn { border-color: rgba(232, 199, 102, 0.35); color: rgba(244, 228, 184, 0.95); background: rgba(232,199,102,.09); }
+.storage-note { font-size: 10px; color: rgba(233, 227, 217, 0.34); padding: 0 4px; text-align: center; }
 
 .main { min-width: 0; display: flex; flex-direction: column; }
 .topbar {

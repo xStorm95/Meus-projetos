@@ -93,26 +93,14 @@ function click(win, selector) {
 
 test("fluxo completo no navegador (jsdom)", async (t) => {
   const { win, errors } = createWindow();
-  await waitFor(() => win.document.querySelector("#form-login"), "tela de acesso");
+  await waitFor(() => win.document.querySelector(".app-shell"), "app abrindo direto");
 
-  // não existe mais cadastro: só a senha de acesso
-  assert.equal(win.document.querySelector('[data-authtab="signup"]'), null, "sem aba de cadastro");
-  assert.match(win.document.querySelector(".auth-card").textContent, /admin123/);
-
-  // ---------- senha errada ----------
-  typeInto(win, "#login-password", "senha-errada");
-  submit(win, "#form-login");
-  await waitFor(() => /Senha incorreta/i.test(win.document.body.textContent), "mensagem de senha incorreta");
-
-  // ---------- senha certa (admin123) ----------
-  typeInto(win, "#login-password", "admin123");
-  submit(win, "#form-login");
-  await waitFor(() => win.document.querySelector(".app-shell"), "painel após o acesso", 12000);
-  assert.match(win.document.querySelector(".topbar-sub").textContent, /Administrador/);
-
-  const store = win.App.store();
-  assert.equal(store.isAuthenticated(), true);
-  assert.equal(store.getUser().role, "admin");
+  // ---------- sem login, sem cadastro ----------
+  assert.equal(win.document.querySelector("#form-login"), null, "não existe tela de login");
+  assert.equal(win.document.querySelector("#auth-forms"), null, "não existe cadastro");
+  assert.match(win.document.querySelector(".sidebar-logo-text").textContent, /Passarela/i);
+  assert.ok(win.document.querySelector(".brand-mark-img"), "logo na lateral");
+  assert.equal(win.App.store().isAuthenticated(), true, "abre já utilizável");
 
   // ---------- produto ----------
   win.App.navigate("products");
@@ -158,6 +146,7 @@ test("fluxo completo no navegador (jsdom)", async (t) => {
   win.App.navigate("profile");
   await waitFor(() => win.document.querySelector("#form-profile"), "formulário de perfil");
   assert.equal(win.document.querySelector("#form-profile [name='email']"), null, "perfil não pede e-mail");
+  assert.equal(win.document.querySelector("#form-password"), null, "perfil não pede senha");
   typeInto(win, "#form-profile [name='city']", "Ipatinga");
   typeInto(win, "#form-profile [name='bio']", "Dona da loja");
   submit(win, "#form-profile");
@@ -179,8 +168,7 @@ test("fluxo completo no navegador (jsdom)", async (t) => {
   const savedSettings = JSON.parse(backup[settingsKey]);
   assert.equal(savedSettings.profile.id, "operador", "o perfil do operador deve estar salvo");
   assert.equal(savedSettings.profile.avatar, fakePhoto, "a foto de perfil deve estar salva");
-  assert.match(savedSettings.accessHash, /^pbkdf2\$/, "a senha é guardada com hash");
-  assert.ok(!JSON.stringify(backup).includes("admin123"), "senha em texto puro nunca é salva");
+  assert.equal(JSON.stringify(backup).includes("admin123"), false, "nada de senha no programa");
 
   const second = createWindow(backup);
   await waitFor(() => second.win.document.querySelector(".app-shell"), "sessão restaurada ao reabrir", 12000);
@@ -189,17 +177,8 @@ test("fluxo completo no navegador (jsdom)", async (t) => {
   assert.equal(second.win.App.store().listSales().length, 1);
   assert.equal(second.win.App.store().getUser().avatar, fakePhoto);
 
-  // ---------- logout e login de novo ----------
-  await second.win.App.store().logout();
-  second.win.App.render();
-  await waitFor(() => second.win.document.querySelector("#form-login"), "tela de login após sair");
-  typeInto(second.win, "#login-password", "senha-errada");
-  submit(second.win, "#form-login");
-  await waitFor(() => /senha incorreta/i.test(second.win.document.body.textContent), "mensagem de senha incorreta");
-
-  typeInto(second.win, "#login-password", "admin123");
-  submit(second.win, "#form-login");
-  await waitFor(() => second.win.document.querySelector(".app-shell"), "login com a senha correta", 12000);
+  // ---------- reabrir não pede nada ----------
+  assert.equal(second.win.document.querySelector("#form-login"), null, "nunca pede login");
 
   // ---------- dashboard e financeiro renderizam ----------
   second.win.App.navigate("dashboard");

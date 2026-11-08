@@ -17,51 +17,26 @@ PostgreSQL + Drizzle ORM · Zod · Recharts · Vitest
 
 ---
 
-## 0. Palco — versão em arquivo único (HTML)
+## 0. Passarela da Moda — programa offline (arquivo único)
 
-Além do ERP completo em Next.js, o repositório traz o **Palco**: a mesma proposta
-de ERP de moda empacotada em **um único arquivo HTML** com cadastro/login reais,
-perfil com foto e persistência no dispositivo — sem servidor, sem build e
-funcionando offline.
+Sistema de gestão para loja de moda que roda **no seu computador, sem internet, sem instalação,
+sem login e sem cadastro**.
 
-**Arquivo para baixar/publicar:** [`web/palco.html`](web/palco.html) (~217 KB)
+**Arquivo para baixar:** [`Passarela-da-Moda.html`](Passarela-da-Moda.html) (~224 KB)
+Baixe, dê dois cliques e o programa abre no navegador.
 
-- Senhas com PBKDF2-HMAC-SHA256 (210 mil iterações) validado contra `node:crypto`
-- Sessão que sobrevive a fechar o navegador
-- Dados em IndexedDB com espelho em localStorage
-- 40 testes automatizados (39 de lógica + 1 de navegador via jsdom)
-
-```bash
-npm run web:build   # gera web/palco.html
-npm run web:test    # roda os testes do app offline
-```
-
-Detalhes, limites e atalhos: [`web/README.md`](web/README.md).
-
----
-
-## 0.1 Palco Online — site com cadastro, login e dados na nuvem
-
-A versão que roda na Vercel: **cadastro e login reais**, e tudo o que o usuário faz (produtos,
-vendas, clientes, financeiro, foto de perfil) **salvo no PostgreSQL** — a mesma conta abre em
-qualquer aparelho e os dados continuam lá ao sair e entrar de novo.
-
-**App:** [`cloud/`](cloud/) · **Passo a passo de deploy:** [`cloud/README.md`](cloud/README.md)
+- **Sem login / sem cadastro**: abre direto no painel.
+- **Salva no computador**: escolha um arquivo (ex.: `Documentos\Passarela\passarela-da-moda.json`)
+  e tudo — produtos, **fotos**, vendas, clientes, despesas — é gravado nele automaticamente.
+- Leve esse arquivo para outro computador ou pen drive e continue de onde parou.
+- Backup manual em um clique (`.json`) e exportação em CSV nos relatórios.
 
 ```bash
-cd cloud && npm install && cp .env.example .env.local   # cole a DATABASE_URL (Neon)
-npm run dev                                            # http://localhost:3001
+npm run web:build   # gera Passarela-da-Moda.html
+npm run web:test    # 30 testes de lógica + 1 de navegador + 2 de gravação em arquivo
 ```
 
-- `/login` cadastro + login (scrypt no servidor, sessão HttpOnly de 24 h)
-- `/app`    o ERP completo, com cada alteração gravada em `user_state` por conta
-- `/perfil` dados da conta e foto sincronizada
-
-Testes: `npm run web:test` (39 + 1 offline), `npm run cloud:test` (12 de API),
-`npm run cloud:e2e` (navegador: cadastro → produto → sair → entrar → outro aparelho).
-
-O arquivo único [`index.html`](index.html) continua disponível para uso **offline**,
-com senha de acesso `admin123`.
+Detalhes: [`web/README.md`](web/README.md) · Logo em [`web/brand/`](web/brand).
 
 ## 1. Rodar localmente
 

@@ -67,49 +67,23 @@
       };
     }
 
-    /* ======================= MODO NUVEM ======================= */
+    /* ==================== OPERADOR (SEM LOGIN) ==================== */
 
-    function isCloud() {
-      return typeof db.isCloud === "function" && db.isCloud();
-    }
-
-    function cloudClient() {
-      if (typeof db.cloud !== "function") return null;
-      return db.cloud();
-    }
-
-    /** Converte a conta do servidor no formato de usuário do app. */
-    function accountToUser(account) {
-      if (!account) return null;
+    /** Não existe conta: o app abre direto e registra quem está usando. */
+    function defaultProfile() {
       return {
-        id: account.id,
-        name: account.name,
-        email: account.email,
-        role: account.role === "owner" ? "admin" : "operador",
-        document: account.document || "",
-        phone: account.phone || "",
-        birthDate: account.birthDate || "",
-        city: account.city || "",
-        bio: account.bio || "",
-        avatar: account.avatar || "",
-        createdAt: account.createdAt || now(),
-        lastLoginAt: account.lastLoginAt || null
+        id: "operador",
+        name: "Passarela da Moda",
+        role: "admin",
+        createdAt: now(),
       };
     }
 
-    /** Lê a sessão do servidor (cookie HttpOnly) e carrega o estado da conta. */
-    async function syncSession() {
-      var client = cloudClient();
-      if (!client) return false;
-      var session = await client.session();
-      if (!session || !session.authenticated || !session.account) {
-        currentUser = null;
-        state.session = null;
-        return false;
+    function currentProfile() {
+      if (!state.settings.profile) {
+        state.settings.profile = defaultProfile();
       }
-      currentUser = accountToUser(session.account);
-      state.session = { token: "cookie", userId: currentUser.id, expiresAt: session.expiresAt || null };
-      return true;
+      return state.settings.profile;
     }
 
     function defaultSettings() {
@@ -123,8 +97,6 @@
         accent: "gold",
         theme: "light",
         lowStockThreshold: 3,
-        accessHash: "",
-        passwordChanged: false,
         profile: null,
         createdAt: now()
       };
@@ -137,60 +109,23 @@
     }
 
     async function load() {
-      if (isCloud()) {
-        var online = await syncSession();
-        if (!online) {
-          state.settings = defaultSettings();
-          loaded = true;
-          emit();
-          return state;
-        }
-        var resultsCloud = await Promise.all([
-          db.get(KEYS.products, []),
-          db.get(KEYS.customers, []),
-          db.get(KEYS.sales, []),
-          db.get(KEYS.expenses, []),
-          db.get(KEYS.settings, null)
-        ]);
-        state.products = resultsCloud[0] || [];
-        state.customers = resultsCloud[1] || [];
-        state.sales = resultsCloud[2] || [];
-        state.expenses = resultsCloud[3] || [];
-        state.settings = resultsCloud[4] || defaultSettings();
-        state.users = currentUser ? [currentUser] : [];
-        loaded = true;
-        emit();
-        return state;
-      }
-
       var results = await Promise.all([
-        db.get(KEYS.users, []),
         db.get(KEYS.products, []),
         db.get(KEYS.customers, []),
         db.get(KEYS.sales, []),
         db.get(KEYS.expenses, []),
-        db.get(KEYS.settings, null),
-        db.get(KEYS.session, null)
+        db.get(KEYS.settings, null)
       ]);
-      state.users = results[0] || [];
-      state.products = results[1] || [];
-      state.customers = results[2] || [];
-      state.sales = results[3] || [];
-      state.expenses = results[4] || [];
-      state.settings = results[5] || defaultSettings();
-      state.session = results[6] || null;
-      if (!results[5]) await db.set(KEYS.settings, state.settings);
+      state.products = results[0] || [];
+      state.customers = results[1] || [];
+      state.sales = results[2] || [];
+      state.expenses = results[3] || [];
+      state.settings = results[4] || defaultSettings();
+      if (!results[4]) await db.set(KEYS.settings, state.settings);
+      currentUser = currentProfile();
+      state.users = [currentUser];
+      state.session = null;
       loaded = true;
-
-      // Restaura a sessão se ainda for válida — é isto que mantém o usuário
-      // logado depois de fechar o navegador.
-      if (state.session && state.session.expiresAt && new Date(state.session.expiresAt).getTime() > Date.now()) {
-        currentUser = state.settings.profile || defaultProfile();
-        if (!currentUser || currentUser.id !== state.session.userId) currentUser = state.settings.profile || defaultProfile();
-      } else if (state.session) {
-        state.session = null;
-        await db.set(KEYS.session, null);
-      }
       emit();
       return state;
     }
@@ -200,153 +135,6 @@
     }
 
     /* ---------------------------- AUTH ---------------------------- */
-
-    /**
-     * Acesso por senha única (sem cadastro, sem e-mail).
-     * A senha fica guardada como hash; o perfil do operador guarda nome e foto.
-     */
-    async function loginWithPassword(password) {
-      await ensureLoaded();
-
-      if (isCloud()) {
-        var client = cloudClient();
-        var res = await client.login({ password: password });
-        if (res.status === 429 || res.status === 423) {
-          var wait = new Error((res.body && res.body.error) || "Muitas tentativas. Aguarde para tentar de novo.");
-          wait.code = "LOCKED";
-          throw wait;
-        }
-        if (res.status === 401 || !res.ok) return false;
-        currentUser = accountToUser(res.body.account);
-        state.users = currentUser ? [currentUser] : [];
-        await load();
-        emit();
-        return true;
-      }
-
-      var settings = state.settings || defaultSettings();
-      var passwordHash = settings.accessHash;
-      var hashToCheck = passwordHash;
-      var matchesDefault = matchesBuiltinPassword(password);
-      if (!passwordHash) {
-        // Primeiro acesso de um banco antigo/limpo: aceita a senha padrão e grava o hash.
-        if (!matchesDefault) return false;
-        settings.accessHash = await hash.hashPassword(password);
-        settings.updatedAt = now();
-        state.settings = settings;
-        await db.set(KEYS.settings, state.settings);
-      } else {
-        var valid = await hash.verifyPassword(password, hashToCheck);
-        if (!valid && matchesDefault && !settings.passwordChanged) {
-          valid = true;
-        }
-        if (!valid) return false;
-      }
-      var profile = state.settings.profile || defaultProfile();
-      profile.lastLoginAt = now();
-      state.settings.profile = profile;
-      state.settings.updatedAt = now();
-      await db.set(KEYS.settings, state.settings);
-      await startSession(profile);
-      emit();
-      return true;
-    }
-
-    /** Cadastro real (apenas no modo nuvem). */
-    async function signup(payload) {
-      if (!isCloud()) {
-        var offline = new Error("O cadastro precisa de conexão com o servidor.");
-        offline.code = "OFFLINE";
-        throw offline;
-      }
-      var client = cloudClient();
-      var validation = core.validateSignup(payload, []);
-      if (!validation.valid) {
-        var invalid = new Error("Confira os campos destacados.");
-        invalid.fields = validation.errors;
-        throw invalid;
-      }
-      var res = await client.signup({
-        name: payload.name,
-        email: payload.email,
-        password: payload.password,
-        passwordConfirm: payload.passwordConfirm,
-        phone: payload.phone || "",
-        document: payload.document || "",
-        city: payload.city || ""
-      });
-      if (!res.ok) {
-        var err = new Error((res.body && res.body.error) || "Não foi possível criar a conta.");
-        err.fields = (res.body && res.body.fields) || {};
-        throw err;
-      }
-      currentUser = accountToUser(res.body.account);
-      state.users = currentUser ? [currentUser] : [];
-      await load();
-      emit();
-      return publicUser(currentUser);
-    }
-
-    /** Dados do servidor (modo nuvem) para a tela de perfil. */
-    function isCloudMode() {
-      return isCloud();
-    }
-
-    /** Senha padrão de fábrica (usada apenas enquanto ninguém a trocou). */
-    function matchesBuiltinPassword(password) {
-      var value = String(password || "");
-      return value === "admin123" || value === "admin";
-    }
-
-    function defaultProfile() {
-      return {
-        id: "operador",
-        name: "Administrador",
-        email: "",
-        role: "admin",
-        document: "",
-        phone: "",
-        birthDate: "",
-        city: "",
-        bio: "",
-        avatar: "",
-        createdAt: now(),
-        lastLoginAt: null
-      };
-    }
-
-    async function startSession(user) {
-      var session = {
-        token: hash.randomToken(),
-        userId: user.id,
-        createdAt: now(),
-        expiresAt: new Date(Date.now() + SESSION_HOURS * 60 * 60 * 1000).toISOString()
-      };
-      state.session = session;
-      currentUser = user;
-      await db.set(KEYS.session, session);
-    }
-
-    async function logout() {
-      if (isCloud()) {
-        var client = cloudClient();
-        if (client) await client.logout();
-        currentUser = null;
-        state.session = null;
-        state.users = [];
-        state.products = [];
-        state.customers = [];
-        state.sales = [];
-        state.expenses = [];
-        state.settings = defaultSettings();
-        emit();
-        return true;
-      }
-      state.session = null;
-      currentUser = null;
-      await db.set(KEYS.session, null);
-      emit();
-    }
 
     function publicUser(user) {
       if (!user) return null;
@@ -367,57 +155,22 @@
     }
 
     function getUser() {
+      if (!currentUser) currentUser = currentProfile();
       return publicUser(currentUser);
+    }
+
+    /** Sempre "logado": quem usa o programa é o operador da loja. */
+    function isAuthenticated() {
+      return true;
     }
 
     async function updateProfile(patch) {
       await ensureLoaded();
-      if (!currentUser) throw new Error("Sessão expirada. Faça login novamente.");
-
-      if (isCloud()) {
-        var client = cloudClient();
-        var body = {};
-        if (patch.name !== undefined) body.name = patch.name;
-        if (patch.email !== undefined) body.email = patch.email;
-        if (patch.phone !== undefined) body.phone = patch.phone;
-        if (patch.document !== undefined) body.document = patch.document;
-        if (patch.birthDate !== undefined) body.birthDate = patch.birthDate;
-        if (patch.city !== undefined) body.city = patch.city;
-        if (patch.bio !== undefined) body.bio = patch.bio;
-
-        var res = null;
-        if (Object.keys(body).length) {
-          res = await client.request("/api/profile", { method: "PATCH", body: body });
-          if (!res.ok) {
-            var errC = new Error((res.body && res.body.error) || "Não foi possível salvar.");
-            errC.fields = (res.body && res.body.fields) || {};
-            throw errC;
-          }
-        }
-
-        if (patch.avatar !== undefined) {
-          var avatarRes = patch.avatar
-            ? await client.request("/api/profile/avatar", { method: "PUT", body: { avatar: patch.avatar } })
-            : await client.request("/api/profile/avatar", { method: "DELETE" });
-          if (!avatarRes.ok) {
-            var errA = new Error((avatarRes.body && avatarRes.body.error) || "Não foi possível salvar a foto.");
-            errA.fields = { avatar: "Não foi possível salvar a foto." };
-            throw errA;
-          }
-          res = avatarRes;
-        }
-
-        var account = res && res.body && res.body.account ? res.body.account : null;
-        if (account) currentUser = accountToUser(account);
-        state.users = currentUser ? [currentUser] : [];
-        state.settings = Object.assign({}, state.settings, { profile: currentUser });
-        emit();
-        return publicUser(currentUser);
-      }
+      if (!currentUser) currentUser = currentProfile();
 
       var errors = {};
       var name = patch.name !== undefined ? String(patch.name).trim() : currentUser.name;
-      if (name.length < 2) errors.name = "Informe seu nome.";
+      if (name.length < 2) errors.name = "Informe a identificação da loja.";
       var email = patch.email !== undefined ? String(patch.email).trim().toLowerCase() : currentUser.email;
       if (email && !core.isValidEmail(email)) errors.email = "E-mail inválido.";
       if (patch.document) {
@@ -448,45 +201,6 @@
       await db.set(KEYS.settings, state.settings);
       emit();
       return publicUser(updated);
-    }
-
-    /** Troca a senha de acesso (não existe conta por e-mail). */
-    async function changePassword(currentPassword, newPassword) {
-      await ensureLoaded();
-
-      if (isCloud()) {
-        var client = cloudClient();
-        var res = await client.request("/api/profile/password", {
-          method: "POST",
-          body: { currentPassword: currentPassword, newPassword: newPassword, confirmPassword: newPassword }
-        });
-        if (!res.ok) {
-          var err = new Error((res.body && res.body.error) || "Não foi possível trocar a senha.");
-          err.fields = (res.body && res.body.fields) || {};
-          throw err;
-        }
-        return true;
-      }
-
-      var stored = state.settings.accessHash;
-      var valid = stored ? await hash.verifyPassword(currentPassword, stored) : matchesBuiltinPassword(currentPassword);
-      if (!valid) {
-        var err = new Error("A senha atual está incorreta.");
-        err.fields = { currentPassword: "Senha atual incorreta." };
-        throw err;
-      }
-      var strength = core.validatePasswordStrength(newPassword);
-      if (strength) {
-        var weak = new Error(strength);
-        weak.fields = { newPassword: strength };
-        throw weak;
-      }
-      state.settings.accessHash = await hash.hashPassword(newPassword);
-      state.settings.passwordChanged = true;
-      state.settings.updatedAt = now();
-      await db.set(KEYS.settings, state.settings);
-      emit();
-      return true;
     }
 
     /* -------------------------- PRODUTOS -------------------------- */
@@ -924,22 +638,15 @@
       };
     }
 
+    /** Conteúdo do backup baixado/gravado pelo usuário. */
     async function exportAll() {
       await ensureLoaded();
-      // Nunca exporta o hash da senha de acesso.
-      var safeSettings = Object.assign({}, state.settings);
-      delete safeSettings.accessHash;
       return {
-        app: "Passarela ERP",
+        app: "Passarela da Moda",
+        format: "passarela-backup",
         exportedAt: now(),
         version: 1,
-        settings: safeSettings,
-        // A senha NUNCA sai no export (apenas hash não exportado)
-        users: state.users.map(function (u) {
-          var copy = Object.assign({}, u);
-          delete copy.passwordHash;
-          return copy;
-        }),
+        settings: state.settings,
         products: state.products,
         customers: state.customers,
         sales: state.sales,
@@ -947,49 +654,54 @@
       };
     }
 
-    /** Volta a senha de acesso para a padrão (admin123). */
-    async function resetPassword() {
-      await ensureLoaded();
-      state.settings.accessHash = await hash.hashPassword("admin123");
-      state.settings.passwordChanged = false;
-      state.settings.updatedAt = now();
-      await db.set(KEYS.settings, state.settings);
-      emit();
-      return true;
-    }
-
     async function wipeData() {
       await db.clearAll();
-      if (isCloud()) {
-        state.products = [];
-        state.customers = [];
-        state.sales = [];
-        state.expenses = [];
-        emit();
-        return true;
-      }
       var keepSettings = Object.assign({}, defaultSettings(), {
-        accessHash: state.settings.accessHash,
-        passwordChanged: state.settings.passwordChanged,
         profile: state.settings.profile,
         storeName: state.settings.storeName,
         accent: state.settings.accent,
         theme: state.settings.theme
       });
-      state = {
-        users: [],
-        products: [],
-        customers: [],
-        sales: [],
-        expenses: [],
-        settings: keepSettings,
-        session: null
-      };
-      currentUser = null;
+      state.products = [];
+      state.customers = [];
+      state.sales = [];
+      state.expenses = [];
+      state.settings = keepSettings;
+      currentUser = currentProfile();
+      state.users = [currentUser];
       loaded = true;
       await db.set(KEYS.settings, state.settings);
       emit();
       return true;
+    }
+
+    /** Importa um backup .json (substitui os dados atuais). */
+    async function restoreBackup(payload) {
+      await ensureLoaded();
+      var data = payload && payload.data ? payload.data : payload;
+      if (!data || typeof data !== "object") throw new Error("Arquivo de backup inválido.");
+      state.products = Array.isArray(data.products) ? data.products : [];
+      state.customers = Array.isArray(data.customers) ? data.customers : [];
+      state.sales = Array.isArray(data.sales) ? data.sales : [];
+      state.expenses = Array.isArray(data.expenses) ? data.expenses : [];
+      if (data.settings) {
+        state.settings = Object.assign({}, defaultSettings(), data.settings);
+      }
+      currentUser = currentProfile();
+      state.users = [currentUser];
+      await Promise.all([
+        db.set(KEYS.products, state.products),
+        db.set(KEYS.customers, state.customers),
+        db.set(KEYS.sales, state.sales),
+        db.set(KEYS.expenses, state.expenses),
+        db.set(KEYS.settings, state.settings),
+      ]);
+      emit();
+      return {
+        products: state.products.length,
+        customers: state.customers.length,
+        sales: state.sales.length,
+      };
     }
 
     return {
@@ -999,38 +711,10 @@
         return state;
       },
       getUser: getUser,
-      isAuthenticated: function () {
-        return Boolean(currentUser);
-      },
-      login: async function (email, password) {
-        if (!isCloud()) {
-          var offline = new Error("Este modo funciona apenas com a senha de acesso.");
-          offline.code = "OFFLINE";
-          throw offline;
-        }
-        await ensureLoaded();
-        var client = cloudClient();
-        var res = await client.login({ email: email, password: password });
-        if (res.status === 429) {
-          var locked = new Error((res.body && res.body.error) || "Muitas tentativas. Aguarde alguns minutos.");
-          locked.code = "LOCKED";
-          throw locked;
-        }
-        if (res.status === 401 || !res.ok) return false;
-        currentUser = accountToUser(res.body.account);
-        state.users = currentUser ? [currentUser] : [];
-        await load();
-        emit();
-        return true;
-      },
-      loginWithPassword: loginWithPassword,
-      signup: signup,
-      isCloudMode: isCloudMode,
+      isAuthenticated: isAuthenticated,
       refresh: load,
-      resetPassword: resetPassword,
-      logout: logout,
+      restoreBackup: restoreBackup,
       updateProfile: updateProfile,
-      changePassword: changePassword,
       saveProduct: saveProduct,
       deleteProduct: deleteProduct,
       adjustStock: adjustStock,

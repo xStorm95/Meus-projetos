@@ -51,100 +51,10 @@ const ALICE = {
   phone: "(31) 99999-8888",
 };
 
-test("acesso por senha única: admin123 entra e inicia sessão", async () => {
-  const { store } = makeStore();
-  await store.load();
-  const entered = await store.loginWithPassword("admin123");
-  assert.equal(entered, true);
-  assert.equal(store.isAuthenticated(), true);
-  assert.equal(store.getUser().role, "admin");
-  assert.ok(!("accessHash" in store.getUser()), "o hash nunca sai no perfil público");
-});
-
-test("a variante admin também entra", async () => {
-  const { store } = makeStore();
-  await store.load();
-  assert.equal(await store.loginWithPassword("admin"), true);
-  assert.equal(store.isAuthenticated(), true);
-});
-
-test("senha errada e senha vazia não entram", async () => {
-  const { store } = makeStore();
-  await store.load();
-  assert.equal(await store.loginWithPassword("errada123"), false);
-  assert.equal(await store.loginWithPassword(""), false);
-  assert.equal(store.isAuthenticated(), false);
-});
-
-test("a senha não é gravada em texto puro", async () => {
-  const { db, store } = makeStore();
-  await store.load();
-  await store.loginWithPassword("admin123");
-  const settings = await db.get("settings", {});
-  assert.match(settings.accessHash, /^pbkdf2\$/);
-  assert.ok(!JSON.stringify(settings).includes('"admin123"'), "senha em texto puro vazou no storage");
-});
-
-test("sessão sobrevive ao fechar e reabrir o site (novo store, mesmo banco)", async () => {
-  const { db, store } = makeStore();
-  await store.load();
-  await store.loginWithPassword("admin123");
-  const store2 = createStore({ db, hash, core });
-  await store2.load();
-  assert.equal(store2.isAuthenticated(), true);
-  assert.equal(store2.getUser().id, "operador");
-});
-
-test("logout limpa a sessão e não volta logado", async () => {
-  const { db, store } = makeStore();
-  await store.load();
-  await store.loginWithPassword("admin123");
-  await store.logout();
-  assert.equal(store.isAuthenticated(), false);
-  const store2 = createStore({ db, hash, core });
-  await store2.load();
-  assert.equal(store2.isAuthenticated(), false);
-});
-
-test("sessão expirada é descartada no carregamento", async () => {
-  const { db, store } = makeStore();
-  await store.load();
-  await store.loginWithPassword("admin123");
-  const session = await db.get("session", {});
-  await db.set("session", { ...session, expiresAt: new Date(Date.now() - 1000).toISOString() });
-  const store2 = createStore({ db, hash, core });
-  await store2.load();
-  assert.equal(store2.isAuthenticated(), false);
-});
-
-test("troca de senha exige a atual e passa a valer no login", async () => {
-  const { store } = makeStore();
-  await store.load();
-  await store.loginWithPassword("admin123");
-  await assert.rejects(() => store.changePassword("errada", "NovaSenha@2026"), /incorreta/);
-  await store.changePassword("admin123", "NovaSenha@2026");
-  await store.logout();
-  assert.equal(await store.loginWithPassword("admin123"), false);
-  assert.equal(await store.loginWithPassword("NovaSenha@2026"), true);
-});
-
-test("resetPassword volta a senha para admin123", async () => {
-  const { store } = makeStore();
-  await store.load();
-  await store.loginWithPassword("admin123");
-  await store.changePassword("admin123", "OutraSenha@2026");
-  await store.logout();
-  assert.equal(await store.loginWithPassword("admin123"), false);
-  await store.loginWithPassword("OutraSenha@2026");
-  await store.resetPassword();
-  await store.logout();
-  assert.equal(await store.loginWithPassword("admin123"), true);
-});
-
 test("perfil: edita dados, foto e mantém tudo após recarregar", async () => {
   const { db, store } = makeStore();
   await store.load();
-  await store.loginWithPassword("admin123");
+  
   const avatar = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==";
   await store.updateProfile({ name: "Alice F. Souza", city: "Ipatinga", bio: "Dona da loja", avatar });
 
@@ -159,7 +69,6 @@ test("perfil: edita dados, foto e mantém tudo após recarregar", async () => {
 test("perfil recusa CPF inválido e mantém a foto", async () => {
   const { store } = makeStore();
   await store.load();
-  await store.loginWithPassword("admin123");
   await assert.rejects(
     () => store.updateProfile({ document: "111.111.111-11" }),
     (err) => Boolean(err.fields.document),
@@ -169,7 +78,7 @@ test("perfil recusa CPF inválido e mantém a foto", async () => {
 test("produto: cria, edita, valida e remove", async () => {
   const { store } = makeStore();
   await store.load();
-  await store.loginWithPassword("admin123");
+  
 
   const product = await store.saveProduct({ name: "Vestido Midi", price: 199.9, cost: 80, stock: 5, category: "Vestidos", size: "M", color: "Preto" });
   assert.equal(product.price, 199.9);
@@ -190,7 +99,7 @@ test("produto: cria, edita, valida e remove", async () => {
 test("venda: baixa estoque, calcula troco e recusa estoque insuficiente", async () => {
   const { store } = makeStore();
   await store.load();
-  await store.loginWithPassword("admin123");
+  
   const p1 = await store.saveProduct({ name: "Blusa", price: 100, cost: 40, stock: 3 });
   const p2 = await store.saveProduct({ name: "Calça", price: 150, cost: 70, stock: 2 });
   const customer = await store.saveCustomer({ name: "Maria Cliente", phone: "31999998888" });
@@ -219,7 +128,7 @@ test("venda: baixa estoque, calcula troco e recusa estoque insuficiente", async 
 test("venda fiado registra saldo e aparece no dashboard", async () => {
   const { store } = makeStore();
   await store.load();
-  await store.loginWithPassword("admin123");
+  
   const product = await store.saveProduct({ name: "Saia", price: 200, cost: 80, stock: 5 });
   const sale = await store.createSale({
     items: [{ productId: product.id, quantity: 1 }],
@@ -234,7 +143,7 @@ test("venda fiado registra saldo e aparece no dashboard", async () => {
 test("cancelamento devolve estoque e marca a venda", async () => {
   const { store } = makeStore();
   await store.load();
-  await store.loginWithPassword("admin123");
+  
   const product = await store.saveProduct({ name: "Short", price: 90, cost: 30, stock: 4 });
   const sale = await store.createSale({ items: [{ productId: product.id, quantity: 2 }], paidAmount: 180 });
   assert.equal(store.listProducts()[0].stock, 2);
@@ -252,7 +161,7 @@ test("cancelamento devolve estoque e marca a venda", async () => {
 test("dashboard calcula lucro, ticket e produtos mais vendidos", async () => {
   const { store } = makeStore();
   await store.load();
-  await store.loginWithPassword("admin123");
+  
   const a = await store.saveProduct({ name: "Produto A", price: 100, cost: 40, stock: 10 });
   const b = await store.saveProduct({ name: "Produto B", price: 50, cost: 50, stock: 10 });
   await store.createSale({ items: [{ productId: a.id, quantity: 2 }], paidAmount: 200 });
@@ -272,7 +181,7 @@ test("dashboard calcula lucro, ticket e produtos mais vendidos", async () => {
 test("despesas: cria, exige valor, alterna pagamento e remove", async () => {
   const { store } = makeStore();
   await store.load();
-  await store.loginWithPassword("admin123");
+  
   await assert.rejects(() => store.saveExpense({ description: "Conta", amount: 0 }), /maior que zero/);
   const expense = await store.saveExpense({ description: "Energia", amount: 320.5, category: "Contas" });
   assert.equal(store.dashboard().expenses, 320.5);
@@ -282,32 +191,41 @@ test("despesas: cria, exige valor, alterna pagamento e remove", async () => {
   assert.equal(store.listExpenses().length, 0);
 });
 
-test("exportação não inclui hash de senha", async () => {
+test("exportação gera um backup completo, pronto para restaurar", async () => {
   const { store } = makeStore();
   await store.load();
-  await store.loginWithPassword("admin123");
+  await store.saveProduct({ name: "Vestido Backup", price: 199.9, stock: 2 });
+  await store.saveCustomer({ name: "Cliente Backup", phone: "31999998888" });
+
   const dump = await store.exportAll();
-  const text = JSON.stringify(dump);
-  assert.ok(!text.includes("pbkdf2$"), "hash de senha não deve ser exportado");
-  assert.equal(dump.settings.accessHash, undefined);
+  assert.equal(dump.app, "Passarela da Moda");
+  assert.equal(dump.format, "passarela-backup");
+  assert.equal(dump.products.length, 1);
+  assert.equal(dump.customers.length, 1);
+
+  // restaura em um "computador novo"
+  const outro = makeStore();
+  await outro.store.load();
+  const totals = await outro.store.restoreBackup(dump);
+  assert.equal(totals.products, 1);
+  assert.equal(outro.store.listProducts()[0].name, "Vestido Backup");
+  assert.equal(outro.store.listCustomers()[0].name, "Cliente Backup");
 });
 
-test("wipeData apaga tudo e volta ao estado inicial", async () => {
+test("wipeData apaga os dados e mantém o programa pronto para usar", async () => {
   const { store } = makeStore();
   await store.load();
-  await store.loginWithPassword("admin123");
   await store.saveProduct({ name: "Produto", price: 10 });
   await store.wipeData();
-  assert.equal(store.isAuthenticated(), false);
   assert.equal(store.listProducts().length, 0);
-  // o acesso continua valendo e o perfil é preservado
-  assert.equal(await store.loginWithPassword("admin123"), true);
+  assert.equal(store.isAuthenticated(), true, "sem login: continua aberto");
+  assert.ok(store.getUser(), "operador preservado");
 });
 
 test("receber saldo de fiado quita a venda e atualiza o dashboard", async () => {
   const { store } = makeStore();
   await store.load();
-  await store.loginWithPassword("admin123");
+  
   const product = await store.saveProduct({ name: "Bolsa", price: 300, cost: 100, stock: 3 });
   const sale = await store.createSale({
     items: [{ productId: product.id, quantity: 1 }],

@@ -4,9 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#17141c">
-  <meta name="description" content="Palco — ERP de moda com cadastro, login, perfil com foto e seus dados salvos no dispositivo. Funciona offline.">
-  <title>Palco · ERP de moda</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%2317141c'/%3E%3Ctext x='32' y='44' font-family='Georgia,serif' font-size='34' fill='%23e8c766' text-anchor='middle'%3EP%3C/text%3E%3C/svg%3E">
+  <meta name="description" content="Passarela da Moda — sistema de gestão para loja de moda. Funciona no seu computador, sem internet e sem login, salvando produtos, fotos, vendas e clientes em arquivo.">
+  <meta name="application-name" content="Passarela da Moda">
+  <title>Passarela da Moda · Gestão de loja</title>
+  <link rel="icon" href="data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20240%20292%22%20width%3D%22240%22%20height%3D%22292%22%20role%3D%22img%22%20aria-label%3D%22Passarela%20da%20Moda%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22goldFace%22%20x1%3D%220.1%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23e2cc93%22%2F%3E%3Cstop%20offset%3D%2245%25%22%20stop-color%3D%22%23cdb173%22%2F%3E%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23a3854a%22%2F%3E%3C%2FlinearGradient%3E%3ClinearGradient%20id%3D%22inkGrad%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23403d38%22%2F%3E%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%231d1b18%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3C%21--%20moldura%20quadrada%20--%3E%3Crect%20x%3D%2234%22%20y%3D%2216%22%20width%3D%22172%22%20height%3D%22172%22%20rx%3D%225%22%20fill%3D%22none%22%20stroke%3D%22%23ada79c%22%20stroke-width%3D%222.4%22%2F%3E%3C%21--%20coluna%20dourada%20em%20perspectiva%20--%3E%3Cpath%20d%3D%22M66%2046%20L106%2060%20L106%20172%20L66%20158%20Z%22%20fill%3D%22url%28%23goldFace%29%22%2F%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22url%28%23inkGrad%29%22%20stroke-width%3D%228%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3C%21--%20haste%20vertical%20do%20P%20--%3E%3Cpath%20d%3D%22M106%2060%20L106%20172%22%2F%3E%3C%21--%20la%C3%A7ada%20do%20P%20--%3E%3Cpath%20d%3D%22M106%2072%20L134%2072%20C158%2072%20158%20118%20134%20118%20L106%20118%22%2F%3E%3C%21--%20haste%20direita%20%28sobe%20at%C3%A9%20o%20topo%29%20--%3E%3Cpath%20d%3D%22M134%20118%20L134%20172%22%2F%3E%3C%21--%20diagonal%20de%20cima%2C%20como%20um%20cabide%20--%3E%3Cpath%20d%3D%22M150%20172%20L188%2046%22%2F%3E%3C%2Fg%3E%3C%21--%20nome%20--%3E%3Ctext%20x%3D%22120%22%20y%3D%22224%22%20text-anchor%3D%22middle%22%20font-family%3D%22Georgia%2C%20%27Times%20New%20Roman%27%2C%20serif%22%0A%20%20%20%20%20%20%20%20font-size%3D%2223%22%20letter-spacing%3D%220.6%22%20fill%3D%22%23ab8b45%22%3EPASSARELA%20DA%3C%2Ftext%3E%3Ctext%20x%3D%22120%22%20y%3D%22262%22%20text-anchor%3D%22middle%22%20font-family%3D%22Georgia%2C%20%27Times%20New%20Roman%27%2C%20serif%22%0A%20%20%20%20%20%20%20%20font-size%3D%2227%22%20letter-spacing%3D%226%22%20fill%3D%22%23ab8b45%22%3EMODA%3C%2Ftext%3E%3C%2Fsvg%3E">
   <style>
 /* ============================================================
    PALCO — ERP de moda · folha de estilo única
@@ -285,13 +286,19 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
   background: var(--bg-sidebar); color: #e9e3d9; padding: 20px 14px;
   display: flex; flex-direction: column; gap: 22px; position: sticky; top: 0; height: 100dvh;
 }
-.sidebar-logo { display: flex; align-items: center; gap: 10px; padding: 4px 8px 0; }
-.sidebar-logo-mark {
-  width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center;
-  background: linear-gradient(140deg, #e8c766, #b08d3f); color: #1b1408; font-weight: 700; font-size: 14px;
-  flex-shrink: 0;
+.sidebar-logo { display: flex; align-items: center; gap: 11px; padding: 4px 8px 0; }
+.brand-mark-img {
+  width: 40px; height: 40px; flex-shrink: 0; border-radius: 11px;
+  background: #f6f2e9; padding: 3px; box-shadow: 0 1px 3px rgba(0,0,0,.28);
 }
-.sidebar-logo-text { font-family: var(--font-display); font-size: 17px; letter-spacing: 0.14em; text-transform: uppercase; }
+.sidebar-logo-text {
+  font-family: var(--font-display); font-size: 15px; letter-spacing: 0.06em;
+  text-transform: uppercase; line-height: 1.1; color: #f2e7cf;
+}
+.sidebar-logo-text small {
+  display: block; font-family: var(--font-body, inherit); font-size: 9.5px;
+  letter-spacing: 0.28em; color: rgba(232, 199, 102, 0.85); text-transform: uppercase; margin-top: 2px;
+}
 .sidebar-store { font-size: 10.5px; color: rgba(233, 227, 217, 0.45); letter-spacing: 0.04em; padding: 0 10px; margin-top: -14px; }
 .nav { display: grid; gap: 3px; }
 .nav-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: rgba(233, 227, 217, 0.34); padding: 10px 10px 4px; }
@@ -312,10 +319,19 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
 }
 .sidebar-foot { margin-top: auto; display: grid; gap: 8px; }
 .storage-chip {
-  font-size: 10.5px; color: rgba(233, 227, 217, 0.5); background: rgba(255, 255, 255, 0.05);
-  border-radius: 9px; padding: 9px 11px; line-height: 1.5;
+  font-size: 10.5px; color: rgba(233, 227, 217, 0.62); background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: 9px; padding: 9px 11px; line-height: 1.45; cursor: pointer;
+  display: flex; align-items: center; gap: 7px; text-align: left; width: 100%;
+  transition: background .16s, border-color .16s, transform .16s;
 }
+.storage-chip:hover { background: rgba(255, 255, 255, 0.09); transform: translateY(-1px); }
+.storage-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.storage-chip svg { flex-shrink: 0; }
 .storage-chip strong { color: rgba(233, 227, 217, 0.85); font-weight: 600; }
+.storage-chip.chip-ok { border-color: rgba(126, 200, 150, 0.35); color: rgba(190, 235, 200, 0.92); background: rgba(126,200,150,.1); }
+.storage-chip.chip-warn { border-color: rgba(232, 199, 102, 0.35); color: rgba(244, 228, 184, 0.95); background: rgba(232,199,102,.09); }
+.storage-note { font-size: 10px; color: rgba(233, 227, 217, 0.34); padding: 0 4px; text-align: center; }
 
 .main { min-width: 0; display: flex; flex-direction: column; }
 .topbar {
@@ -600,7 +616,7 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
     <div style="min-height:100dvh;display:grid;place-items:center;font-family:system-ui,sans-serif;color:#6b6660">
       <div style="text-align:center">
         <div style="width:44px;height:44px;border-radius:50%;border:3px solid #e7e0d5;border-top-color:#b08d3f;animation:spin .8s linear infinite;margin:0 auto 14px"></div>
-        <p style="font-size:13px">Carregando o Palco…</p>
+        <p style="font-size:13px">Carregando a Passarela da Moda…</p>
       </div>
     </div>
   </div>
@@ -1356,14 +1372,15 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
   </script>
   <script>
 /*
- * Camada de dados do Palco.
+ * Passarela da Moda — camada de dados OFFLINE.
  *
- * DOIS MODOS, mesma API (init/get/set/keys/clearAll):
- *   1. nuvem  — quando há um servidor Palco configurado: cada usuário tem seus
- *               dados no PostgreSQL do servidor, acessíveis de qualquer aparelho.
- *   2. local  — IndexedDB + espelho em localStorage (offline / arquivo único).
+ * Tudo fica salvo em DOIS lugares, sempre:
+ *   1. no navegador (IndexedDB) — para o app abrir sozinho ao reabrir;
+ *   2. no COMPUTADOR, em um arquivo do próprio programa — com a File System
+ *      Access API o usuário escolhe/escolhe a pasta uma vez e as gravações
+ *      passam a ser escritas direto em disco (backup automático).
  *
- * O modo é decidido por `PalcoCloud.detect()`, que confere /api/health.
+ * Nada é enviado para nenhum servidor. Sem contas, sem senhas, sem internet.
  */
 (function (root, factory) {
   if (typeof module === "object" && module.exports) module.exports = factory();
@@ -1371,15 +1388,19 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   "use strict";
 
-  var DB_NAME = "passarela_erp";
+  var DB_NAME = "passarela_moda";
   var DB_VERSION = 1;
   var STORE = "kv";
   var MIRROR_PREFIX = "passarela:kv:";
+  var HANDLE_KEY = "passarela:file-handle";
 
   var memory = {};
   var driver = "memory";
   var idb = null;
-  var cloud = null; // cliente HTTP do servidor (quando online)
+  var fileHandle = null; // FileSystemFileHandle (quando o usuário vinculou um arquivo)
+  var fileStatus = "off"; // off | ready | error
+  var saveTimer = null;
+  var pendingSave = false;
 
   function hasLocalStorage() {
     try {
@@ -1392,96 +1413,232 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
     }
   }
 
-  /* ============================ NUVEM ============================ */
+  /* ===================== ARQUIVO NO COMPUTADOR ===================== */
 
-  function createCloudClient() {
-    function request(path, options) {
-      var opts = options || {};
-      return fetch(path, {
-        method: opts.method || "GET",
-        headers: Object.assign({ "content-type": "application/json" }, opts.headers || {}),
-        credentials: "same-origin",
-        cache: "no-store",
-        body: opts.body ? JSON.stringify(opts.body) : undefined,
-      }).then(function (res) {
-        return res
-          .text()
-          .then(function (text) {
-            var body = null;
-            try {
-              body = text ? JSON.parse(text) : null;
-            } catch (err) {
-              body = null;
-            }
-            return { status: res.status, ok: res.ok, body: body || {} };
-          });
-      });
-    }
+  function fileApiAvailable() {
+    return typeof window !== "undefined" && typeof window.showSaveFilePicker === "function";
+  }
 
+  /** Guarda a referência do arquivo no IndexedDB (o handle não cabe no localStorage). */
+  function idbSaveHandle(handle) {
+    return new Promise(function (resolve) {
+      if (!idb) return resolve(false);
+      try {
+        var tx = idb.transaction(STORE, "readwrite");
+        var req = tx.objectStore(STORE).put(handle, HANDLE_KEY);
+        req.onsuccess = function () {
+          resolve(true);
+        };
+        req.onerror = function () {
+          resolve(false);
+        };
+      } catch (err) {
+        resolve(false);
+      }
+    });
+  }
+
+  function idbLoadHandle() {
+    return new Promise(function (resolve) {
+      if (!idb) return resolve(null);
+      try {
+        var tx = idb.transaction(STORE, "readonly");
+        var req = tx.objectStore(STORE).get(HANDLE_KEY);
+        req.onsuccess = function () {
+          resolve(req.result && typeof req.result.createWritable === "function" ? req.result : null);
+        };
+        req.onerror = function () {
+          resolve(null);
+        };
+      } catch (err) {
+        resolve(null);
+      }
+    });
+  }
+
+  function idbClearHandle() {
+    return new Promise(function (resolve) {
+      if (!idb) return resolve(true);
+      try {
+        var tx = idb.transaction(STORE, "readwrite");
+        tx.objectStore(STORE).delete(HANDLE_KEY);
+        tx.oncomplete = function () {
+          resolve(true);
+        };
+        tx.onerror = function () {
+          resolve(false);
+        };
+      } catch (err) {
+        resolve(false);
+      }
+    });
+  }
+
+  /** Conteúdo completo do arquivo de dados (.passarela.json). */
+  function snapshot() {
     return {
-      request: request,
-
-      mode: function () {
-        return request("/api/mode").then(function (res) {
-          if (!res.ok) return null;
-          return res.body;
-        });
-      },
-
-      session: function () {
-        return request("/api/auth/session").then(function (res) {
-          return res.ok ? res.body : { authenticated: false, account: null };
-        });
-      },
-
-      signup: function (payload) {
-        return request("/api/auth/signup", { method: "POST", body: payload });
-      },
-
-      login: function (payload) {
-        return request("/api/auth/login", { method: "POST", body: payload });
-      },
-
-      logout: function () {
-        return request("/api/auth/logout", { method: "POST" });
-      },
-
-      pull: function () {
-        return request("/api/state").then(function (res) {
-          return res.ok ? res.body.state || {} : null;
-        });
-      },
-
-      set: function (key, value) {
-        return request("/api/state/" + encodeURIComponent(key), {
-          method: "PUT",
-          body: { value: value },
-        }).then(function (res) {
-          return res.ok;
-        });
-      },
-
-      clearAll: function () {
-        return request("/api/state", { method: "DELETE" }).then(function (res) {
-          return res.ok;
-        });
-      },
+      app: "Passarela da Moda",
+      format: "passarela-backup",
+      version: 1,
+      savedAt: new Date().toISOString(),
+      data: memory,
     };
   }
 
-  /** Tenta falar com um servidor Palco; devolve true quando online e aberto ao público. */
-  async function detectServer() {
-    if (typeof fetch !== "function") return false;
+  async function writeFile() {
+    if (!fileHandle) return false;
     try {
-      var probe = await fetch("/api/health", { method: "GET", credentials: "same-origin", cache: "no-store" });
-      if (!probe.ok) return false;
-      var info = await probe.json();
-      if (!info || info.app !== "palco") return false;
-      cloud = createCloudClient();
+      var text = JSON.stringify(snapshot(), null, 2);
+      var writable = await fileHandle.createWritable();
+      await writable.write(text);
+      await writable.close();
+      // mantém uma cópia em memória do último texto gravado
+      memory.__lastSavedAt = new Date().toISOString();
+      fileStatus = "ready";
       return true;
     } catch (err) {
+      fileStatus = "error";
       return false;
     }
+  }
+
+  /** Grava no arquivo, agrupando várias chamadas seguidas numa só escrita. */
+  function scheduleFileWrite() {
+    if (!fileHandle) return;
+    pendingSave = true;
+    if (saveTimer) return;
+    saveTimer = setTimeout(function () {
+      saveTimer = null;
+      if (!pendingSave) return;
+      pendingSave = false;
+      writeFile();
+    }, 400);
+  }
+
+  /** Usuário escolhe (ou cria) o arquivo de dados. Precisa de um clique. */
+  async function linkFile(suggestedName) {
+    if (!fileApiAvailable()) {
+      return { ok: false, reason: "unsupported" };
+    }
+    try {
+      var handle = await window.showSaveFilePicker({
+        suggestedName: suggestedName || "passarela-da-moda.passarela.json",
+        types: [{ description: "Dados da Passarela da Moda", accept: { "application/json": [".json"] } }],
+      });
+      fileHandle = handle;
+      await idbSaveHandle(handle);
+
+      // Se o arquivo escolhido já tem dados (ex.: backup de outro computador) e
+      // aqui está vazio, os dados do arquivo entram para o programa.
+      var read = await readFileHandle();
+      var fileProducts = read && read.data && read.data.products ? read.data.products.length : 0;
+      var localProducts = (memory.products || []).length;
+      var merged = false;
+
+      if (fileProducts > 0 && fileProducts >= localProducts) {
+        memory = Object.assign({}, memory, read.data);
+        await localSet("products", memory.products || []);
+        await localSet("customers", memory.customers || []);
+        await localSet("sales", memory.sales || []);
+        await localSet("expenses", memory.expenses || []);
+        if (memory.settings) await localSet("settings", memory.settings);
+        merged = true;
+      } else {
+        await writeFile();
+      }
+
+      return { ok: true, name: handle.name, mode: "create", merged: merged, entries: fileProducts };
+    } catch (err) {
+      if (err && err.name === "AbortError") return { ok: false, reason: "cancelled" };
+      return { ok: false, reason: "error", message: err && err.message };
+    }
+  }
+
+  /** Reabre o arquivo vinculado anteriormente (pode exigir permissão). */
+  async function reopenLinkedFile(requestPermission) {
+    if (!fileApiAvailable()) return { ok: false, reason: "unsupported" };
+    var handle = await idbLoadHandle();
+    if (!handle) return { ok: false, reason: "none" };
+
+    var permission = "granted";
+    if (handle.queryPermission) permission = await handle.queryPermission({ mode: "readwrite" });
+    if (permission !== "granted") {
+      if (!requestPermission) return { ok: false, reason: "permission" };
+      permission = await handle.requestPermission({ mode: "readwrite" });
+      if (permission !== "granted") return { ok: false, reason: "permission" };
+    }
+
+    fileHandle = handle;
+    fileStatus = "ready";
+
+    // o arquivo é a fonte da verdade: o que existe nele entra para o navegador
+    var localEmpty = !memory.products || memory.products.length === 0;
+    var read = await readFileHandle();
+    var restored = false;
+
+    if (read && read.data && (read.data.products || []).length) {
+      var localCount = (memory.products || []).length;
+      var fileCount = (read.data.products || []).length;
+      if (localEmpty || fileCount > localCount) {
+        memory = Object.assign({}, memory, read.data);
+        await localSet("products", memory.products || []);
+        await localSet("customers", memory.customers || []);
+        await localSet("sales", memory.sales || []);
+        await localSet("expenses", memory.expenses || []);
+        if (memory.settings) await localSet("settings", memory.settings);
+        restored = true;
+      }
+    }
+    if (!restored) await writeFile();
+
+    return { ok: true, name: handle.name, restored: restored, entries: (read && read.data && (read.data.products || []).length) || 0 };
+  }
+
+  async function readFileHandle() {
+    if (!fileHandle) return null;
+    try {
+      var file = await fileHandle.getFile();
+      var text = await file.text();
+      if (!text) return { data: {} };
+      var parsed = JSON.parse(text);
+      if (parsed && parsed.format === "passarela-backup" && parsed.data) return parsed;
+      if (parsed && parsed.products) return { data: parsed };
+      return { data: {} };
+    } catch (err) {
+      return null;
+    }
+  }
+
+  async function unlinkFile() {
+    fileHandle = null;
+    fileStatus = "off";
+    await idbClearHandle();
+    return true;
+  }
+
+  /** Grava uma chave no armazenamento local (IndexedDB + espelho), se existir. */
+  async function localSet(key, value) {
+    memory[key] = value;
+    if (driver === "indexeddb" && idb) {
+      await idbSet(key, value);
+      if (hasLocalStorage()) {
+        try {
+          localStorage.setItem(MIRROR_PREFIX + key, JSON.stringify(value));
+        } catch (err) {
+          /* quota cheia: IndexedDB já salvou */
+        }
+      }
+      return true;
+    }
+    if (hasLocalStorage()) {
+      try {
+        localStorage.setItem(MIRROR_PREFIX + key, JSON.stringify(value));
+        return true;
+      } catch (err) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /* ========================== INDEXEDDB ========================== */
@@ -1561,7 +1718,9 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
       var tx = idb.transaction(STORE, "readonly");
       var req = tx.objectStore(STORE).getAllKeys();
       req.onsuccess = function () {
-        resolve((req.result || []).map(String));
+        resolve((req.result || []).filter(function (k) {
+          return typeof k === "string" && k.indexOf("__") !== 0 && k !== HANDLE_KEY;
+        }));
       };
       req.onerror = function () {
         resolve([]);
@@ -1571,10 +1730,23 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
 
   function idbClear() {
     return new Promise(function (resolve) {
+      var ids = [];
       var tx = idb.transaction(STORE, "readwrite");
-      tx.objectStore(STORE).clear();
+      tx.objectStore(STORE).getAllKeys().onsuccess = function (event) {
+        ids = event.target.result || [];
+      };
       tx.oncomplete = function () {
-        resolve(true);
+        var tx2 = idb.transaction(STORE, "readwrite");
+        ids.forEach(function (key) {
+          if (key === HANDLE_KEY) return;
+          tx2.objectStore(STORE).delete(key);
+        });
+        tx2.oncomplete = function () {
+          resolve(true);
+        };
+        tx2.onerror = function () {
+          resolve(false);
+        };
       };
       tx.onerror = function () {
         resolve(false);
@@ -1585,21 +1757,16 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
   /* ============================ INIT ============================ */
 
   async function init() {
-    var online = await detectServer();
-    if (online) {
-      driver = "cloud";
-      return true;
-    }
-
     idb = await openIndexedDb();
+
     if (idb) {
       driver = "indexeddb";
-      // Recupera espelho do localStorage caso o IndexedDB tenha sido limpo.
       if (hasLocalStorage()) {
         for (var i = 0; i < localStorage.length; i++) {
           var fullKey = localStorage.key(i);
           if (!fullKey || fullKey.indexOf(MIRROR_PREFIX) !== 0) continue;
           var key = fullKey.slice(MIRROR_PREFIX.length);
+          if (key === HANDLE_KEY || key.indexOf("__") === 0) continue;
           var raw = localStorage.getItem(fullKey);
           if (!raw) continue;
           var existing = await idbGet(key);
@@ -1612,88 +1779,87 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
           }
         }
       }
-      return true;
-    }
-
-    if (hasLocalStorage()) {
+    } else if (hasLocalStorage()) {
       driver = "localstorage";
-      return true;
+    } else {
+      driver = "memory";
     }
 
-    driver = "memory";
+    // tenta reabrir o arquivo já vinculado (sem pedir permissão na abertura)
+    var reopen = await reopenLinkedFile(false);
+    if (reopen.ok && reopen.restored) {
+      // dados vieram do arquivo: o app recarrega do IndexedDB em seguida
+      driver = driver || "indexeddb";
+    }
     return true;
   }
 
   /* ============================ GET/SET ============================ */
 
   async function get(key, fallback) {
-    if (driver === "cloud") {
-      // O servidor entrega o snapshot completo de uma vez (ver pull()).
-      var snapshot = await cloud.pull();
-      memory = snapshot || {};
-      return memory[key] === undefined ? fallback : memory[key];
-    }
+    var value = null;
     if (driver === "indexeddb") {
-      var value = await idbGet(key);
-      if (value !== null) return value;
-      var mirror = hasLocalStorage() ? localStorage.getItem(MIRROR_PREFIX + key) : null;
+      value = await idbGet(key);
+    }
+    if (value && typeof value === "object" && value.__passarelaHandle) value = null;
+
+    if (value === null && hasLocalStorage()) {
+      var mirror = localStorage.getItem(MIRROR_PREFIX + key);
       if (mirror) {
         try {
-          return JSON.parse(mirror);
+          value = JSON.parse(mirror);
         } catch (err) {
-          return fallback;
+          value = null;
         }
       }
-      return fallback;
     }
-    if (driver === "localstorage") {
-      var rawLocal = localStorage.getItem(MIRROR_PREFIX + key);
-      if (!rawLocal) return fallback;
-      try {
-        return JSON.parse(rawLocal);
-      } catch (err) {
-        return fallback;
-      }
+    if (value === null && driver === "memory") {
+      value = memory[key] === undefined ? null : memory[key];
     }
-    return memory[key] === undefined ? fallback : memory[key];
+    if (value === null && fileHandle) {
+      var fromFile = await readFileHandle();
+      if (fromFile && fromFile.data && fromFile.data[key] !== undefined) value = fromFile.data[key];
+    }
+    if (value === null) return fallback;
+    memory[key] = value;
+    return value;
   }
 
   async function set(key, value) {
-    if (driver === "cloud") {
-      memory[key] = value;
-      return cloud.set(key, value);
-    }
+    if (key === HANDLE_KEY || key === "__lastSavedAt") return false;
+    memory[key] = value;
+
+    var ok = true;
     if (driver === "indexeddb") {
-      var ok = await idbSet(key, value);
+      ok = await idbSet(key, value);
       if (hasLocalStorage()) {
         try {
           localStorage.setItem(MIRROR_PREFIX + key, JSON.stringify(value));
         } catch (err) {
-          /* quota cheia: o IndexedDB continua sendo a fonte */
+          /* quota cheia: IndexedDB já salvou */
         }
       }
-      return ok;
-    }
-    if (driver === "localstorage") {
+    } else if (driver === "localstorage") {
       try {
         localStorage.setItem(MIRROR_PREFIX + key, JSON.stringify(value));
-        return true;
       } catch (err) {
-        return false;
+        ok = false;
       }
     }
-    memory[key] = value;
-    return true;
+
+    scheduleFileWrite();
+    return ok;
   }
 
   async function keys() {
-    if (driver === "cloud") return Object.keys(memory);
     if (driver === "indexeddb") return idbKeys();
     if (driver === "localstorage") {
       var out = [];
       for (var i = 0; i < localStorage.length; i++) {
         var full = localStorage.key(i);
-        if (full && full.indexOf(MIRROR_PREFIX) === 0) out.push(full.slice(MIRROR_PREFIX.length));
+        if (full && full.indexOf(MIRROR_PREFIX) === 0 && full.indexOf("__") === -1) {
+          out.push(full.slice(MIRROR_PREFIX.length));
+        }
       }
       return out;
     }
@@ -1701,28 +1867,22 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
   }
 
   async function clearAll() {
-    if (driver === "cloud") {
-      memory = {};
-      return cloud.clearAll();
-    }
+    memory = {};
     if (driver === "indexeddb") {
       await idbClear();
       if (hasLocalStorage()) {
         for (var i = localStorage.length - 1; i >= 0; i--) {
           var full = localStorage.key(i);
-          if (full && full.indexOf(MIRROR_PREFIX) === 0) localStorage.removeItem(full);
+          if (full && full.indexOf(MIRROR_PREFIX) === 0 && full.indexOf("__") === -1) localStorage.removeItem(full);
         }
       }
-      return true;
-    }
-    if (driver === "localstorage") {
+    } else if (driver === "localstorage") {
       for (var j = localStorage.length - 1; j >= 0; j--) {
         var key = localStorage.key(j);
         if (key && key.indexOf(MIRROR_PREFIX) === 0) localStorage.removeItem(key);
       }
-      return true;
     }
-    memory = {};
+    scheduleFileWrite();
     return true;
   }
 
@@ -1735,12 +1895,20 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
     driver: function () {
       return driver;
     },
-    isCloud: function () {
-      return driver === "cloud";
+    /* arquivo no computador */
+    fileSupported: fileApiAvailable,
+    linkFile: linkFile,
+    reopenFile: reopenLinkedFile,
+    unlinkFile: unlinkFile,
+    saveNow: writeFile,
+    fileInfo: function () {
+      return {
+        linked: Boolean(fileHandle),
+        name: fileHandle ? fileHandle.name : null,
+        status: fileStatus,
+      };
     },
-    cloud: function () {
-      return cloud;
-    },
+    snapshot: snapshot,
   };
 });
   </script>
@@ -1814,49 +1982,23 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
       };
     }
 
-    /* ======================= MODO NUVEM ======================= */
+    /* ==================== OPERADOR (SEM LOGIN) ==================== */
 
-    function isCloud() {
-      return typeof db.isCloud === "function" && db.isCloud();
-    }
-
-    function cloudClient() {
-      if (typeof db.cloud !== "function") return null;
-      return db.cloud();
-    }
-
-    /** Converte a conta do servidor no formato de usuário do app. */
-    function accountToUser(account) {
-      if (!account) return null;
+    /** Não existe conta: o app abre direto e registra quem está usando. */
+    function defaultProfile() {
       return {
-        id: account.id,
-        name: account.name,
-        email: account.email,
-        role: account.role === "owner" ? "admin" : "operador",
-        document: account.document || "",
-        phone: account.phone || "",
-        birthDate: account.birthDate || "",
-        city: account.city || "",
-        bio: account.bio || "",
-        avatar: account.avatar || "",
-        createdAt: account.createdAt || now(),
-        lastLoginAt: account.lastLoginAt || null
+        id: "operador",
+        name: "Passarela da Moda",
+        role: "admin",
+        createdAt: now(),
       };
     }
 
-    /** Lê a sessão do servidor (cookie HttpOnly) e carrega o estado da conta. */
-    async function syncSession() {
-      var client = cloudClient();
-      if (!client) return false;
-      var session = await client.session();
-      if (!session || !session.authenticated || !session.account) {
-        currentUser = null;
-        state.session = null;
-        return false;
+    function currentProfile() {
+      if (!state.settings.profile) {
+        state.settings.profile = defaultProfile();
       }
-      currentUser = accountToUser(session.account);
-      state.session = { token: "cookie", userId: currentUser.id, expiresAt: session.expiresAt || null };
-      return true;
+      return state.settings.profile;
     }
 
     function defaultSettings() {
@@ -1870,8 +2012,6 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
         accent: "gold",
         theme: "light",
         lowStockThreshold: 3,
-        accessHash: "",
-        passwordChanged: false,
         profile: null,
         createdAt: now()
       };
@@ -1884,60 +2024,23 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
     }
 
     async function load() {
-      if (isCloud()) {
-        var online = await syncSession();
-        if (!online) {
-          state.settings = defaultSettings();
-          loaded = true;
-          emit();
-          return state;
-        }
-        var resultsCloud = await Promise.all([
-          db.get(KEYS.products, []),
-          db.get(KEYS.customers, []),
-          db.get(KEYS.sales, []),
-          db.get(KEYS.expenses, []),
-          db.get(KEYS.settings, null)
-        ]);
-        state.products = resultsCloud[0] || [];
-        state.customers = resultsCloud[1] || [];
-        state.sales = resultsCloud[2] || [];
-        state.expenses = resultsCloud[3] || [];
-        state.settings = resultsCloud[4] || defaultSettings();
-        state.users = currentUser ? [currentUser] : [];
-        loaded = true;
-        emit();
-        return state;
-      }
-
       var results = await Promise.all([
-        db.get(KEYS.users, []),
         db.get(KEYS.products, []),
         db.get(KEYS.customers, []),
         db.get(KEYS.sales, []),
         db.get(KEYS.expenses, []),
-        db.get(KEYS.settings, null),
-        db.get(KEYS.session, null)
+        db.get(KEYS.settings, null)
       ]);
-      state.users = results[0] || [];
-      state.products = results[1] || [];
-      state.customers = results[2] || [];
-      state.sales = results[3] || [];
-      state.expenses = results[4] || [];
-      state.settings = results[5] || defaultSettings();
-      state.session = results[6] || null;
-      if (!results[5]) await db.set(KEYS.settings, state.settings);
+      state.products = results[0] || [];
+      state.customers = results[1] || [];
+      state.sales = results[2] || [];
+      state.expenses = results[3] || [];
+      state.settings = results[4] || defaultSettings();
+      if (!results[4]) await db.set(KEYS.settings, state.settings);
+      currentUser = currentProfile();
+      state.users = [currentUser];
+      state.session = null;
       loaded = true;
-
-      // Restaura a sessão se ainda for válida — é isto que mantém o usuário
-      // logado depois de fechar o navegador.
-      if (state.session && state.session.expiresAt && new Date(state.session.expiresAt).getTime() > Date.now()) {
-        currentUser = state.settings.profile || defaultProfile();
-        if (!currentUser || currentUser.id !== state.session.userId) currentUser = state.settings.profile || defaultProfile();
-      } else if (state.session) {
-        state.session = null;
-        await db.set(KEYS.session, null);
-      }
       emit();
       return state;
     }
@@ -1947,153 +2050,6 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
     }
 
     /* ---------------------------- AUTH ---------------------------- */
-
-    /**
-     * Acesso por senha única (sem cadastro, sem e-mail).
-     * A senha fica guardada como hash; o perfil do operador guarda nome e foto.
-     */
-    async function loginWithPassword(password) {
-      await ensureLoaded();
-
-      if (isCloud()) {
-        var client = cloudClient();
-        var res = await client.login({ password: password });
-        if (res.status === 429 || res.status === 423) {
-          var wait = new Error((res.body && res.body.error) || "Muitas tentativas. Aguarde para tentar de novo.");
-          wait.code = "LOCKED";
-          throw wait;
-        }
-        if (res.status === 401 || !res.ok) return false;
-        currentUser = accountToUser(res.body.account);
-        state.users = currentUser ? [currentUser] : [];
-        await load();
-        emit();
-        return true;
-      }
-
-      var settings = state.settings || defaultSettings();
-      var passwordHash = settings.accessHash;
-      var hashToCheck = passwordHash;
-      var matchesDefault = matchesBuiltinPassword(password);
-      if (!passwordHash) {
-        // Primeiro acesso de um banco antigo/limpo: aceita a senha padrão e grava o hash.
-        if (!matchesDefault) return false;
-        settings.accessHash = await hash.hashPassword(password);
-        settings.updatedAt = now();
-        state.settings = settings;
-        await db.set(KEYS.settings, state.settings);
-      } else {
-        var valid = await hash.verifyPassword(password, hashToCheck);
-        if (!valid && matchesDefault && !settings.passwordChanged) {
-          valid = true;
-        }
-        if (!valid) return false;
-      }
-      var profile = state.settings.profile || defaultProfile();
-      profile.lastLoginAt = now();
-      state.settings.profile = profile;
-      state.settings.updatedAt = now();
-      await db.set(KEYS.settings, state.settings);
-      await startSession(profile);
-      emit();
-      return true;
-    }
-
-    /** Cadastro real (apenas no modo nuvem). */
-    async function signup(payload) {
-      if (!isCloud()) {
-        var offline = new Error("O cadastro precisa de conexão com o servidor.");
-        offline.code = "OFFLINE";
-        throw offline;
-      }
-      var client = cloudClient();
-      var validation = core.validateSignup(payload, []);
-      if (!validation.valid) {
-        var invalid = new Error("Confira os campos destacados.");
-        invalid.fields = validation.errors;
-        throw invalid;
-      }
-      var res = await client.signup({
-        name: payload.name,
-        email: payload.email,
-        password: payload.password,
-        passwordConfirm: payload.passwordConfirm,
-        phone: payload.phone || "",
-        document: payload.document || "",
-        city: payload.city || ""
-      });
-      if (!res.ok) {
-        var err = new Error((res.body && res.body.error) || "Não foi possível criar a conta.");
-        err.fields = (res.body && res.body.fields) || {};
-        throw err;
-      }
-      currentUser = accountToUser(res.body.account);
-      state.users = currentUser ? [currentUser] : [];
-      await load();
-      emit();
-      return publicUser(currentUser);
-    }
-
-    /** Dados do servidor (modo nuvem) para a tela de perfil. */
-    function isCloudMode() {
-      return isCloud();
-    }
-
-    /** Senha padrão de fábrica (usada apenas enquanto ninguém a trocou). */
-    function matchesBuiltinPassword(password) {
-      var value = String(password || "");
-      return value === "admin123" || value === "admin";
-    }
-
-    function defaultProfile() {
-      return {
-        id: "operador",
-        name: "Administrador",
-        email: "",
-        role: "admin",
-        document: "",
-        phone: "",
-        birthDate: "",
-        city: "",
-        bio: "",
-        avatar: "",
-        createdAt: now(),
-        lastLoginAt: null
-      };
-    }
-
-    async function startSession(user) {
-      var session = {
-        token: hash.randomToken(),
-        userId: user.id,
-        createdAt: now(),
-        expiresAt: new Date(Date.now() + SESSION_HOURS * 60 * 60 * 1000).toISOString()
-      };
-      state.session = session;
-      currentUser = user;
-      await db.set(KEYS.session, session);
-    }
-
-    async function logout() {
-      if (isCloud()) {
-        var client = cloudClient();
-        if (client) await client.logout();
-        currentUser = null;
-        state.session = null;
-        state.users = [];
-        state.products = [];
-        state.customers = [];
-        state.sales = [];
-        state.expenses = [];
-        state.settings = defaultSettings();
-        emit();
-        return true;
-      }
-      state.session = null;
-      currentUser = null;
-      await db.set(KEYS.session, null);
-      emit();
-    }
 
     function publicUser(user) {
       if (!user) return null;
@@ -2114,57 +2070,22 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
     }
 
     function getUser() {
+      if (!currentUser) currentUser = currentProfile();
       return publicUser(currentUser);
+    }
+
+    /** Sempre "logado": quem usa o programa é o operador da loja. */
+    function isAuthenticated() {
+      return true;
     }
 
     async function updateProfile(patch) {
       await ensureLoaded();
-      if (!currentUser) throw new Error("Sessão expirada. Faça login novamente.");
-
-      if (isCloud()) {
-        var client = cloudClient();
-        var body = {};
-        if (patch.name !== undefined) body.name = patch.name;
-        if (patch.email !== undefined) body.email = patch.email;
-        if (patch.phone !== undefined) body.phone = patch.phone;
-        if (patch.document !== undefined) body.document = patch.document;
-        if (patch.birthDate !== undefined) body.birthDate = patch.birthDate;
-        if (patch.city !== undefined) body.city = patch.city;
-        if (patch.bio !== undefined) body.bio = patch.bio;
-
-        var res = null;
-        if (Object.keys(body).length) {
-          res = await client.request("/api/profile", { method: "PATCH", body: body });
-          if (!res.ok) {
-            var errC = new Error((res.body && res.body.error) || "Não foi possível salvar.");
-            errC.fields = (res.body && res.body.fields) || {};
-            throw errC;
-          }
-        }
-
-        if (patch.avatar !== undefined) {
-          var avatarRes = patch.avatar
-            ? await client.request("/api/profile/avatar", { method: "PUT", body: { avatar: patch.avatar } })
-            : await client.request("/api/profile/avatar", { method: "DELETE" });
-          if (!avatarRes.ok) {
-            var errA = new Error((avatarRes.body && avatarRes.body.error) || "Não foi possível salvar a foto.");
-            errA.fields = { avatar: "Não foi possível salvar a foto." };
-            throw errA;
-          }
-          res = avatarRes;
-        }
-
-        var account = res && res.body && res.body.account ? res.body.account : null;
-        if (account) currentUser = accountToUser(account);
-        state.users = currentUser ? [currentUser] : [];
-        state.settings = Object.assign({}, state.settings, { profile: currentUser });
-        emit();
-        return publicUser(currentUser);
-      }
+      if (!currentUser) currentUser = currentProfile();
 
       var errors = {};
       var name = patch.name !== undefined ? String(patch.name).trim() : currentUser.name;
-      if (name.length < 2) errors.name = "Informe seu nome.";
+      if (name.length < 2) errors.name = "Informe a identificação da loja.";
       var email = patch.email !== undefined ? String(patch.email).trim().toLowerCase() : currentUser.email;
       if (email && !core.isValidEmail(email)) errors.email = "E-mail inválido.";
       if (patch.document) {
@@ -2195,45 +2116,6 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
       await db.set(KEYS.settings, state.settings);
       emit();
       return publicUser(updated);
-    }
-
-    /** Troca a senha de acesso (não existe conta por e-mail). */
-    async function changePassword(currentPassword, newPassword) {
-      await ensureLoaded();
-
-      if (isCloud()) {
-        var client = cloudClient();
-        var res = await client.request("/api/profile/password", {
-          method: "POST",
-          body: { currentPassword: currentPassword, newPassword: newPassword, confirmPassword: newPassword }
-        });
-        if (!res.ok) {
-          var err = new Error((res.body && res.body.error) || "Não foi possível trocar a senha.");
-          err.fields = (res.body && res.body.fields) || {};
-          throw err;
-        }
-        return true;
-      }
-
-      var stored = state.settings.accessHash;
-      var valid = stored ? await hash.verifyPassword(currentPassword, stored) : matchesBuiltinPassword(currentPassword);
-      if (!valid) {
-        var err = new Error("A senha atual está incorreta.");
-        err.fields = { currentPassword: "Senha atual incorreta." };
-        throw err;
-      }
-      var strength = core.validatePasswordStrength(newPassword);
-      if (strength) {
-        var weak = new Error(strength);
-        weak.fields = { newPassword: strength };
-        throw weak;
-      }
-      state.settings.accessHash = await hash.hashPassword(newPassword);
-      state.settings.passwordChanged = true;
-      state.settings.updatedAt = now();
-      await db.set(KEYS.settings, state.settings);
-      emit();
-      return true;
     }
 
     /* -------------------------- PRODUTOS -------------------------- */
@@ -2671,22 +2553,15 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
       };
     }
 
+    /** Conteúdo do backup baixado/gravado pelo usuário. */
     async function exportAll() {
       await ensureLoaded();
-      // Nunca exporta o hash da senha de acesso.
-      var safeSettings = Object.assign({}, state.settings);
-      delete safeSettings.accessHash;
       return {
-        app: "Passarela ERP",
+        app: "Passarela da Moda",
+        format: "passarela-backup",
         exportedAt: now(),
         version: 1,
-        settings: safeSettings,
-        // A senha NUNCA sai no export (apenas hash não exportado)
-        users: state.users.map(function (u) {
-          var copy = Object.assign({}, u);
-          delete copy.passwordHash;
-          return copy;
-        }),
+        settings: state.settings,
         products: state.products,
         customers: state.customers,
         sales: state.sales,
@@ -2694,49 +2569,54 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
       };
     }
 
-    /** Volta a senha de acesso para a padrão (admin123). */
-    async function resetPassword() {
-      await ensureLoaded();
-      state.settings.accessHash = await hash.hashPassword("admin123");
-      state.settings.passwordChanged = false;
-      state.settings.updatedAt = now();
-      await db.set(KEYS.settings, state.settings);
-      emit();
-      return true;
-    }
-
     async function wipeData() {
       await db.clearAll();
-      if (isCloud()) {
-        state.products = [];
-        state.customers = [];
-        state.sales = [];
-        state.expenses = [];
-        emit();
-        return true;
-      }
       var keepSettings = Object.assign({}, defaultSettings(), {
-        accessHash: state.settings.accessHash,
-        passwordChanged: state.settings.passwordChanged,
         profile: state.settings.profile,
         storeName: state.settings.storeName,
         accent: state.settings.accent,
         theme: state.settings.theme
       });
-      state = {
-        users: [],
-        products: [],
-        customers: [],
-        sales: [],
-        expenses: [],
-        settings: keepSettings,
-        session: null
-      };
-      currentUser = null;
+      state.products = [];
+      state.customers = [];
+      state.sales = [];
+      state.expenses = [];
+      state.settings = keepSettings;
+      currentUser = currentProfile();
+      state.users = [currentUser];
       loaded = true;
       await db.set(KEYS.settings, state.settings);
       emit();
       return true;
+    }
+
+    /** Importa um backup .json (substitui os dados atuais). */
+    async function restoreBackup(payload) {
+      await ensureLoaded();
+      var data = payload && payload.data ? payload.data : payload;
+      if (!data || typeof data !== "object") throw new Error("Arquivo de backup inválido.");
+      state.products = Array.isArray(data.products) ? data.products : [];
+      state.customers = Array.isArray(data.customers) ? data.customers : [];
+      state.sales = Array.isArray(data.sales) ? data.sales : [];
+      state.expenses = Array.isArray(data.expenses) ? data.expenses : [];
+      if (data.settings) {
+        state.settings = Object.assign({}, defaultSettings(), data.settings);
+      }
+      currentUser = currentProfile();
+      state.users = [currentUser];
+      await Promise.all([
+        db.set(KEYS.products, state.products),
+        db.set(KEYS.customers, state.customers),
+        db.set(KEYS.sales, state.sales),
+        db.set(KEYS.expenses, state.expenses),
+        db.set(KEYS.settings, state.settings),
+      ]);
+      emit();
+      return {
+        products: state.products.length,
+        customers: state.customers.length,
+        sales: state.sales.length,
+      };
     }
 
     return {
@@ -2746,38 +2626,10 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
         return state;
       },
       getUser: getUser,
-      isAuthenticated: function () {
-        return Boolean(currentUser);
-      },
-      login: async function (email, password) {
-        if (!isCloud()) {
-          var offline = new Error("Este modo funciona apenas com a senha de acesso.");
-          offline.code = "OFFLINE";
-          throw offline;
-        }
-        await ensureLoaded();
-        var client = cloudClient();
-        var res = await client.login({ email: email, password: password });
-        if (res.status === 429) {
-          var locked = new Error((res.body && res.body.error) || "Muitas tentativas. Aguarde alguns minutos.");
-          locked.code = "LOCKED";
-          throw locked;
-        }
-        if (res.status === 401 || !res.ok) return false;
-        currentUser = accountToUser(res.body.account);
-        state.users = currentUser ? [currentUser] : [];
-        await load();
-        emit();
-        return true;
-      },
-      loginWithPassword: loginWithPassword,
-      signup: signup,
-      isCloudMode: isCloudMode,
+      isAuthenticated: isAuthenticated,
       refresh: load,
-      resetPassword: resetPassword,
-      logout: logout,
+      restoreBackup: restoreBackup,
       updateProfile: updateProfile,
-      changePassword: changePassword,
       saveProduct: saveProduct,
       deleteProduct: deleteProduct,
       adjustStock: adjustStock,
@@ -3346,6 +3198,9 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
     ]}
   ];
 
+  /** Logo oficial (vetor, nítida em qualquer tamanho). */
+  var LOGO_MARK = "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%2216%200%20208%20208%22%20width%3D%22208%22%20height%3D%22208%22%20role%3D%22img%22%20aria-label%3D%22Passarela%20da%20Moda%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22goldFace%22%20x1%3D%220.1%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23e2cc93%22%2F%3E%3Cstop%20offset%3D%2245%25%22%20stop-color%3D%22%23cdb173%22%2F%3E%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23a3854a%22%2F%3E%3C%2FlinearGradient%3E%3ClinearGradient%20id%3D%22inkGrad%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23403d38%22%2F%3E%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%231d1b18%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3C%21--%20moldura%20quadrada%20--%3E%3Crect%20x%3D%2234%22%20y%3D%2216%22%20width%3D%22172%22%20height%3D%22172%22%20rx%3D%225%22%20fill%3D%22none%22%20stroke%3D%22%23ada79c%22%20stroke-width%3D%222.4%22%2F%3E%3C%21--%20coluna%20dourada%20em%20perspectiva%20--%3E%3Cpath%20d%3D%22M66%2046%20L106%2060%20L106%20172%20L66%20158%20Z%22%20fill%3D%22url%28%23goldFace%29%22%2F%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22url%28%23inkGrad%29%22%20stroke-width%3D%228%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3C%21--%20haste%20vertical%20do%20P%20--%3E%3Cpath%20d%3D%22M106%2060%20L106%20172%22%2F%3E%3C%21--%20la%C3%A7ada%20do%20P%20--%3E%3Cpath%20d%3D%22M106%2072%20L134%2072%20C158%2072%20158%20118%20134%20118%20L106%20118%22%2F%3E%3C%21--%20haste%20direita%20%28sobe%20at%C3%A9%20o%20topo%29%20--%3E%3Cpath%20d%3D%22M134%20118%20L134%20172%22%2F%3E%3C%21--%20diagonal%20de%20cima%2C%20como%20um%20cabide%20--%3E%3Cpath%20d%3D%22M150%20172%20L188%2046%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E";
+
   var PAYMENT_LABELS = {
     DINHEIRO: "Dinheiro",
     PIX: "Pix",
@@ -3364,6 +3219,7 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
     await dbLib.init();
     store = storeLib.createStore({ db: dbLib, hash: hash, core: core });
     await store.load();
+    refreshFileState();
     applyTheme();
     render();
     // Re-renderiza quando os dados mudam (ex.: outra aba aberta)
@@ -3393,243 +3249,96 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
     session.user = store.getUser();
     applyTheme();
     var root = document.getElementById("root");
-    if (!session.user) {
-      root.innerHTML = authView();
-      bindAuth();
-      return;
-    }
     root.innerHTML = appView();
     bindApp();
   }
 
   /* ============================== AUTH ============================== */
 
-  /* ============================== ACESSO ============================== */
+  /* ============================== ARQUIVO DE DADOS ============================== */
 
-  var SESSION_HOURS = 12;
+  /** Estado do arquivo no computador, exibido na barra superior. */
+  var fileState = { supported: false, linked: false, name: null, status: "off", message: "" };
 
-  function isCloud() {
-    return store && typeof store.isCloudMode === "function" && store.isCloudMode();
+  function refreshFileState() {
+    fileState.supported = typeof dbLib.fileSupported === "function" && dbLib.fileSupported();
+    var info = typeof dbLib.fileInfo === "function" ? dbLib.fileInfo() : { linked: false, name: null, status: "off" };
+    fileState.linked = info.linked;
+    fileState.name = info.name;
+    fileState.status = info.status;
+    return fileState;
   }
 
-  function authView() {
-    var online = isCloud();
-    return (
-      '<div class="auth-shell">' +
-        '<aside class="auth-brand">' +
-          '<div class="auth-brand-inner">' +
-            '<div class="auth-logo"><span class="auth-logo-mark">P</span> Palco</div>' +
-            '<h1 class="auth-headline">Sua loja inteira<br>em um só <em>palco</em>.</h1>' +
-            '<p class="auth-sub">' +
-              (online
-                ? "Crie sua conta e entre: produtos, vendas, clientes e sua foto ficam salvos no servidor e abrem em qualquer aparelho."
-                : "PDV, estoque, clientes, financeiro e relatórios — num único arquivo, funcionando offline.") +
-            '</p>' +
-            '<div class="auth-features">' +
-              feature("shield", online ? "Senha criptografada no servidor" : "Acesso protegido por senha") +
-              feature("camera", online ? "Foto de perfil salva na nuvem" : "Foto de perfil salva no aparelho") +
-              feature("database", online ? "Dados no banco de dados, fora do navegador" : "Produtos, vendas e clientes salvos offline") +
-              feature("reports", "Relatórios e backup em CSV") +
-            '</div>' +
-          '</div>' +
-          '<p class="auth-foot">' +
-            (online
-              ? "Seus dados ficam no servidor do Palco, ligados à sua conta.<br>Entre com o mesmo e-mail e senha em qualquer dispositivo."
-              : "Seus dados ficam neste navegador (IndexedDB). Nada é enviado para servidores.<br>Faça backup em Perfil → Backup para não perder ao limpar o navegador.") +
-          '</p>' +
-        '</aside>' +
-        '<section class="auth-panel">' +
-          '<div class="auth-card">' +
-            (online
-              ? '<div class="auth-tabs" role="tablist">' +
-                  '<button class="auth-tab" role="tab" data-authtab="login" aria-selected="true">Entrar</button>' +
-                  '<button class="auth-tab" role="tab" data-authtab="signup" aria-selected="false">Criar conta</button>' +
-                '</div>'
-              : "") +
-            '<div id="auth-forms"></div>' +
-          '</div>' +
-        '</section>' +
-      '</div>'
-    );
-  }
-
-  function feature(icon, text) {
-    return '<div class="auth-feature">' + Icons.icon(icon, 17) + "<span>" + ui.escapeHtml(text) + "</span></div>";
-  }
-
-  function loginForm() {
-    var online = isCloud();
-    return (
-      '<form class="auth-form" id="form-login" novalidate>' +
-        '<div><h2 style="font-family:var(--font-display);font-size:26px;font-weight:500">' + (online ? "Bem-vindo de volta" : "Entrar no Palco") + '</h2>' +
-        '<p class="small muted mt-8">' + (online ? "Entre com o e-mail e a senha da sua conta." : "Digite a senha de acesso da loja.") + '</p></div>' +
-        (online
-          ? '<div class="field"><label for="login-email">E-mail</label>' +
-              '<div class="input-group"><span class="icon-left">' + Icons.icon("mail", 16) + "</span>" +
-              '<input class="input" id="login-email" name="email" type="email" autocomplete="email" placeholder="voce@loja.com" required></div>' +
-              '<span class="field-error" data-error="email"></span></div>'
-          : "") +
-        '<div class="field"><label for="login-password">Senha</label>' +
-          '<div class="input-group"><span class="icon-left">' + Icons.icon("lock", 16) + "</span>" +
-          '<input class="input" id="login-password" name="password" type="password" autocomplete="current-password" placeholder="Sua senha" required>' +
-          '<button class="icon-right" type="button" aria-label="Mostrar senha" data-toggle-password="login-password">' + Icons.icon("eye", 16) + "</button></div>" +
-          '<span class="field-error" data-error="password"></span></div>' +
-        '<button class="btn btn-primary btn-lg btn-block" type="submit" id="login-submit">Entrar</button>' +
-        (online
-          ? '<p class="tiny faint center">Não tem conta ainda? Use a aba <strong>Criar conta</strong>.</p>'
-          : '<p class="tiny faint center">A senha padrão é <strong>admin123</strong>. Você pode trocá-la em<br>Meu perfil → Segurança.</p>') +
-      "</form>"
-    );
-  }
-
-  function signupForm() {
-    return (
-      '<form class="auth-form" id="form-signup" novalidate>' +
-        '<div><h2 style="font-family:var(--font-display);font-size:26px;font-weight:500">Criar sua conta</h2>' +
-        '<p class="small muted mt-8">Sua conta guarda os dados da loja no servidor.</p></div>' +
-        '<div class="field"><label for="su-name">Nome completo</label>' +
-          '<input class="input" id="su-name" name="name" autocomplete="name" placeholder="Seu nome" required>' +
-          '<span class="field-error" data-error="name"></span></div>' +
-        '<div class="field"><label for="su-email">E-mail</label>' +
-          '<input class="input" id="su-email" name="email" type="email" autocomplete="email" placeholder="voce@loja.com" required>' +
-          '<span class="field-error" data-error="email"></span></div>' +
-        '<div class="grid grid-2" style="gap:12px">' +
-          '<div class="field"><label for="su-phone">Telefone (opcional)</label>' +
-            '<input class="input" id="su-phone" name="phone" inputmode="tel" placeholder="(31) 99999-8888">' +
-            '<span class="field-error" data-error="phone"></span></div>' +
-          '<div class="field"><label for="su-city">Cidade (opcional)</label>' +
-            '<input class="input" id="su-city" name="city" placeholder="Ipatinga, MG">' +
-            '<span class="field-error" data-error="city"></span></div>' +
-        "</div>" +
-        '<div class="field"><label for="su-password">Senha</label>' +
-          '<div class="input-group"><span class="icon-left">' + Icons.icon("lock", 16) + "</span>" +
-          '<input class="input" id="su-password" name="password" type="password" autocomplete="new-password" placeholder="Mínimo 8 caracteres com número" required>' +
-          '<button class="icon-right" type="button" aria-label="Mostrar senha" data-toggle-password="su-password">' + Icons.icon("eye", 16) + "</button></div>" +
-          '<div class="password-meter" data-meter="su-password" data-score="0"><span></span><span></span><span></span><span></span></div>' +
-          '<span class="field-error" data-error="password"></span></div>' +
-        '<div class="field"><label for="su-password2">Confirmar senha</label>' +
-          '<input class="input" id="su-password2" name="passwordConfirm" type="password" autocomplete="new-password" placeholder="Repita a senha" required>' +
-          '<span class="field-error" data-error="passwordConfirm"></span></div>' +
-        '<button class="btn btn-primary btn-lg btn-block" type="submit" id="signup-submit">Criar conta e entrar</button>' +
-        '<p class="tiny faint center">Sua senha é criptografada no servidor. Nunca guardamos texto puro.</p>' +
-      "</form>"
-    );
-  }
-
-  function bindAuth() {
-    var forms = document.getElementById("auth-forms");
-    var online = isCloud();
-    var mode = online && aux.authTab === "signup" ? "signup" : "login";
-
-    function paint() {
-      forms.innerHTML = mode === "login" ? loginForm() : signupForm();
-      ui.$$("[data-authtab]").forEach(function (tab) {
-        tab.setAttribute("aria-selected", tab.dataset.authtab === mode ? "true" : "false");
-      });
-      ui.$$("[data-toggle-password]").forEach(function (btn) {
-        btn.addEventListener("click", function () {
-          var input = document.getElementById(btn.dataset.togglePassword);
-          input.type = input.type === "password" ? "text" : "password";
-          btn.innerHTML = Icons.icon(input.type === "password" ? "eye" : "eyeOff", 16);
-        });
-      });
-      if (mode === "signup") {
-        ui.applyMask(document.getElementById("su-phone"), ui.phoneMask);
-        var pwd = document.getElementById("su-password");
-        pwd.addEventListener("input", function () {
-          var meter = document.querySelector("[data-meter]");
-          if (meter) meter.dataset.score = String(core.passwordScore(pwd.value));
-        });
-        document.getElementById("form-signup").addEventListener("submit", onSubmitSignup);
+  /** Vincula (cria/abre) o arquivo de dados no computador. Precisa de clique do usuário. */
+  async function linkDataFile() {
+    var result = await dbLib.linkFile("passarela-da-moda.passarela.json");
+    if (!result.ok) {
+      if (result.reason === "unsupported") {
+        ui.toast(
+          "Este navegador não grava direto em arquivo. Use o Chrome ou o Edge, ou clique em Backup para baixar o arquivo.",
+          "warning",
+          "Sem gravação automática"
+        );
+      } else if (result.reason === "cancelled") {
+        ui.toast("Nenhum arquivo foi escolhido.", "info");
       } else {
-        document.getElementById("form-login").addEventListener("submit", onSubmitLogin);
+        ui.toast(result.message || "Não foi possível criar o arquivo.", "error");
       }
-      var first = forms.querySelector("input");
-      if (first) first.focus();
+      return false;
     }
-
-    ui.$$("[data-authtab]").forEach(function (tab) {
-      tab.addEventListener("click", function () {
-        mode = tab.dataset.authtab;
-        aux.authTab = mode;
-        paint();
-      });
-    });
-
-    paint();
+    refreshFileState();
+    if (result.merged) {
+      await store.refresh();
+      ui.toast(
+        "Dados carregados de " + result.name + " (" + result.entries + " produto(s)). Tudo passa a ser gravado nele.",
+        "success",
+        "Arquivo importado"
+      );
+    } else {
+      ui.toast("Arquivo vinculado: " + result.name + ". Tudo agora é salvo nele automaticamente.", "success", "Salvando no computador");
+      await dbLib.saveNow();
+    }
+    render();
+    return true;
   }
 
-  async function onSubmitLogin(event) {
-    event.preventDefault();
-    var form = event.target;
-    var button = document.getElementById("login-submit");
-    ui.clearErrors(form);
-    var online = isCloud();
-    var email = online ? fieldValue(form, "email").trim() : "";
-    var password = fieldValue(form, "password");
-
-    if (online) {
-      if (!core.isValidEmail(email)) return ui.showFieldErrors({ email: "Informe um e-mail válido." }, form);
-      if (!password) return ui.showFieldErrors({ password: "Informe sua senha." }, form);
-    } else if (!password) {
-      return ui.showFieldErrors({ password: "Digite a senha de acesso." }, form);
-    }
-
-    button.disabled = true;
-    button.textContent = "Entrando...";
-    try {
-      var ok = online ? await store.login(email, password) : await store.loginWithPassword(password);
-      if (!ok) {
-        ui.showFieldErrors({ password: online ? "E-mail ou senha incorretos." : "Senha incorreta." }, form);
-        ui.toast("E-mail ou senha incorretos.", "error", "Não foi possível entrar");
-        return;
+  /** Reabre o arquivo já vinculado (o navegador pede permissão uma vez por sessão). */
+  async function reopenDataFile() {
+    var result = await dbLib.reopenFile(true);
+    if (!result.ok) {
+      if (result.reason === "none") {
+        return linkDataFile();
       }
-      ui.toast("Login realizado. Bom trabalho!", "success", "Bem-vindo");
-      cart = [];
-      aux = {};
-      render();
-    } catch (err) {
-      ui.showFieldErrors({ password: err.message }, form);
-      ui.toast(err.message, "error", "Não foi possível entrar");
-    } finally {
-      if (button) {
-        button.disabled = false;
-        button.textContent = "Entrar";
-      }
+      ui.toast("Permissão não concedida para gravar no arquivo.", "warning");
+      return false;
     }
+    refreshFileState();
+    await store.refresh();
+    render();
+    ui.toast(
+      result.restored
+        ? "Dados carregados de " + result.name + " (" + result.entries + " produto(s))."
+        : "Arquivo reconectado: " + result.name + ". As alterações passam a ser gravadas nele.",
+      "success",
+      "Arquivo de dados"
+    );
+    return true;
   }
 
-  async function onSubmitSignup(event) {
-    event.preventDefault();
-    var form = event.target;
-    var button = document.getElementById("signup-submit");
-    ui.clearErrors(form);
-    var payload = {
-      name: fieldValue(form, "name"),
-      email: fieldValue(form, "email"),
-      phone: fieldValue(form, "phone"),
-      city: fieldValue(form, "city"),
-      password: fieldValue(form, "password"),
-      passwordConfirm: fieldValue(form, "passwordConfirm")
-    };
-    var validation = core.validateSignup(payload, []);
-    if (!validation.valid) return ui.showFieldErrors(validation.errors, form);
-
-    button.disabled = true;
-    button.textContent = "Criando conta...";
-    try {
-      await store.signup(payload);
-      ui.toast("Conta criada! Seus dados agora ficam salvos na nuvem.", "success", "Bem-vindo ao Palco");
-      render();
-    } catch (err) {
-      if (err.fields && Object.keys(err.fields).length) ui.showFieldErrors(err.fields, form);
-      else ui.toast(err.message, "error");
-    } finally {
-      if (button) {
-        button.disabled = false;
-        button.textContent = "Criar conta e entrar";
-      }
+  function fileChip() {
+    refreshFileState();
+    if (!fileState.supported) {
+      return '<button class="storage-chip chip-warn" data-action="download-backup" title="Baixar o arquivo de dados">' +
+        Icons.icon("download", 14) + " <span>Baixar arquivo manualmente</span></button>";
     }
+    if (!fileState.linked) {
+      return '<button class="storage-chip chip-warn" data-action="link-file" title="Escolher o arquivo onde os dados são salvos">' +
+        Icons.icon("database", 14) + " <span>Escolher arquivo de dados</span></button>";
+    }
+    var ok = fileState.status !== "error";
+    return '<button class="storage-chip ' + (ok ? "chip-ok" : "chip-warn") + '" data-action="file-panel" title="' +
+      ui.escapeHtml(fileState.name || "") + '">' + Icons.icon("check", 14) + " <span>Salvando em " +
+      ui.escapeHtml(fileState.name || "arquivo") + "</span></button>";
   }
 
   /* ============================== SHELL ============================== */
@@ -3664,12 +3373,12 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
     return (
       '<div class="app-shell">' +
         '<aside class="sidebar">' +
-          '<div class="sidebar-logo"><span class="sidebar-logo-mark">P</span><span class="sidebar-logo-text">Palco</span></div>' +
+          '<div class="sidebar-logo"><img class="brand-mark-img" src="' + LOGO_MARK + '" alt=""><span class="sidebar-logo-text">Passarela<small>da Moda</small></span></div>' +
           '<div class="sidebar-store">' + ui.escapeHtml(settings.storeName || "Minha loja") + "</div>" +
           '<nav class="nav">' + nav + "</nav>" +
           '<div class="sidebar-foot">' +
-            '<div class="storage-chip"><strong>' + ui.escapeHtml(storageLabel()) + "</strong><br>" + (isCloud() ? "dados salvos na sua conta" : "dados salvos neste dispositivo") + "</div>" +
-            '<button class="nav-item" data-action="logout">' + Icons.icon("logout", 17) + "<span>Sair</span></button>" +
+            fileChip() +
+            '<div class="storage-note">' + ui.escapeHtml(storageLabel()) + "</div>" +
           "</div>" +
         "</aside>" +
         '<div class="main">' +
@@ -3684,6 +3393,19 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
       "</div>" +
       '<div class="toasts" id="toasts"></div>'
     );
+  }
+
+  /** Backup manual: baixa o .json com tudo (inclusive fotos). */
+  async function downloadBackup() {
+    var dump = await store.exportAll();
+    ui.downloadFile("passarela-da-moda-" + core.todayKey() + ".json", JSON.stringify(dump, null, 2), "application/json");
+    ui.toast("Backup baixado. Guarde o arquivo numa pasta segura.", "success");
+  }
+
+  function lastSavedLabel() {
+    var savedAt = store.getState().settings && store.getState().settings.savedAt;
+    var stamp = savedAt || (typeof dbLib.fileInfo === "function" ? null : null);
+    return stamp ? core.relativeTime(stamp) : "agora";
   }
 
   function storageLabel() {
@@ -3715,8 +3437,6 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
         navigate(node.dataset.nav);
       });
     });
-    var logout = document.querySelector('[data-action="logout"]');
-    if (logout) logout.addEventListener("click", doLogout);
     bindView();
   }
 
@@ -3726,21 +3446,6 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
     cart = [];
     render();
     window.scrollTo({ top: 0, behavior: "smooth" });
-  }
-
-  async function doLogout() {
-    var ok = await ui.confirmDialog({
-      title: "Sair do Palco?",
-      message: "Seus dados continuam salvos. Na próxima visita basta digitar a senha de acesso.",
-      confirmLabel: "Sair"
-    });
-    if (!ok) return;
-    await store.logout();
-    cart = [];
-    aux = { authTab: "login" };
-    view = "dashboard";
-    render();
-    ui.toast("Você saiu da conta.", "info", "Até logo");
   }
 
   function renderView() {
@@ -3833,7 +3538,7 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
     return (
       (hasData ? "" :
         '<div class="banner banner-accent mt-0" style="margin-bottom:14px">' + Icons.icon("sparkles", 18) +
-        "<div><strong>Bem-vinda ao Palco!</strong> Comece cadastrando seus produtos e clientes — depois use o PDV para vender. " +
+        "<div><strong>Bem-vindo à Passarela da Moda!</strong> Comece cadastrando seus produtos e clientes — depois use o PDV para vender. " +
         '<div class="row gap-8 mt-8"><button class="btn btn-primary btn-sm" data-nav="products">Cadastrar produto</button>' +
         '<button class="btn btn-outline btn-sm" data-nav="customers">Cadastrar cliente</button></div></div></div>') +
       '<div class="grid grid-4">' + kpis + "</div>" +
@@ -4811,7 +4516,7 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
           "</div>" +
           '<div class="grow" style="min-width:200px">' +
             "<h2>" + ui.escapeHtml(user.name) + "</h2>" +
-            '<p style="color:rgba(246,239,227,.7);font-size:13px">' + ui.escapeHtml(user.city || "Loja no Palco") + "</p>" +
+            '<p style="color:rgba(246,239,227,.7);font-size:13px">' + ui.escapeHtml(user.city || "Passarela da Moda") + "</p>" +
             '<div class="row gap-8 wrap mt-8">' +
               '<span class="badge" style="background:rgba(255,255,255,.12);color:#f4e4b8">Acesso administrativo</span>' +
               '<span class="badge" style="background:rgba(255,255,255,.12);color:#f6efe3">Desde ' + ui.escapeHtml(core.formatDateBR(user.createdAt)) + "</span>" +
@@ -4828,7 +4533,7 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
           '<div class="card"><div class="card-head"><span class="card-title">Dados pessoais</span></div>' +
             '<div class="card-body"><form class="stack" id="form-profile" novalidate>' +
               profileField("Nome de exibição", "name", user.name) +
-              (isCloud() ? accountEmailField(user.email) : "") +
+
               '<div class="grid grid-2" style="gap:12px">' +
                 profileField("Telefone", "phone", user.phone ? ui.phoneMask(user.phone) : "", "tel") +
                 profileField("CPF/CNPJ", "document", user.document ? (user.document.length > 11 ? core.maskCNPJ(user.document) : core.maskCPF(user.document)) : "", "text") +
@@ -4843,25 +4548,31 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
             "</form></div></div>" +
 
           '<div class="stack">' +
-            '<div class="card"><div class="card-head"><span class="card-title">Segurança</span></div>' +
-              '<div class="card-body"><form class="stack" id="form-password" novalidate>' +
-                profileField("Senha atual", "currentPassword", "", "password") +
-                '<div class="grid grid-2" style="gap:12px">' +
-                  profileField("Nova senha", "newPassword", "", "password") +
-                  profileField("Confirmar", "newPasswordConfirm", "", "password") +
+            '<div class="card"><div class="card-head"><span class="card-title">Arquivo de dados no computador</span></div>' +
+              '<div class="card-body stack">' +
+                '<p class="small muted">Escolha um arquivo no seu computador e o programa grava tudo nele sozinho: produtos, fotos, vendas, clientes e configurações.</p>' +
+                '<div class="banner ' + (fileState.linked ? "banner-info" : "banner-warning") + '">' +
+                  Icons.icon(fileState.linked ? "check" : "alert", 16) +
+                  "<div>" + (fileState.linked
+                    ? "Salvando em <strong>" + ui.escapeHtml(fileState.name) + "</strong>."
+                    : fileState.supported
+                      ? 'Nenhum arquivo vinculado ainda. Clique em <strong>Escolher arquivo</strong> para ativar o salvamento automático.'
+                      : "Este navegador não permite gravar direto em arquivo. Use <strong>Baixar backup</strong> para guardar os dados manualmente.") +
+                  "</div></div>" +
+                '<div class="row gap-8 wrap">' +
+                  (fileState.supported
+                    ? fileState.linked
+                      ? '<button class="btn btn-outline btn-sm" id="relink-file">' + Icons.icon("folder", 14) + " Trocar arquivo</button>"
+                      : '<button class="btn btn-primary btn-sm" id="link-file">' + Icons.icon("folder", 14) + " Escolher arquivo</button>"
+                    : "") +
+                  '<button class="btn btn-primary btn-sm" id="save-now">' + Icons.icon("check", 14) + " Salvar agora</button>" +
                 "</div>" +
-                '<div class="banner banner-info">' + Icons.icon("shield", 16) + "<div>" +
-                  (isCloud()
-                    ? "Sua senha é criptografada (scrypt) no servidor e nunca volta para o navegador."
-                    : "Senha de acesso guardada com hash PBKDF2 (210.000 iterações). A padrão é <strong>admin123</strong>.") +
-                "</div></div>" +
-                '<div class="row gap-8 wrap"><button class="btn btn-outline" type="submit">Alterar senha</button>' +
-                (isCloud() ? "" : '<button class="btn btn-ghost btn-sm" type="button" id="reset-password">Voltar para admin123</button>') + "</div>" +
-              "</form></div></div>" +
+                '<p class="tiny faint">Última gravação: ' + ui.escapeHtml(lastSavedLabel()) + "</p>" +
+              "</div></div>" +
 
             '<div class="card"><div class="card-head"><span class="card-title">Backup dos seus dados</span></div>' +
               '<div class="card-body stack">' +
-                '<p class="small muted">Os dados vivem neste navegador. Faça backup antes de limpar o histórico ou trocar de aparelho.</p>' +
+                '<p class="small muted">O backup é um arquivo .json com tudo (inclusive as fotos). Guarde numa pasta segura ou leve para outro computador.</p>' +
                 '<div class="row gap-8 wrap">' +
                   '<button class="btn btn-primary btn-sm" id="export-backup">' + Icons.icon("download", 14) + " Baixar backup</button>" +
                   '<label class="btn btn-outline btn-sm" style="position:relative;overflow:hidden">' + Icons.icon("upload", 14) + " Restaurar" +
@@ -4946,7 +4657,7 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
       try {
         await store.updateProfile({
           name: fieldValue(form, "name"),
-          email: isCloud() ? fieldValue(form, "email") : undefined,
+
           phone: fieldValue(form, "phone"),
           document: fieldValue(form, "document"),
           birthDate: fieldValue(form, "birthDate"),
@@ -4961,21 +4672,21 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
       }
     });
 
-    var passwordForm = document.getElementById("form-password");
-    if (passwordForm) passwordForm.addEventListener("submit", async function (event) {
-      event.preventDefault();
-      ui.clearErrors(passwordForm);
-      if (fieldValue(passwordForm, "newPassword") !== fieldValue(passwordForm, "newPasswordConfirm")) {
-        return ui.showFieldErrors({ newPasswordConfirm: "As senhas não conferem." }, passwordForm);
+    var linkButton = document.getElementById("link-file");
+    if (linkButton) linkButton.addEventListener("click", linkDataFile);
+
+    var relinkButton = document.getElementById("relink-file");
+    if (relinkButton) relinkButton.addEventListener("click", linkDataFile);
+
+    var saveNow = document.getElementById("save-now");
+    if (saveNow) saveNow.addEventListener("click", async function () {
+      if (!fileState.linked) {
+        var linked = await linkDataFile();
+        if (!linked) return;
       }
-      try {
-        await store.changePassword(fieldValue(passwordForm, "currentPassword"), fieldValue(passwordForm, "newPassword"));
-        passwordForm.reset();
-        ui.toast("Senha alterada com sucesso.", "success");
-      } catch (err) {
-        if (err.fields) ui.showFieldErrors(err.fields, passwordForm);
-        else ui.toast(err.message, "error");
-      }
+      var ok = await dbLib.saveNow();
+      ui.toast(ok ? "Dados gravados no arquivo." : "Não foi possível gravar agora.", ok ? "success" : "error");
+      render();
     });
 
     var exportButton = document.getElementById("export-backup");
@@ -4993,23 +4704,19 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
       reader.onload = function () {
         try {
           var parsed = JSON.parse(String(reader.result));
-          if (!parsed || !Array.isArray(parsed.products)) throw new Error("Arquivo não parece ser um backup do Palco.");
+          var payload = parsed && parsed.data ? parsed.data : parsed;
+          if (!payload || !Array.isArray(payload.products)) throw new Error("Arquivo não parece ser um backup da Passarela da Moda.");
           ui.confirmDialog({
             title: "Restaurar backup?",
-            message: "Isso substitui os dados atuais deste navegador pelos dados do arquivo (" +
-              parsed.products.length + " produto(s), " + (parsed.sales || []).length + " venda(s)).",
+            message: "Isso substitui os dados atuais pelos dados do arquivo (" +
+              payload.products.length + " produto(s), " + (payload.sales || []).length + " venda(s)).",
             confirmLabel: "Restaurar",
             danger: true
           }).then(async function (ok) {
             if (!ok) return;
-            await dbLib.set("products", parsed.products || []);
-            await dbLib.set("customers", parsed.customers || []);
-            await dbLib.set("sales", parsed.sales || []);
-            await dbLib.set("expenses", parsed.expenses || []);
-            if (parsed.settings) await dbLib.set("settings", parsed.settings);
-            await store.load();
+            var totals = await store.restoreBackup(parsed);
             render();
-            ui.toast("Backup restaurado.", "success");
+            ui.toast("Backup restaurado: " + totals.products + " produto(s), " + totals.sales + " venda(s).", "success");
           });
         } catch (err) {
           ui.toast(err.message, "error", "Arquivo inválido");
@@ -5069,7 +4776,7 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
             '<div class="card"><div class="card-head"><span class="card-title">Armazenamento</span></div>' +
               '<div class="card-body stack">' +
                 '<div class="row-between small"><span class="muted">Tecnologia</span><span class="bold">' + ui.escapeHtml(storageLabel()) + "</span></div>" +
-                '<div class="row-between small"><span class="muted">' + (isCloud() ? "Conta" : "Senha de acesso") + '</span><span class="bold">' + (isCloud() ? ui.escapeHtml(session.user.email) : (store.getState().settings.passwordChanged ? "personalizada" : "padrão (admin123)")) + "</span></div>" +
+                '<div class="row-between small"><span class="muted">Arquivo de dados</span><span class="bold">' + (fileState.linked ? ui.escapeHtml(fileState.name) : "não vinculado") + "</span></div>" +
                 '<div class="row-between small"><span class="muted">Tamanho dos dados</span><span class="bold">' + storageSize() + "</span></div>" +
                 '<div class="banner banner-warning">' + Icons.icon("alert", 16) + "<div>Limpar os dados do navegador apaga o sistema. Faça backup em <strong>Meu perfil</strong> antes.</div></div>" +
               "</div></div>" +
@@ -5135,19 +4842,6 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
     if (lowStock) lowStock.addEventListener("change", async function () {
       await store.saveSettings({ lowStockThreshold: Math.max(0, Number(lowStock.value) || 0) });
       ui.toast("Alerta de estoque atualizado.", "success");
-    });
-
-    var resetPassword = document.getElementById("reset-password");
-    if (resetPassword) resetPassword.addEventListener("click", async function () {
-      var ok = await ui.confirmDialog({
-        title: "Voltar a senha para admin123?",
-        message: "A senha de acesso desta loja volta a ser admin123. Seus dados não são afetados.",
-        confirmLabel: "Voltar para admin123"
-      });
-      if (!ok) return;
-      await store.resetPassword();
-      ui.toast("Senha de acesso voltou para admin123.", "success");
-      render();
     });
 
     var wipe = document.getElementById("wipe-data");
@@ -5298,10 +4992,21 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
   }
 
   document.addEventListener("click", function (event) {
-    var target = event.target.closest ? event.target.closest("[data-action]") : null;
-    if (target && target.dataset.action === "logout") {
+    var action = event.target.closest ? event.target.closest("[data-action]") : null;
+    if (action && action.dataset.action === "link-file") {
       event.preventDefault();
-      doLogout();
+      linkDataFile();
+      return;
+    }
+    if (action && action.dataset.action === "file-panel") {
+      event.preventDefault();
+      navigate("settings");
+      return;
+    }
+    if (action && action.dataset.action === "download-backup") {
+      event.preventDefault();
+      downloadBackup();
+      return;
     }
 
     var newProduct = event.target.closest ? event.target.closest("[data-new-product]") : null;

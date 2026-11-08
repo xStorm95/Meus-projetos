@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="16 0 208 208" width="208" height="208" role="img" aria-label="Passarela da Moda">
+  <defs>
+    <linearGradient id="goldFace" x1="0.1" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#e2cc93"/>
+      <stop offset="45%" stop-color="#cdb173"/>
+      <stop offset="100%" stop-color="#a3854a"/>
+    </linearGradient>
+    <linearGradient id="inkGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#403d38"/>
+      <stop offset="100%" stop-color="#1d1b18"/>
+    </linearGradient>
+  </defs>
+
+  <!-- moldura quadrada -->
+  <rect x="34" y="16" width="172" height="172" rx="5" fill="none" stroke="#ada79c" stroke-width="2.4"/>
+
+  <!-- coluna dourada em perspectiva -->
+  <path d="M66 46 L106 60 L106 172 L66 158 Z" fill="url(#goldFace)"/>
+
+  <g fill="none" stroke="url(#inkGrad)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
+    <!-- haste vertical do P -->
+    <path d="M106 60 L106 172"/>
+    <!-- laçada do P -->
+    <path d="M106 72 L134 72 C158 72 158 118 134 118 L106 118"/>
+    <!-- haste direita (sobe até o topo) -->
+    <path d="M134 118 L134 172"/>
+    <!-- diagonal de cima, como um cabide -->
+    <path d="M150 172 L188 46"/>
+  </g>
+
+</svg>

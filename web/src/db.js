@@ -1,12 +1,13 @@
 /*
- * Camada de dados do Palco.
+ * Passarela da Moda — camada de dados OFFLINE.
  *
- * DOIS MODOS, mesma API (init/get/set/keys/clearAll):
- *   1. nuvem  — quando há um servidor Palco configurado: cada usuário tem seus
- *               dados no PostgreSQL do servidor, acessíveis de qualquer aparelho.
- *   2. local  — IndexedDB + espelho em localStorage (offline / arquivo único).
+ * Tudo fica salvo em DOIS lugares, sempre:
+ *   1. no navegador (IndexedDB) — para o app abrir sozinho ao reabrir;
+ *   2. no COMPUTADOR, em um arquivo do próprio programa — com a File System
+ *      Access API o usuário escolhe/escolhe a pasta uma vez e as gravações
+ *      passam a ser escritas direto em disco (backup automático).
  *
- * O modo é decidido por `PalcoCloud.detect()`, que confere /api/health.
+ * Nada é enviado para nenhum servidor. Sem contas, sem senhas, sem internet.
  */
 (function (root, factory) {
   if (typeof module === "object" && module.exports) module.exports = factory();
@@ -14,15 +15,19 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   "use strict";
 
-  var DB_NAME = "passarela_erp";
+  var DB_NAME = "passarela_moda";
   var DB_VERSION = 1;
   var STORE = "kv";
   var MIRROR_PREFIX = "passarela:kv:";
+  var HANDLE_KEY = "passarela:file-handle";
 
   var memory = {};
   var driver = "memory";
   var idb = null;
-  var cloud = null; // cliente HTTP do servidor (quando online)
+  var fileHandle = null; // FileSystemFileHandle (quando o usuário vinculou um arquivo)
+  var fileStatus = "off"; // off | ready | error
+  var saveTimer = null;
+  var pendingSave = false;
 
   function hasLocalStorage() {
     try {
@@ -35,96 +40,232 @@
     }
   }
 
-  /* ============================ NUVEM ============================ */
+  /* ===================== ARQUIVO NO COMPUTADOR ===================== */
 
-  function createCloudClient() {
-    function request(path, options) {
-      var opts = options || {};
-      return fetch(path, {
-        method: opts.method || "GET",
-        headers: Object.assign({ "content-type": "application/json" }, opts.headers || {}),
-        credentials: "same-origin",
-        cache: "no-store",
-        body: opts.body ? JSON.stringify(opts.body) : undefined,
-      }).then(function (res) {
-        return res
-          .text()
-          .then(function (text) {
-            var body = null;
-            try {
-              body = text ? JSON.parse(text) : null;
-            } catch (err) {
-              body = null;
-            }
-            return { status: res.status, ok: res.ok, body: body || {} };
-          });
-      });
-    }
+  function fileApiAvailable() {
+    return typeof window !== "undefined" && typeof window.showSaveFilePicker === "function";
+  }
 
+  /** Guarda a referência do arquivo no IndexedDB (o handle não cabe no localStorage). */
+  function idbSaveHandle(handle) {
+    return new Promise(function (resolve) {
+      if (!idb) return resolve(false);
+      try {
+        var tx = idb.transaction(STORE, "readwrite");
+        var req = tx.objectStore(STORE).put(handle, HANDLE_KEY);
+        req.onsuccess = function () {
+          resolve(true);
+        };
+        req.onerror = function () {
+          resolve(false);
+        };
+      } catch (err) {
+        resolve(false);
+      }
+    });
+  }
+
+  function idbLoadHandle() {
+    return new Promise(function (resolve) {
+      if (!idb) return resolve(null);
+      try {
+        var tx = idb.transaction(STORE, "readonly");
+        var req = tx.objectStore(STORE).get(HANDLE_KEY);
+        req.onsuccess = function () {
+          resolve(req.result && typeof req.result.createWritable === "function" ? req.result : null);
+        };
+        req.onerror = function () {
+          resolve(null);
+        };
+      } catch (err) {
+        resolve(null);
+      }
+    });
+  }
+
+  function idbClearHandle() {
+    return new Promise(function (resolve) {
+      if (!idb) return resolve(true);
+      try {
+        var tx = idb.transaction(STORE, "readwrite");
+        tx.objectStore(STORE).delete(HANDLE_KEY);
+        tx.oncomplete = function () {
+          resolve(true);
+        };
+        tx.onerror = function () {
+          resolve(false);
+        };
+      } catch (err) {
+        resolve(false);
+      }
+    });
+  }
+
+  /** Conteúdo completo do arquivo de dados (.passarela.json). */
+  function snapshot() {
     return {
-      request: request,
-
-      mode: function () {
-        return request("/api/mode").then(function (res) {
-          if (!res.ok) return null;
-          return res.body;
-        });
-      },
-
-      session: function () {
-        return request("/api/auth/session").then(function (res) {
-          return res.ok ? res.body : { authenticated: false, account: null };
-        });
-      },
-
-      signup: function (payload) {
-        return request("/api/auth/signup", { method: "POST", body: payload });
-      },
-
-      login: function (payload) {
-        return request("/api/auth/login", { method: "POST", body: payload });
-      },
-
-      logout: function () {
-        return request("/api/auth/logout", { method: "POST" });
-      },
-
-      pull: function () {
-        return request("/api/state").then(function (res) {
-          return res.ok ? res.body.state || {} : null;
-        });
-      },
-
-      set: function (key, value) {
-        return request("/api/state/" + encodeURIComponent(key), {
-          method: "PUT",
-          body: { value: value },
-        }).then(function (res) {
-          return res.ok;
-        });
-      },
-
-      clearAll: function () {
-        return request("/api/state", { method: "DELETE" }).then(function (res) {
-          return res.ok;
-        });
-      },
+      app: "Passarela da Moda",
+      format: "passarela-backup",
+      version: 1,
+      savedAt: new Date().toISOString(),
+      data: memory,
     };
   }
 
-  /** Tenta falar com um servidor Palco; devolve true quando online e aberto ao público. */
-  async function detectServer() {
-    if (typeof fetch !== "function") return false;
+  async function writeFile() {
+    if (!fileHandle) return false;
     try {
-      var probe = await fetch("/api/health", { method: "GET", credentials: "same-origin", cache: "no-store" });
-      if (!probe.ok) return false;
-      var info = await probe.json();
-      if (!info || info.app !== "palco") return false;
-      cloud = createCloudClient();
+      var text = JSON.stringify(snapshot(), null, 2);
+      var writable = await fileHandle.createWritable();
+      await writable.write(text);
+      await writable.close();
+      // mantém uma cópia em memória do último texto gravado
+      memory.__lastSavedAt = new Date().toISOString();
+      fileStatus = "ready";
       return true;
     } catch (err) {
+      fileStatus = "error";
       return false;
     }
+  }
+
+  /** Grava no arquivo, agrupando várias chamadas seguidas numa só escrita. */
+  function scheduleFileWrite() {
+    if (!fileHandle) return;
+    pendingSave = true;
+    if (saveTimer) return;
+    saveTimer = setTimeout(function () {
+      saveTimer = null;
+      if (!pendingSave) return;
+      pendingSave = false;
+      writeFile();
+    }, 400);
+  }
+
+  /** Usuário escolhe (ou cria) o arquivo de dados. Precisa de um clique. */
+  async function linkFile(suggestedName) {
+    if (!fileApiAvailable()) {
+      return { ok: false, reason: "unsupported" };
+    }
+    try {
+      var handle = await window.showSaveFilePicker({
+        suggestedName: suggestedName || "passarela-da-moda.passarela.json",
+        types: [{ description: "Dados da Passarela da Moda", accept: { "application/json": [".json"] } }],
+      });
+      fileHandle = handle;
+      await idbSaveHandle(handle);
+
+      // Se o arquivo escolhido já tem dados (ex.: backup de outro computador) e
+      // aqui está vazio, os dados do arquivo entram para o programa.
+      var read = await readFileHandle();
+      var fileProducts = read && read.data && read.data.products ? read.data.products.length : 0;
+      var localProducts = (memory.products || []).length;
+      var merged = false;
+
+      if (fileProducts > 0 && fileProducts >= localProducts) {
+        memory = Object.assign({}, memory, read.data);
+        await localSet("products", memory.products || []);
+        await localSet("customers", memory.customers || []);
+        await localSet("sales", memory.sales || []);
+        await localSet("expenses", memory.expenses || []);
+        if (memory.settings) await localSet("settings", memory.settings);
+        merged = true;
+      } else {
+        await writeFile();
+      }
+
+      return { ok: true, name: handle.name, mode: "create", merged: merged, entries: fileProducts };
+    } catch (err) {
+      if (err && err.name === "AbortError") return { ok: false, reason: "cancelled" };
+      return { ok: false, reason: "error", message: err && err.message };
+    }
+  }
+
+  /** Reabre o arquivo vinculado anteriormente (pode exigir permissão). */
+  async function reopenLinkedFile(requestPermission) {
+    if (!fileApiAvailable()) return { ok: false, reason: "unsupported" };
+    var handle = await idbLoadHandle();
+    if (!handle) return { ok: false, reason: "none" };
+
+    var permission = "granted";
+    if (handle.queryPermission) permission = await handle.queryPermission({ mode: "readwrite" });
+    if (permission !== "granted") {
+      if (!requestPermission) return { ok: false, reason: "permission" };
+      permission = await handle.requestPermission({ mode: "readwrite" });
+      if (permission !== "granted") return { ok: false, reason: "permission" };
+    }
+
+    fileHandle = handle;
+    fileStatus = "ready";
+
+    // o arquivo é a fonte da verdade: o que existe nele entra para o navegador
+    var localEmpty = !memory.products || memory.products.length === 0;
+    var read = await readFileHandle();
+    var restored = false;
+
+    if (read && read.data && (read.data.products || []).length) {
+      var localCount = (memory.products || []).length;
+      var fileCount = (read.data.products || []).length;
+      if (localEmpty || fileCount > localCount) {
+        memory = Object.assign({}, memory, read.data);
+        await localSet("products", memory.products || []);
+        await localSet("customers", memory.customers || []);
+        await localSet("sales", memory.sales || []);
+        await localSet("expenses", memory.expenses || []);
+        if (memory.settings) await localSet("settings", memory.settings);
+        restored = true;
+      }
+    }
+    if (!restored) await writeFile();
+
+    return { ok: true, name: handle.name, restored: restored, entries: (read && read.data && (read.data.products || []).length) || 0 };
+  }
+
+  async function readFileHandle() {
+    if (!fileHandle) return null;
+    try {
+      var file = await fileHandle.getFile();
+      var text = await file.text();
+      if (!text) return { data: {} };
+      var parsed = JSON.parse(text);
+      if (parsed && parsed.format === "passarela-backup" && parsed.data) return parsed;
+      if (parsed && parsed.products) return { data: parsed };
+      return { data: {} };
+    } catch (err) {
+      return null;
+    }
+  }
+
+  async function unlinkFile() {
+    fileHandle = null;
+    fileStatus = "off";
+    await idbClearHandle();
+    return true;
+  }
+
+  /** Grava uma chave no armazenamento local (IndexedDB + espelho), se existir. */
+  async function localSet(key, value) {
+    memory[key] = value;
+    if (driver === "indexeddb" && idb) {
+      await idbSet(key, value);
+      if (hasLocalStorage()) {
+        try {
+          localStorage.setItem(MIRROR_PREFIX + key, JSON.stringify(value));
+        } catch (err) {
+          /* quota cheia: IndexedDB já salvou */
+        }
+      }
+      return true;
+    }
+    if (hasLocalStorage()) {
+      try {
+        localStorage.setItem(MIRROR_PREFIX + key, JSON.stringify(value));
+        return true;
+      } catch (err) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /* ========================== INDEXEDDB ========================== */
@@ -204,7 +345,9 @@
       var tx = idb.transaction(STORE, "readonly");
       var req = tx.objectStore(STORE).getAllKeys();
       req.onsuccess = function () {
-        resolve((req.result || []).map(String));
+        resolve((req.result || []).filter(function (k) {
+          return typeof k === "string" && k.indexOf("__") !== 0 && k !== HANDLE_KEY;
+        }));
       };
       req.onerror = function () {
         resolve([]);
@@ -214,10 +357,23 @@
 
   function idbClear() {
     return new Promise(function (resolve) {
+      var ids = [];
       var tx = idb.transaction(STORE, "readwrite");
-      tx.objectStore(STORE).clear();
+      tx.objectStore(STORE).getAllKeys().onsuccess = function (event) {
+        ids = event.target.result || [];
+      };
       tx.oncomplete = function () {
-        resolve(true);
+        var tx2 = idb.transaction(STORE, "readwrite");
+        ids.forEach(function (key) {
+          if (key === HANDLE_KEY) return;
+          tx2.objectStore(STORE).delete(key);
+        });
+        tx2.oncomplete = function () {
+          resolve(true);
+        };
+        tx2.onerror = function () {
+          resolve(false);
+        };
       };
       tx.onerror = function () {
         resolve(false);
@@ -228,21 +384,16 @@
   /* ============================ INIT ============================ */
 
   async function init() {
-    var online = await detectServer();
-    if (online) {
-      driver = "cloud";
-      return true;
-    }
-
     idb = await openIndexedDb();
+
     if (idb) {
       driver = "indexeddb";
-      // Recupera espelho do localStorage caso o IndexedDB tenha sido limpo.
       if (hasLocalStorage()) {
         for (var i = 0; i < localStorage.length; i++) {
           var fullKey = localStorage.key(i);
           if (!fullKey || fullKey.indexOf(MIRROR_PREFIX) !== 0) continue;
           var key = fullKey.slice(MIRROR_PREFIX.length);
+          if (key === HANDLE_KEY || key.indexOf("__") === 0) continue;
           var raw = localStorage.getItem(fullKey);
           if (!raw) continue;
           var existing = await idbGet(key);
@@ -255,88 +406,87 @@
           }
         }
       }
-      return true;
-    }
-
-    if (hasLocalStorage()) {
+    } else if (hasLocalStorage()) {
       driver = "localstorage";
-      return true;
+    } else {
+      driver = "memory";
     }
 
-    driver = "memory";
+    // tenta reabrir o arquivo já vinculado (sem pedir permissão na abertura)
+    var reopen = await reopenLinkedFile(false);
+    if (reopen.ok && reopen.restored) {
+      // dados vieram do arquivo: o app recarrega do IndexedDB em seguida
+      driver = driver || "indexeddb";
+    }
     return true;
   }
 
   /* ============================ GET/SET ============================ */
 
   async function get(key, fallback) {
-    if (driver === "cloud") {
-      // O servidor entrega o snapshot completo de uma vez (ver pull()).
-      var snapshot = await cloud.pull();
-      memory = snapshot || {};
-      return memory[key] === undefined ? fallback : memory[key];
-    }
+    var value = null;
     if (driver === "indexeddb") {
-      var value = await idbGet(key);
-      if (value !== null) return value;
-      var mirror = hasLocalStorage() ? localStorage.getItem(MIRROR_PREFIX + key) : null;
+      value = await idbGet(key);
+    }
+    if (value && typeof value === "object" && value.__passarelaHandle) value = null;
+
+    if (value === null && hasLocalStorage()) {
+      var mirror = localStorage.getItem(MIRROR_PREFIX + key);
       if (mirror) {
         try {
-          return JSON.parse(mirror);
+          value = JSON.parse(mirror);
         } catch (err) {
-          return fallback;
+          value = null;
         }
       }
-      return fallback;
     }
-    if (driver === "localstorage") {
-      var rawLocal = localStorage.getItem(MIRROR_PREFIX + key);
-      if (!rawLocal) return fallback;
-      try {
-        return JSON.parse(rawLocal);
-      } catch (err) {
-        return fallback;
-      }
+    if (value === null && driver === "memory") {
+      value = memory[key] === undefined ? null : memory[key];
     }
-    return memory[key] === undefined ? fallback : memory[key];
+    if (value === null && fileHandle) {
+      var fromFile = await readFileHandle();
+      if (fromFile && fromFile.data && fromFile.data[key] !== undefined) value = fromFile.data[key];
+    }
+    if (value === null) return fallback;
+    memory[key] = value;
+    return value;
   }
 
   async function set(key, value) {
-    if (driver === "cloud") {
-      memory[key] = value;
-      return cloud.set(key, value);
-    }
+    if (key === HANDLE_KEY || key === "__lastSavedAt") return false;
+    memory[key] = value;
+
+    var ok = true;
     if (driver === "indexeddb") {
-      var ok = await idbSet(key, value);
+      ok = await idbSet(key, value);
       if (hasLocalStorage()) {
         try {
           localStorage.setItem(MIRROR_PREFIX + key, JSON.stringify(value));
         } catch (err) {
-          /* quota cheia: o IndexedDB continua sendo a fonte */
+          /* quota cheia: IndexedDB já salvou */
         }
       }
-      return ok;
-    }
-    if (driver === "localstorage") {
+    } else if (driver === "localstorage") {
       try {
         localStorage.setItem(MIRROR_PREFIX + key, JSON.stringify(value));
-        return true;
       } catch (err) {
-        return false;
+        ok = false;
       }
     }
-    memory[key] = value;
-    return true;
+
+    scheduleFileWrite();
+    return ok;
   }
 
   async function keys() {
-    if (driver === "cloud") return Object.keys(memory);
     if (driver === "indexeddb") return idbKeys();
     if (driver === "localstorage") {
       var out = [];
       for (var i = 0; i < localStorage.length; i++) {
         var full = localStorage.key(i);
-        if (full && full.indexOf(MIRROR_PREFIX) === 0) out.push(full.slice(MIRROR_PREFIX.length));
+        if (full && full.indexOf(MIRROR_PREFIX) === 0 && full.indexOf("__") === -1) {
+          out.push(full.slice(MIRROR_PREFIX.length));
+        }
       }
       return out;
     }
@@ -344,28 +494,22 @@
   }
 
   async function clearAll() {
-    if (driver === "cloud") {
-      memory = {};
-      return cloud.clearAll();
-    }
+    memory = {};
     if (driver === "indexeddb") {
       await idbClear();
       if (hasLocalStorage()) {
         for (var i = localStorage.length - 1; i >= 0; i--) {
           var full = localStorage.key(i);
-          if (full && full.indexOf(MIRROR_PREFIX) === 0) localStorage.removeItem(full);
+          if (full && full.indexOf(MIRROR_PREFIX) === 0 && full.indexOf("__") === -1) localStorage.removeItem(full);
         }
       }
-      return true;
-    }
-    if (driver === "localstorage") {
+    } else if (driver === "localstorage") {
       for (var j = localStorage.length - 1; j >= 0; j--) {
         var key = localStorage.key(j);
         if (key && key.indexOf(MIRROR_PREFIX) === 0) localStorage.removeItem(key);
       }
-      return true;
     }
-    memory = {};
+    scheduleFileWrite();
     return true;
   }
 
@@ -378,11 +522,19 @@
     driver: function () {
       return driver;
     },
-    isCloud: function () {
-      return driver === "cloud";
+    /* arquivo no computador */
+    fileSupported: fileApiAvailable,
+    linkFile: linkFile,
+    reopenFile: reopenLinkedFile,
+    unlinkFile: unlinkFile,
+    saveNow: writeFile,
+    fileInfo: function () {
+      return {
+        linked: Boolean(fileHandle),
+        name: fileHandle ? fileHandle.name : null,
+        status: fileStatus,
+      };
     },
-    cloud: function () {
-      return cloud;
-    },
+    snapshot: snapshot,
   };
 });
