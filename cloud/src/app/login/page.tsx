@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 export default async function LoginPage() {
   const session = await getSession();
-  if (session) redirect("/perfil");
+  if (session) redirect("/app");
 
   let hasAccounts = true;
   try {

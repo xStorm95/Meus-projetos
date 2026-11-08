@@ -95,7 +95,7 @@ export function AuthScreen({ initialMode = "signup" }: { initialMode?: Mode }) {
       fail(result.error, result.fields);
       return;
     }
-    router.replace("/perfil");
+    router.replace("/app");
     router.refresh();
   };
 
@@ -121,7 +121,7 @@ export function AuthScreen({ initialMode = "signup" }: { initialMode?: Mode }) {
       fail(result.error, result.fields);
       return;
     }
-    router.replace("/perfil");
+    router.replace("/app");
     router.refresh();
   };
 

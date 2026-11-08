@@ -51,6 +51,14 @@ function main() {
   fs.writeFileSync(outFile, html, "utf8");
   fs.writeFileSync(path.join(ROOT, "palco.html"), html, "utf8");
 
+  // Cópia servida pelo Next (cloud/public/palco.html) — é o que a Vercel entrega em /app.
+  const cloudPublic = path.join(ROOT, "..", "cloud", "public");
+  if (fs.existsSync(path.join(ROOT, "..", "cloud"))) {
+    fs.mkdirSync(cloudPublic, { recursive: true });
+    fs.writeFileSync(path.join(cloudPublic, "palco.html"), html, "utf8");
+    console.log("[build] cloud/public/palco.html atualizado");
+  }
+
   const kb = (Buffer.byteLength(html, "utf8") / 1024).toFixed(1);
   console.log(`[build] dist/palco.html — ${kb} KB (arquivo único, offline)`);
 }

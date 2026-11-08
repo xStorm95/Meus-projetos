@@ -2,7 +2,7 @@
  * Schema do banco (PostgreSQL / Neon) usando Drizzle ORM.
  * Uma conta por e-mail, sessões com token em hash, foto guardada em base64.
  */
-import { boolean, index, integer, pgTable, text, timestamp, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
+import { bigint, boolean, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
 
 export const accounts = pgTable(
   "accounts",
@@ -49,6 +49,24 @@ export const sessions = pgTable(
   (table) => [
     uniqueIndex("sessions_token_idx").on(table.tokenHash),
     index("sessions_account_idx").on(table.accountId),
+  ],
+);
+
+/** Estado do app (produtos, vendas, clientes, configurações) por conta e por chave. */
+export const userState = pgTable(
+  "user_state",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    stateKey: varchar("state_key", { length: 64 }).notNull(),
+    value: jsonb("value").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("user_state_key_idx").on(table.accountId, table.stateKey),
+    index("user_state_account_idx").on(table.accountId),
   ],
 );
 

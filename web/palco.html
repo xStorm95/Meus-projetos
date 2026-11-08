@@ -1356,14 +1356,14 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
   </script>
   <script>
 /*
- * Camada de dados do aplicativo.
+ * Camada de dados do Palco.
  *
- * Persistência: IndexedDB (primário, sem limite prático para fotos) com
- * espelhamento automático em localStorage (fallback para navegadores em que o
- * IndexedDB está bloqueado, ex.: modo privado de alguns navegadores).
+ * DOIS MODOS, mesma API (init/get/set/keys/clearAll):
+ *   1. nuvem  — quando há um servidor Palco configurado: cada usuário tem seus
+ *               dados no PostgreSQL do servidor, acessíveis de qualquer aparelho.
+ *   2. local  — IndexedDB + espelho em localStorage (offline / arquivo único).
  *
- * Tudo fica salvo NO DISPOSITIVO do usuário. Ao fechar e reabrir o site, ou
- * desligar o computador, os dados continuam lá.
+ * O modo é decidido por `PalcoCloud.detect()`, que confere /api/health.
  */
 (function (root, factory) {
   if (typeof module === "object" && module.exports) module.exports = factory();
@@ -1379,6 +1379,7 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
   var memory = {};
   var driver = "memory";
   var idb = null;
+  var cloud = null; // cliente HTTP do servidor (quando online)
 
   function hasLocalStorage() {
     try {
@@ -1390,6 +1391,100 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
       return false;
     }
   }
+
+  /* ============================ NUVEM ============================ */
+
+  function createCloudClient() {
+    function request(path, options) {
+      var opts = options || {};
+      return fetch(path, {
+        method: opts.method || "GET",
+        headers: Object.assign({ "content-type": "application/json" }, opts.headers || {}),
+        credentials: "same-origin",
+        cache: "no-store",
+        body: opts.body ? JSON.stringify(opts.body) : undefined,
+      }).then(function (res) {
+        return res
+          .text()
+          .then(function (text) {
+            var body = null;
+            try {
+              body = text ? JSON.parse(text) : null;
+            } catch (err) {
+              body = null;
+            }
+            return { status: res.status, ok: res.ok, body: body || {} };
+          });
+      });
+    }
+
+    return {
+      request: request,
+
+      mode: function () {
+        return request("/api/mode").then(function (res) {
+          if (!res.ok) return null;
+          return res.body;
+        });
+      },
+
+      session: function () {
+        return request("/api/auth/session").then(function (res) {
+          return res.ok ? res.body : { authenticated: false, account: null };
+        });
+      },
+
+      signup: function (payload) {
+        return request("/api/auth/signup", { method: "POST", body: payload });
+      },
+
+      login: function (payload) {
+        return request("/api/auth/login", { method: "POST", body: payload });
+      },
+
+      logout: function () {
+        return request("/api/auth/logout", { method: "POST" });
+      },
+
+      pull: function () {
+        return request("/api/state").then(function (res) {
+          return res.ok ? res.body.state || {} : null;
+        });
+      },
+
+      set: function (key, value) {
+        return request("/api/state/" + encodeURIComponent(key), {
+          method: "PUT",
+          body: { value: value },
+        }).then(function (res) {
+          return res.ok;
+        });
+      },
+
+      clearAll: function () {
+        return request("/api/state", { method: "DELETE" }).then(function (res) {
+          return res.ok;
+        });
+      },
+    };
+  }
+
+  /** Tenta falar com um servidor Palco; devolve true quando online e aberto ao público. */
+  async function detectServer() {
+    if (typeof fetch !== "function") return false;
+    try {
+      var probe = await fetch("/api/health", { method: "GET", credentials: "same-origin", cache: "no-store" });
+      if (!probe.ok) return false;
+      var info = await probe.json();
+      if (!info || info.app !== "palco") return false;
+      cloud = createCloudClient();
+      return true;
+    } catch (err) {
+      return false;
+    }
+  }
+
+  /* ========================== INDEXEDDB ========================== */
 
   function openIndexedDb() {
     return new Promise(function (resolve) {
@@ -1474,7 +1569,28 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
     });
   }
 
+  function idbClear() {
+    return new Promise(function (resolve) {
+      var tx = idb.transaction(STORE, "readwrite");
+      tx.objectStore(STORE).clear();
+      tx.oncomplete = function () {
+        resolve(true);
+      };
+      tx.onerror = function () {
+        resolve(false);
+      };
+    });
+  }
+
+  /* ============================ INIT ============================ */
+
   async function init() {
+    var online = await detectServer();
+    if (online) {
+      driver = "cloud";
+      return true;
+    }
+
     idb = await openIndexedDb();
     if (idb) {
       driver = "indexeddb";
@@ -1496,97 +1612,118 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
           }
         }
       }
-      return driver;
-    }
-    driver = hasLocalStorage() ? "localstorage" : "memory";
-    return driver;
-  }
-
-  function readLocal(key) {
-    if (!hasLocalStorage()) return null;
-    var raw = localStorage.getItem(MIRROR_PREFIX + key);
-    if (raw === null) return null;
-    try {
-      return JSON.parse(raw);
-    } catch (err) {
-      return null;
-    }
-  }
-
-  function writeLocal(key, value) {
-    if (!hasLocalStorage()) return false;
-    try {
-      localStorage.setItem(MIRROR_PREFIX + key, JSON.stringify(value));
       return true;
-    } catch (err) {
-      return false;
     }
+
+    if (hasLocalStorage()) {
+      driver = "localstorage";
+      return true;
+    }
+
+    driver = "memory";
+    return true;
   }
+
+  /* ============================ GET/SET ============================ */
 
   async function get(key, fallback) {
-    var value = null;
-    if (driver === "indexeddb") {
-      value = await idbGet(key);
-      if (value === null) value = readLocal(key);
-    } else if (driver === "localstorage") {
-      value = readLocal(key);
-    } else {
-      value = Object.prototype.hasOwnProperty.call(memory, key) ? memory[key] : null;
+    if (driver === "cloud") {
+      // O servidor entrega o snapshot completo de uma vez (ver pull()).
+      var snapshot = await cloud.pull();
+      memory = snapshot || {};
+      return memory[key] === undefined ? fallback : memory[key];
     }
-    return value === null || value === undefined ? fallback : value;
+    if (driver === "indexeddb") {
+      var value = await idbGet(key);
+      if (value !== null) return value;
+      var mirror = hasLocalStorage() ? localStorage.getItem(MIRROR_PREFIX + key) : null;
+      if (mirror) {
+        try {
+          return JSON.parse(mirror);
+        } catch (err) {
+          return fallback;
+        }
+      }
+      return fallback;
+    }
+    if (driver === "localstorage") {
+      var rawLocal = localStorage.getItem(MIRROR_PREFIX + key);
+      if (!rawLocal) return fallback;
+      try {
+        return JSON.parse(rawLocal);
+      } catch (err) {
+        return fallback;
+      }
+    }
+    return memory[key] === undefined ? fallback : memory[key];
   }
 
   async function set(key, value) {
+    if (driver === "cloud") {
+      memory[key] = value;
+      return cloud.set(key, value);
+    }
     if (driver === "indexeddb") {
       var ok = await idbSet(key, value);
-      writeLocal(key, value); // espelho / fallback
+      if (hasLocalStorage()) {
+        try {
+          localStorage.setItem(MIRROR_PREFIX + key, JSON.stringify(value));
+        } catch (err) {
+          /* quota cheia: o IndexedDB continua sendo a fonte */
+        }
+      }
       return ok;
     }
-    if (driver === "localstorage") return writeLocal(key, value);
+    if (driver === "localstorage") {
+      try {
+        localStorage.setItem(MIRROR_PREFIX + key, JSON.stringify(value));
+        return true;
+      } catch (err) {
+        return false;
+      }
+    }
     memory[key] = value;
     return true;
   }
 
   async function keys() {
-    if (driver === "indexeddb") {
-      var list = await idbKeys();
-      if (list.length) return list;
-      return Object.keys(memory);
-    }
-    if (driver === "localstorage" && hasLocalStorage()) {
+    if (driver === "cloud") return Object.keys(memory);
+    if (driver === "indexeddb") return idbKeys();
+    if (driver === "localstorage") {
       var out = [];
       for (var i = 0; i < localStorage.length; i++) {
-        var k = localStorage.key(i);
-        if (k && k.indexOf(MIRROR_PREFIX) === 0) out.push(k.slice(MIRROR_PREFIX.length));
+        var full = localStorage.key(i);
+        if (full && full.indexOf(MIRROR_PREFIX) === 0) out.push(full.slice(MIRROR_PREFIX.length));
       }
       return out;
     }
     return Object.keys(memory);
   }
 
-  /** Remove todas as chaves do aplicativo (usado em "apagar tudo"). */
   async function clearAll() {
-    var all = await keys();
-    for (var i = 0; i < all.length; i++) await set(all[i], null);
-    if (driver === "indexeddb" && idb) {
-      await new Promise(function (resolve) {
-        var tx = idb.transaction(STORE, "readwrite");
-        tx.objectStore(STORE).clear();
-        tx.oncomplete = resolve;
-        tx.onerror = resolve;
-      });
+    if (driver === "cloud") {
+      memory = {};
+      return cloud.clearAll();
     }
-    if (hasLocalStorage()) {
-      var toRemove = [];
-      for (var j = 0; j < localStorage.length; j++) {
-        var fullKey = localStorage.key(j);
-        if (fullKey && fullKey.indexOf(MIRROR_PREFIX) === 0) toRemove.push(fullKey);
+    if (driver === "indexeddb") {
+      await idbClear();
+      if (hasLocalStorage()) {
+        for (var i = localStorage.length - 1; i >= 0; i--) {
+          var full = localStorage.key(i);
+          if (full && full.indexOf(MIRROR_PREFIX) === 0) localStorage.removeItem(full);
+        }
       }
-      toRemove.forEach(function (k) {
-        localStorage.removeItem(k);
-      });
+      return true;
+    }
+    if (driver === "localstorage") {
+      for (var j = localStorage.length - 1; j >= 0; j--) {
+        var key = localStorage.key(j);
+        if (key && key.indexOf(MIRROR_PREFIX) === 0) localStorage.removeItem(key);
+      }
+      return true;
     }
     memory = {};
+    return true;
   }
 
   return {
@@ -1597,7 +1734,13 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
     clearAll: clearAll,
     driver: function () {
       return driver;
-    }
+    },
+    isCloud: function () {
+      return driver === "cloud";
+    },
+    cloud: function () {
+      return cloud;
+    },
   };
 });
   </script>
@@ -1671,6 +1814,51 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
       };
     }
 
+    /* ======================= MODO NUVEM ======================= */
+
+    function isCloud() {
+      return typeof db.isCloud === "function" && db.isCloud();
+    }
+
+    function cloudClient() {
+      if (typeof db.cloud !== "function") return null;
+      return db.cloud();
+    }
+
+    /** Converte a conta do servidor no formato de usuário do app. */
+    function accountToUser(account) {
+      if (!account) return null;
+      return {
+        id: account.id,
+        name: account.name,
+        email: account.email,
+        role: account.role === "owner" ? "admin" : "operador",
+        document: account.document || "",
+        phone: account.phone || "",
+        birthDate: account.birthDate || "",
+        city: account.city || "",
+        bio: account.bio || "",
+        avatar: account.avatar || "",
+        createdAt: account.createdAt || now(),
+        lastLoginAt: account.lastLoginAt || null
+      };
+    }
+
+    /** Lê a sessão do servidor (cookie HttpOnly) e carrega o estado da conta. */
+    async function syncSession() {
+      var client = cloudClient();
+      if (!client) return false;
+      var session = await client.session();
+      if (!session || !session.authenticated || !session.account) {
+        currentUser = null;
+        state.session = null;
+        return false;
+      }
+      currentUser = accountToUser(session.account);
+      state.session = { token: "cookie", userId: currentUser.id, expiresAt: session.expiresAt || null };
+      return true;
+    }
+
     function defaultSettings() {
       return {
         storeName: "Minha Loja",
@@ -1696,6 +1884,32 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
     }
 
     async function load() {
+      if (isCloud()) {
+        var online = await syncSession();
+        if (!online) {
+          state.settings = defaultSettings();
+          loaded = true;
+          emit();
+          return state;
+        }
+        var resultsCloud = await Promise.all([
+          db.get(KEYS.products, []),
+          db.get(KEYS.customers, []),
+          db.get(KEYS.sales, []),
+          db.get(KEYS.expenses, []),
+          db.get(KEYS.settings, null)
+        ]);
+        state.products = resultsCloud[0] || [];
+        state.customers = resultsCloud[1] || [];
+        state.sales = resultsCloud[2] || [];
+        state.expenses = resultsCloud[3] || [];
+        state.settings = resultsCloud[4] || defaultSettings();
+        state.users = currentUser ? [currentUser] : [];
+        loaded = true;
+        emit();
+        return state;
+      }
+
       var results = await Promise.all([
         db.get(KEYS.users, []),
         db.get(KEYS.products, []),
@@ -1740,6 +1954,23 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
      */
     async function loginWithPassword(password) {
       await ensureLoaded();
+
+      if (isCloud()) {
+        var client = cloudClient();
+        var res = await client.login({ password: password });
+        if (res.status === 429 || res.status === 423) {
+          var wait = new Error((res.body && res.body.error) || "Muitas tentativas. Aguarde para tentar de novo.");
+          wait.code = "LOCKED";
+          throw wait;
+        }
+        if (res.status === 401 || !res.ok) return false;
+        currentUser = accountToUser(res.body.account);
+        state.users = currentUser ? [currentUser] : [];
+        await load();
+        emit();
+        return true;
+      }
+
       var settings = state.settings || defaultSettings();
       var passwordHash = settings.accessHash;
       var hashToCheck = passwordHash;
@@ -1766,6 +1997,46 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
       await startSession(profile);
       emit();
       return true;
+    }
+
+    /** Cadastro real (apenas no modo nuvem). */
+    async function signup(payload) {
+      if (!isCloud()) {
+        var offline = new Error("O cadastro precisa de conexão com o servidor.");
+        offline.code = "OFFLINE";
+        throw offline;
+      }
+      var client = cloudClient();
+      var validation = core.validateSignup(payload, []);
+      if (!validation.valid) {
+        var invalid = new Error("Confira os campos destacados.");
+        invalid.fields = validation.errors;
+        throw invalid;
+      }
+      var res = await client.signup({
+        name: payload.name,
+        email: payload.email,
+        password: payload.password,
+        passwordConfirm: payload.passwordConfirm,
+        phone: payload.phone || "",
+        document: payload.document || "",
+        city: payload.city || ""
+      });
+      if (!res.ok) {
+        var err = new Error((res.body && res.body.error) || "Não foi possível criar a conta.");
+        err.fields = (res.body && res.body.fields) || {};
+        throw err;
+      }
+      currentUser = accountToUser(res.body.account);
+      state.users = currentUser ? [currentUser] : [];
+      await load();
+      emit();
+      return publicUser(currentUser);
+    }
+
+    /** Dados do servidor (modo nuvem) para a tela de perfil. */
+    function isCloudMode() {
+      return isCloud();
     }
 
     /** Senha padrão de fábrica (usada apenas enquanto ninguém a trocou). */
@@ -1804,6 +2075,20 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
     }
 
     async function logout() {
+      if (isCloud()) {
+        var client = cloudClient();
+        if (client) await client.logout();
+        currentUser = null;
+        state.session = null;
+        state.users = [];
+        state.products = [];
+        state.customers = [];
+        state.sales = [];
+        state.expenses = [];
+        state.settings = defaultSettings();
+        emit();
+        return true;
+      }
       state.session = null;
       currentUser = null;
       await db.set(KEYS.session, null);
@@ -1835,6 +2120,48 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
     async function updateProfile(patch) {
       await ensureLoaded();
       if (!currentUser) throw new Error("Sessão expirada. Faça login novamente.");
+
+      if (isCloud()) {
+        var client = cloudClient();
+        var body = {};
+        if (patch.name !== undefined) body.name = patch.name;
+        if (patch.email !== undefined) body.email = patch.email;
+        if (patch.phone !== undefined) body.phone = patch.phone;
+        if (patch.document !== undefined) body.document = patch.document;
+        if (patch.birthDate !== undefined) body.birthDate = patch.birthDate;
+        if (patch.city !== undefined) body.city = patch.city;
+        if (patch.bio !== undefined) body.bio = patch.bio;
+
+        var res = null;
+        if (Object.keys(body).length) {
+          res = await client.request("/api/profile", { method: "PATCH", body: body });
+          if (!res.ok) {
+            var errC = new Error((res.body && res.body.error) || "Não foi possível salvar.");
+            errC.fields = (res.body && res.body.fields) || {};
+            throw errC;
+          }
+        }
+
+        if (patch.avatar !== undefined) {
+          var avatarRes = patch.avatar
+            ? await client.request("/api/profile/avatar", { method: "PUT", body: { avatar: patch.avatar } })
+            : await client.request("/api/profile/avatar", { method: "DELETE" });
+          if (!avatarRes.ok) {
+            var errA = new Error((avatarRes.body && avatarRes.body.error) || "Não foi possível salvar a foto.");
+            errA.fields = { avatar: "Não foi possível salvar a foto." };
+            throw errA;
+          }
+          res = avatarRes;
+        }
+
+        var account = res && res.body && res.body.account ? res.body.account : null;
+        if (account) currentUser = accountToUser(account);
+        state.users = currentUser ? [currentUser] : [];
+        state.settings = Object.assign({}, state.settings, { profile: currentUser });
+        emit();
+        return publicUser(currentUser);
+      }
+
       var errors = {};
       var name = patch.name !== undefined ? String(patch.name).trim() : currentUser.name;
       if (name.length < 2) errors.name = "Informe seu nome.";
@@ -1873,6 +2200,21 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
     /** Troca a senha de acesso (não existe conta por e-mail). */
     async function changePassword(currentPassword, newPassword) {
       await ensureLoaded();
+
+      if (isCloud()) {
+        var client = cloudClient();
+        var res = await client.request("/api/profile/password", {
+          method: "POST",
+          body: { currentPassword: currentPassword, newPassword: newPassword, confirmPassword: newPassword }
+        });
+        if (!res.ok) {
+          var err = new Error((res.body && res.body.error) || "Não foi possível trocar a senha.");
+          err.fields = (res.body && res.body.fields) || {};
+          throw err;
+        }
+        return true;
+      }
+
       var stored = state.settings.accessHash;
       var valid = stored ? await hash.verifyPassword(currentPassword, stored) : matchesBuiltinPassword(currentPassword);
       if (!valid) {
@@ -2365,6 +2707,14 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
 
     async function wipeData() {
       await db.clearAll();
+      if (isCloud()) {
+        state.products = [];
+        state.customers = [];
+        state.sales = [];
+        state.expenses = [];
+        emit();
+        return true;
+      }
       var keepSettings = Object.assign({}, defaultSettings(), {
         accessHash: state.settings.accessHash,
         passwordChanged: state.settings.passwordChanged,
@@ -2399,7 +2749,31 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
       isAuthenticated: function () {
         return Boolean(currentUser);
       },
+      login: async function (email, password) {
+        if (!isCloud()) {
+          var offline = new Error("Este modo funciona apenas com a senha de acesso.");
+          offline.code = "OFFLINE";
+          throw offline;
+        }
+        await ensureLoaded();
+        var client = cloudClient();
+        var res = await client.login({ email: email, password: password });
+        if (res.status === 429) {
+          var locked = new Error((res.body && res.body.error) || "Muitas tentativas. Aguarde alguns minutos.");
+          locked.code = "LOCKED";
+          throw locked;
+        }
+        if (res.status === 401 || !res.ok) return false;
+        currentUser = accountToUser(res.body.account);
+        state.users = currentUser ? [currentUser] : [];
+        await load();
+        emit();
+        return true;
+      },
       loginWithPassword: loginWithPassword,
+      signup: signup,
+      isCloudMode: isCloudMode,
+      refresh: load,
       resetPassword: resetPassword,
       logout: logout,
       updateProfile: updateProfile,
@@ -3032,30 +3406,46 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
 
   /* ============================== ACESSO ============================== */
 
-  /** Senha única de acesso (sem cadastro, sem e-mail). */
-  var ACCESS_PASSWORD = "admin123";
-  var ACCESS_ALT = "admin";
   var SESSION_HOURS = 12;
 
+  function isCloud() {
+    return store && typeof store.isCloudMode === "function" && store.isCloudMode();
+  }
+
   function authView() {
+    var online = isCloud();
     return (
       '<div class="auth-shell">' +
         '<aside class="auth-brand">' +
           '<div class="auth-brand-inner">' +
             '<div class="auth-logo"><span class="auth-logo-mark">P</span> Palco</div>' +
             '<h1 class="auth-headline">Sua loja inteira<br>em um só <em>palco</em>.</h1>' +
-            '<p class="auth-sub">PDV, estoque, clientes, financeiro e relatórios — num único arquivo, funcionando offline.</p>' +
+            '<p class="auth-sub">' +
+              (online
+                ? "Crie sua conta e entre: produtos, vendas, clientes e sua foto ficam salvos no servidor e abrem em qualquer aparelho."
+                : "PDV, estoque, clientes, financeiro e relatórios — num único arquivo, funcionando offline.") +
+            '</p>' +
             '<div class="auth-features">' +
-              feature("shield", "Acesso protegido por senha") +
-              feature("camera", "Foto de perfil salva no aparelho") +
-              feature("database", "Produtos, vendas e clientes salvos offline") +
+              feature("shield", online ? "Senha criptografada no servidor" : "Acesso protegido por senha") +
+              feature("camera", online ? "Foto de perfil salva na nuvem" : "Foto de perfil salva no aparelho") +
+              feature("database", online ? "Dados no banco de dados, fora do navegador" : "Produtos, vendas e clientes salvos offline") +
               feature("reports", "Relatórios e backup em CSV") +
             '</div>' +
           '</div>' +
-          '<p class="auth-foot">Seus dados ficam neste navegador (IndexedDB). Nada é enviado para servidores.<br>Faça backup em Perfil → Backup para não perder ao limpar o navegador.</p>' +
+          '<p class="auth-foot">' +
+            (online
+              ? "Seus dados ficam no servidor do Palco, ligados à sua conta.<br>Entre com o mesmo e-mail e senha em qualquer dispositivo."
+              : "Seus dados ficam neste navegador (IndexedDB). Nada é enviado para servidores.<br>Faça backup em Perfil → Backup para não perder ao limpar o navegador.") +
+          '</p>' +
         '</aside>' +
         '<section class="auth-panel">' +
           '<div class="auth-card">' +
+            (online
+              ? '<div class="auth-tabs" role="tablist">' +
+                  '<button class="auth-tab" role="tab" data-authtab="login" aria-selected="true">Entrar</button>' +
+                  '<button class="auth-tab" role="tab" data-authtab="signup" aria-selected="false">Criar conta</button>' +
+                '</div>'
+              : "") +
             '<div id="auth-forms"></div>' +
           '</div>' +
         '</section>' +
@@ -3068,34 +3458,105 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
   }
 
   function loginForm() {
+    var online = isCloud();
     return (
       '<form class="auth-form" id="form-login" novalidate>' +
-        '<div><h2 style="font-family:var(--font-display);font-size:26px;font-weight:500">Entrar no Palco</h2>' +
-        '<p class="small muted mt-8">Digite a senha de acesso da loja.</p></div>' +
-        '<div class="field"><label for="login-password">Senha de acesso</label>' +
+        '<div><h2 style="font-family:var(--font-display);font-size:26px;font-weight:500">' + (online ? "Bem-vindo de volta" : "Entrar no Palco") + '</h2>' +
+        '<p class="small muted mt-8">' + (online ? "Entre com o e-mail e a senha da sua conta." : "Digite a senha de acesso da loja.") + '</p></div>' +
+        (online
+          ? '<div class="field"><label for="login-email">E-mail</label>' +
+              '<div class="input-group"><span class="icon-left">' + Icons.icon("mail", 16) + "</span>" +
+              '<input class="input" id="login-email" name="email" type="email" autocomplete="email" placeholder="voce@loja.com" required></div>' +
+              '<span class="field-error" data-error="email"></span></div>'
+          : "") +
+        '<div class="field"><label for="login-password">Senha</label>' +
           '<div class="input-group"><span class="icon-left">' + Icons.icon("lock", 16) + "</span>" +
-          '<input class="input" id="login-password" name="password" type="password" autocomplete="current-password" placeholder="Sua senha" required autofocus>' +
+          '<input class="input" id="login-password" name="password" type="password" autocomplete="current-password" placeholder="Sua senha" required>' +
           '<button class="icon-right" type="button" aria-label="Mostrar senha" data-toggle-password="login-password">' + Icons.icon("eye", 16) + "</button></div>" +
           '<span class="field-error" data-error="password"></span></div>' +
         '<button class="btn btn-primary btn-lg btn-block" type="submit" id="login-submit">Entrar</button>' +
-        '<p class="tiny faint center">A senha padrão é <strong>admin123</strong>. Você pode trocá-la em<br>Meu perfil → Segurança.</p>' +
+        (online
+          ? '<p class="tiny faint center">Não tem conta ainda? Use a aba <strong>Criar conta</strong>.</p>'
+          : '<p class="tiny faint center">A senha padrão é <strong>admin123</strong>. Você pode trocá-la em<br>Meu perfil → Segurança.</p>') +
+      "</form>"
+    );
+  }
+
+  function signupForm() {
+    return (
+      '<form class="auth-form" id="form-signup" novalidate>' +
+        '<div><h2 style="font-family:var(--font-display);font-size:26px;font-weight:500">Criar sua conta</h2>' +
+        '<p class="small muted mt-8">Sua conta guarda os dados da loja no servidor.</p></div>' +
+        '<div class="field"><label for="su-name">Nome completo</label>' +
+          '<input class="input" id="su-name" name="name" autocomplete="name" placeholder="Seu nome" required>' +
+          '<span class="field-error" data-error="name"></span></div>' +
+        '<div class="field"><label for="su-email">E-mail</label>' +
+          '<input class="input" id="su-email" name="email" type="email" autocomplete="email" placeholder="voce@loja.com" required>' +
+          '<span class="field-error" data-error="email"></span></div>' +
+        '<div class="grid grid-2" style="gap:12px">' +
+          '<div class="field"><label for="su-phone">Telefone (opcional)</label>' +
+            '<input class="input" id="su-phone" name="phone" inputmode="tel" placeholder="(31) 99999-8888">' +
+            '<span class="field-error" data-error="phone"></span></div>' +
+          '<div class="field"><label for="su-city">Cidade (opcional)</label>' +
+            '<input class="input" id="su-city" name="city" placeholder="Ipatinga, MG">' +
+            '<span class="field-error" data-error="city"></span></div>' +
+        "</div>" +
+        '<div class="field"><label for="su-password">Senha</label>' +
+          '<div class="input-group"><span class="icon-left">' + Icons.icon("lock", 16) + "</span>" +
+          '<input class="input" id="su-password" name="password" type="password" autocomplete="new-password" placeholder="Mínimo 8 caracteres com número" required>' +
+          '<button class="icon-right" type="button" aria-label="Mostrar senha" data-toggle-password="su-password">' + Icons.icon("eye", 16) + "</button></div>" +
+          '<div class="password-meter" data-meter="su-password" data-score="0"><span></span><span></span><span></span><span></span></div>' +
+          '<span class="field-error" data-error="password"></span></div>' +
+        '<div class="field"><label for="su-password2">Confirmar senha</label>' +
+          '<input class="input" id="su-password2" name="passwordConfirm" type="password" autocomplete="new-password" placeholder="Repita a senha" required>' +
+          '<span class="field-error" data-error="passwordConfirm"></span></div>' +
+        '<button class="btn btn-primary btn-lg btn-block" type="submit" id="signup-submit">Criar conta e entrar</button>' +
+        '<p class="tiny faint center">Sua senha é criptografada no servidor. Nunca guardamos texto puro.</p>' +
       "</form>"
     );
   }
 
   function bindAuth() {
     var forms = document.getElementById("auth-forms");
-    forms.innerHTML = loginForm();
-    ui.$$("[data-toggle-password]").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        var input = document.getElementById(btn.dataset.togglePassword);
-        input.type = input.type === "password" ? "text" : "password";
-        btn.innerHTML = Icons.icon(input.type === "password" ? "eye" : "eyeOff", 16);
+    var online = isCloud();
+    var mode = online && aux.authTab === "signup" ? "signup" : "login";
+
+    function paint() {
+      forms.innerHTML = mode === "login" ? loginForm() : signupForm();
+      ui.$$("[data-authtab]").forEach(function (tab) {
+        tab.setAttribute("aria-selected", tab.dataset.authtab === mode ? "true" : "false");
+      });
+      ui.$$("[data-toggle-password]").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          var input = document.getElementById(btn.dataset.togglePassword);
+          input.type = input.type === "password" ? "text" : "password";
+          btn.innerHTML = Icons.icon(input.type === "password" ? "eye" : "eyeOff", 16);
+        });
+      });
+      if (mode === "signup") {
+        ui.applyMask(document.getElementById("su-phone"), ui.phoneMask);
+        var pwd = document.getElementById("su-password");
+        pwd.addEventListener("input", function () {
+          var meter = document.querySelector("[data-meter]");
+          if (meter) meter.dataset.score = String(core.passwordScore(pwd.value));
+        });
+        document.getElementById("form-signup").addEventListener("submit", onSubmitSignup);
+      } else {
+        document.getElementById("form-login").addEventListener("submit", onSubmitLogin);
+      }
+      var first = forms.querySelector("input");
+      if (first) first.focus();
+    }
+
+    ui.$$("[data-authtab]").forEach(function (tab) {
+      tab.addEventListener("click", function () {
+        mode = tab.dataset.authtab;
+        aux.authTab = mode;
+        paint();
       });
     });
-    document.getElementById("form-login").addEventListener("submit", onSubmitLogin);
-    var first = forms.querySelector("input");
-    if (first) first.focus();
+
+    paint();
   }
 
   async function onSubmitLogin(event) {
@@ -3103,20 +3564,29 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
     var form = event.target;
     var button = document.getElementById("login-submit");
     ui.clearErrors(form);
+    var online = isCloud();
+    var email = online ? fieldValue(form, "email").trim() : "";
     var password = fieldValue(form, "password");
-    if (!password) return ui.showFieldErrors({ password: "Digite a senha de acesso." }, form);
+
+    if (online) {
+      if (!core.isValidEmail(email)) return ui.showFieldErrors({ email: "Informe um e-mail válido." }, form);
+      if (!password) return ui.showFieldErrors({ password: "Informe sua senha." }, form);
+    } else if (!password) {
+      return ui.showFieldErrors({ password: "Digite a senha de acesso." }, form);
+    }
 
     button.disabled = true;
     button.textContent = "Entrando...";
     try {
-      var ok = await store.loginWithPassword(password);
+      var ok = online ? await store.login(email, password) : await store.loginWithPassword(password);
       if (!ok) {
-        ui.showFieldErrors({ password: "Senha incorreta." }, form);
-        ui.toast("Senha incorreta.", "error", "Não foi possível entrar");
+        ui.showFieldErrors({ password: online ? "E-mail ou senha incorretos." : "Senha incorreta." }, form);
+        ui.toast("E-mail ou senha incorretos.", "error", "Não foi possível entrar");
         return;
       }
-      ui.toast("Acesso liberado. Bom trabalho!", "success", "Bem-vinda");
+      ui.toast("Login realizado. Bom trabalho!", "success", "Bem-vindo");
       cart = [];
+      aux = {};
       render();
     } catch (err) {
       ui.showFieldErrors({ password: err.message }, form);
@@ -3125,6 +3595,39 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
       if (button) {
         button.disabled = false;
         button.textContent = "Entrar";
+      }
+    }
+  }
+
+  async function onSubmitSignup(event) {
+    event.preventDefault();
+    var form = event.target;
+    var button = document.getElementById("signup-submit");
+    ui.clearErrors(form);
+    var payload = {
+      name: fieldValue(form, "name"),
+      email: fieldValue(form, "email"),
+      phone: fieldValue(form, "phone"),
+      city: fieldValue(form, "city"),
+      password: fieldValue(form, "password"),
+      passwordConfirm: fieldValue(form, "passwordConfirm")
+    };
+    var validation = core.validateSignup(payload, []);
+    if (!validation.valid) return ui.showFieldErrors(validation.errors, form);
+
+    button.disabled = true;
+    button.textContent = "Criando conta...";
+    try {
+      await store.signup(payload);
+      ui.toast("Conta criada! Seus dados agora ficam salvos na nuvem.", "success", "Bem-vindo ao Palco");
+      render();
+    } catch (err) {
+      if (err.fields && Object.keys(err.fields).length) ui.showFieldErrors(err.fields, form);
+      else ui.toast(err.message, "error");
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = "Criar conta e entrar";
       }
     }
   }
@@ -3165,7 +3668,7 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
           '<div class="sidebar-store">' + ui.escapeHtml(settings.storeName || "Minha loja") + "</div>" +
           '<nav class="nav">' + nav + "</nav>" +
           '<div class="sidebar-foot">' +
-            '<div class="storage-chip"><strong>' + ui.escapeHtml(storageLabel()) + "</strong><br>dados salvos neste dispositivo</div>" +
+            '<div class="storage-chip"><strong>' + ui.escapeHtml(storageLabel()) + "</strong><br>" + (isCloud() ? "dados salvos na sua conta" : "dados salvos neste dispositivo") + "</div>" +
             '<button class="nav-item" data-action="logout">' + Icons.icon("logout", 17) + "<span>Sair</span></button>" +
           "</div>" +
         "</aside>" +
@@ -3185,6 +3688,7 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
 
   function storageLabel() {
     var driver = dbLib.driver();
+    if (driver === "cloud") return "Nuvem (PostgreSQL)";
     if (driver === "indexeddb") return "IndexedDB ativo";
     if (driver === "localstorage") return "Armazenamento local";
     return "Modo temporário";
@@ -3233,7 +3737,8 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
     if (!ok) return;
     await store.logout();
     cart = [];
-    aux = {};
+    aux = { authTab: "login" };
+    view = "dashboard";
     render();
     ui.toast("Você saiu da conta.", "info", "Até logo");
   }
@@ -4323,6 +4828,7 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
           '<div class="card"><div class="card-head"><span class="card-title">Dados pessoais</span></div>' +
             '<div class="card-body"><form class="stack" id="form-profile" novalidate>' +
               profileField("Nome de exibição", "name", user.name) +
+              (isCloud() ? accountEmailField(user.email) : "") +
               '<div class="grid grid-2" style="gap:12px">' +
                 profileField("Telefone", "phone", user.phone ? ui.phoneMask(user.phone) : "", "tel") +
                 profileField("CPF/CNPJ", "document", user.document ? (user.document.length > 11 ? core.maskCNPJ(user.document) : core.maskCPF(user.document)) : "", "text") +
@@ -4344,9 +4850,13 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
                   profileField("Nova senha", "newPassword", "", "password") +
                   profileField("Confirmar", "newPasswordConfirm", "", "password") +
                 "</div>" +
-                '<div class="banner banner-info">' + Icons.icon("shield", 16) + "<div>Senha de acesso guardada com hash PBKDF2 (210.000 iterações). A padrão é <strong>admin123</strong>.</div></div>" +
+                '<div class="banner banner-info">' + Icons.icon("shield", 16) + "<div>" +
+                  (isCloud()
+                    ? "Sua senha é criptografada (scrypt) no servidor e nunca volta para o navegador."
+                    : "Senha de acesso guardada com hash PBKDF2 (210.000 iterações). A padrão é <strong>admin123</strong>.") +
+                "</div></div>" +
                 '<div class="row gap-8 wrap"><button class="btn btn-outline" type="submit">Alterar senha</button>' +
-                '<button class="btn btn-ghost btn-sm" type="button" id="reset-password">Voltar para admin123</button></div>' +
+                (isCloud() ? "" : '<button class="btn btn-ghost btn-sm" type="button" id="reset-password">Voltar para admin123</button>') + "</div>" +
               "</form></div></div>" +
 
             '<div class="card"><div class="card-head"><span class="card-title">Backup dos seus dados</span></div>' +
@@ -4378,6 +4888,13 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
       products: state.products.length,
       customers: state.customers.length
     };
+  }
+
+  function accountEmailField(email) {
+    return '<div class="field"><label>E-mail da conta</label>' +
+      '<input class="input" name="email" value="' + ui.escapeHtml(email || "") + '" type="email" autocomplete="email">' +
+      '<span class="hint">É o e-mail usado para entrar. Trocar aqui muda seu login.</span>' +
+      '<span class="field-error" data-error="email"></span></div>';
   }
 
   function profileField(label, name, value, type) {
@@ -4429,7 +4946,7 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
       try {
         await store.updateProfile({
           name: fieldValue(form, "name"),
-          email: fieldValue(form, "email"),
+          email: isCloud() ? fieldValue(form, "email") : undefined,
           phone: fieldValue(form, "phone"),
           document: fieldValue(form, "document"),
           birthDate: fieldValue(form, "birthDate"),
@@ -4552,7 +5069,7 @@ table.data .actions { display: flex; gap: 4px; justify-content: flex-end; }
             '<div class="card"><div class="card-head"><span class="card-title">Armazenamento</span></div>' +
               '<div class="card-body stack">' +
                 '<div class="row-between small"><span class="muted">Tecnologia</span><span class="bold">' + ui.escapeHtml(storageLabel()) + "</span></div>" +
-                '<div class="row-between small"><span class="muted">Senha de acesso</span><span class="bold">' + (store.getState().settings.passwordChanged ? "personalizada" : "padrão (admin123)") + "</span></div>" +
+                '<div class="row-between small"><span class="muted">' + (isCloud() ? "Conta" : "Senha de acesso") + '</span><span class="bold">' + (isCloud() ? ui.escapeHtml(session.user.email) : (store.getState().settings.passwordChanged ? "personalizada" : "padrão (admin123)")) + "</span></div>" +
                 '<div class="row-between small"><span class="muted">Tamanho dos dados</span><span class="bold">' + storageSize() + "</span></div>" +
                 '<div class="banner banner-warning">' + Icons.icon("alert", 16) + "<div>Limpar os dados do navegador apaga o sistema. Faça backup em <strong>Meu perfil</strong> antes.</div></div>" +
               "</div></div>" +

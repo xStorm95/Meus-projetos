@@ -64,6 +64,20 @@ export async function migrate(): Promise<string[]> {
     )`);
   applied.push("tabela sessions");
 
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS user_state (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      account_id uuid NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+      state_key varchar(64) NOT NULL,
+      value jsonb NOT NULL,
+      updated_at timestamptz NOT NULL DEFAULT now()
+    )`);
+  applied.push("tabela user_state");
+
+  await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS user_state_key_idx ON user_state (account_id, state_key)`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS user_state_account_idx ON user_state (account_id)`);
+  applied.push("índices de user_state");
+
   await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS sessions_token_idx ON sessions (token_hash)`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS sessions_account_idx ON sessions (account_id)`);
   applied.push("índices de sessions");

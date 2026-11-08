@@ -40,25 +40,28 @@ Detalhes, limites e atalhos: [`web/README.md`](web/README.md).
 
 ---
 
-## 0.1 Palco Conta — banco na nuvem, pronto para Vercel
+## 0.1 Palco Online — site com cadastro, login e dados na nuvem
 
-A versão da conta (cadastro, login e **perfil com foto**) que **não fica presa a um
-computador**: os dados vivem em PostgreSQL na nuvem e a mesma conta abre em qualquer
-aparelho. É o app em [`cloud/`](cloud/), feito para a Vercel.
+A versão que roda na Vercel: **cadastro e login reais**, e tudo o que o usuário faz (produtos,
+vendas, clientes, financeiro, foto de perfil) **salvo no PostgreSQL** — a mesma conta abre em
+qualquer aparelho e os dados continuam lá ao sair e entrar de novo.
 
-**Para publicar:** <https://vercel.com/new> → importe `xStorm95/Meus-projetos` →
-*Root Directory* `cloud` → variável `DATABASE_URL` (Neon/Postgres) → *Deploy*.
-Passo a passo completo: [`cloud/README.md`](cloud/README.md).
+**App:** [`cloud/`](cloud/) · **Passo a passo de deploy:** [`cloud/README.md`](cloud/README.md)
 
 ```bash
-cd cloud && npm install && npm run db:migrate && npm run dev   # http://localhost:3001
-cd cloud && npm test                                           # 12 testes de integração
+cd cloud && npm install && cp .env.example .env.local   # cole a DATABASE_URL (Neon)
+npm run dev                                            # http://localhost:3001
 ```
 
-- senha com **scrypt** no servidor, sessão em cookie HttpOnly de 24 h
-- foto redimensionada no navegador e salva no banco (`accounts.avatar`)
-- login em outro aparelho mostra os mesmos dados e a mesma foto
-- build de produção e migração idempotente validados
+- `/login` cadastro + login (scrypt no servidor, sessão HttpOnly de 24 h)
+- `/app`    o ERP completo, com cada alteração gravada em `user_state` por conta
+- `/perfil` dados da conta e foto sincronizada
+
+Testes: `npm run web:test` (39 + 1 offline), `npm run cloud:test` (12 de API),
+`npm run cloud:e2e` (navegador: cadastro → produto → sair → entrar → outro aparelho).
+
+O arquivo único [`index.html`](index.html) continua disponível para uso **offline**,
+com senha de acesso `admin123`.
 
 ## 1. Rodar localmente
 

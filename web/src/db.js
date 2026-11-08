@@ -1,12 +1,12 @@
 /*
- * Camada de dados do aplicativo.
+ * Camada de dados do Palco.
  *
- * Persistência: IndexedDB (primário, sem limite prático para fotos) com
- * espelhamento automático em localStorage (fallback para navegadores em que o
- * IndexedDB está bloqueado, ex.: modo privado de alguns navegadores).
+ * DOIS MODOS, mesma API (init/get/set/keys/clearAll):
+ *   1. nuvem  — quando há um servidor Palco configurado: cada usuário tem seus
+ *               dados no PostgreSQL do servidor, acessíveis de qualquer aparelho.
+ *   2. local  — IndexedDB + espelho em localStorage (offline / arquivo único).
  *
- * Tudo fica salvo NO DISPOSITIVO do usuário. Ao fechar e reabrir o site, ou
- * desligar o computador, os dados continuam lá.
+ * O modo é decidido por `PalcoCloud.detect()`, que confere /api/health.
  */
 (function (root, factory) {
   if (typeof module === "object" && module.exports) module.exports = factory();
@@ -22,6 +22,7 @@
   var memory = {};
   var driver = "memory";
   var idb = null;
+  var cloud = null; // cliente HTTP do servidor (quando online)
 
   function hasLocalStorage() {
     try {
@@ -33,6 +34,100 @@
       return false;
     }
   }
+
+  /* ============================ NUVEM ============================ */
+
+  function createCloudClient() {
+    function request(path, options) {
+      var opts = options || {};
+      return fetch(path, {
+        method: opts.method || "GET",
+        headers: Object.assign({ "content-type": "application/json" }, opts.headers || {}),
+        credentials: "same-origin",
+        cache: "no-store",
+        body: opts.body ? JSON.stringify(opts.body) : undefined,
+      }).then(function (res) {
+        return res
+          .text()
+          .then(function (text) {
+            var body = null;
+            try {
+              body = text ? JSON.parse(text) : null;
+            } catch (err) {
+              body = null;
+            }
+            return { status: res.status, ok: res.ok, body: body || {} };
+          });
+      });
+    }
+
+    return {
+      request: request,
+
+      mode: function () {
+        return request("/api/mode").then(function (res) {
+          if (!res.ok) return null;
+          return res.body;
+        });
+      },
+
+      session: function () {
+        return request("/api/auth/session").then(function (res) {
+          return res.ok ? res.body : { authenticated: false, account: null };
+        });
+      },
+
+      signup: function (payload) {
+        return request("/api/auth/signup", { method: "POST", body: payload });
+      },
+
+      login: function (payload) {
+        return request("/api/auth/login", { method: "POST", body: payload });
+      },
+
+      logout: function () {
+        return request("/api/auth/logout", { method: "POST" });
+      },
+
+      pull: function () {
+        return request("/api/state").then(function (res) {
+          return res.ok ? res.body.state || {} : null;
+        });
+      },
+
+      set: function (key, value) {
+        return request("/api/state/" + encodeURIComponent(key), {
+          method: "PUT",
+          body: { value: value },
+        }).then(function (res) {
+          return res.ok;
+        });
+      },
+
+      clearAll: function () {
+        return request("/api/state", { method: "DELETE" }).then(function (res) {
+          return res.ok;
+        });
+      },
+    };
+  }
+
+  /** Tenta falar com um servidor Palco; devolve true quando online e aberto ao público. */
+  async function detectServer() {
+    if (typeof fetch !== "function") return false;
+    try {
+      var probe = await fetch("/api/health", { method: "GET", credentials: "same-origin", cache: "no-store" });
+      if (!probe.ok) return false;
+      var info = await probe.json();
+      if (!info || info.app !== "palco") return false;
+      cloud = createCloudClient();
+      return true;
+    } catch (err) {
+      return false;
+    }
+  }
+
+  /* ========================== INDEXEDDB ========================== */
 
   function openIndexedDb() {
     return new Promise(function (resolve) {
@@ -117,7 +212,28 @@
     });
   }
 
+  function idbClear() {
+    return new Promise(function (resolve) {
+      var tx = idb.transaction(STORE, "readwrite");
+      tx.objectStore(STORE).clear();
+      tx.oncomplete = function () {
+        resolve(true);
+      };
+      tx.onerror = function () {
+        resolve(false);
+      };
+    });
+  }
+
+  /* ============================ INIT ============================ */
+
   async function init() {
+    var online = await detectServer();
+    if (online) {
+      driver = "cloud";
+      return true;
+    }
+
     idb = await openIndexedDb();
     if (idb) {
       driver = "indexeddb";
@@ -139,97 +255,118 @@
           }
         }
       }
-      return driver;
-    }
-    driver = hasLocalStorage() ? "localstorage" : "memory";
-    return driver;
-  }
-
-  function readLocal(key) {
-    if (!hasLocalStorage()) return null;
-    var raw = localStorage.getItem(MIRROR_PREFIX + key);
-    if (raw === null) return null;
-    try {
-      return JSON.parse(raw);
-    } catch (err) {
-      return null;
-    }
-  }
-
-  function writeLocal(key, value) {
-    if (!hasLocalStorage()) return false;
-    try {
-      localStorage.setItem(MIRROR_PREFIX + key, JSON.stringify(value));
       return true;
-    } catch (err) {
-      return false;
     }
+
+    if (hasLocalStorage()) {
+      driver = "localstorage";
+      return true;
+    }
+
+    driver = "memory";
+    return true;
   }
+
+  /* ============================ GET/SET ============================ */
 
   async function get(key, fallback) {
-    var value = null;
-    if (driver === "indexeddb") {
-      value = await idbGet(key);
-      if (value === null) value = readLocal(key);
-    } else if (driver === "localstorage") {
-      value = readLocal(key);
-    } else {
-      value = Object.prototype.hasOwnProperty.call(memory, key) ? memory[key] : null;
+    if (driver === "cloud") {
+      // O servidor entrega o snapshot completo de uma vez (ver pull()).
+      var snapshot = await cloud.pull();
+      memory = snapshot || {};
+      return memory[key] === undefined ? fallback : memory[key];
     }
-    return value === null || value === undefined ? fallback : value;
+    if (driver === "indexeddb") {
+      var value = await idbGet(key);
+      if (value !== null) return value;
+      var mirror = hasLocalStorage() ? localStorage.getItem(MIRROR_PREFIX + key) : null;
+      if (mirror) {
+        try {
+          return JSON.parse(mirror);
+        } catch (err) {
+          return fallback;
+        }
+      }
+      return fallback;
+    }
+    if (driver === "localstorage") {
+      var rawLocal = localStorage.getItem(MIRROR_PREFIX + key);
+      if (!rawLocal) return fallback;
+      try {
+        return JSON.parse(rawLocal);
+      } catch (err) {
+        return fallback;
+      }
+    }
+    return memory[key] === undefined ? fallback : memory[key];
   }
 
   async function set(key, value) {
+    if (driver === "cloud") {
+      memory[key] = value;
+      return cloud.set(key, value);
+    }
     if (driver === "indexeddb") {
       var ok = await idbSet(key, value);
-      writeLocal(key, value); // espelho / fallback
+      if (hasLocalStorage()) {
+        try {
+          localStorage.setItem(MIRROR_PREFIX + key, JSON.stringify(value));
+        } catch (err) {
+          /* quota cheia: o IndexedDB continua sendo a fonte */
+        }
+      }
       return ok;
     }
-    if (driver === "localstorage") return writeLocal(key, value);
+    if (driver === "localstorage") {
+      try {
+        localStorage.setItem(MIRROR_PREFIX + key, JSON.stringify(value));
+        return true;
+      } catch (err) {
+        return false;
+      }
+    }
     memory[key] = value;
     return true;
   }
 
   async function keys() {
-    if (driver === "indexeddb") {
-      var list = await idbKeys();
-      if (list.length) return list;
-      return Object.keys(memory);
-    }
-    if (driver === "localstorage" && hasLocalStorage()) {
+    if (driver === "cloud") return Object.keys(memory);
+    if (driver === "indexeddb") return idbKeys();
+    if (driver === "localstorage") {
       var out = [];
       for (var i = 0; i < localStorage.length; i++) {
-        var k = localStorage.key(i);
-        if (k && k.indexOf(MIRROR_PREFIX) === 0) out.push(k.slice(MIRROR_PREFIX.length));
+        var full = localStorage.key(i);
+        if (full && full.indexOf(MIRROR_PREFIX) === 0) out.push(full.slice(MIRROR_PREFIX.length));
       }
       return out;
     }
     return Object.keys(memory);
   }
 
-  /** Remove todas as chaves do aplicativo (usado em "apagar tudo"). */
   async function clearAll() {
-    var all = await keys();
-    for (var i = 0; i < all.length; i++) await set(all[i], null);
-    if (driver === "indexeddb" && idb) {
-      await new Promise(function (resolve) {
-        var tx = idb.transaction(STORE, "readwrite");
-        tx.objectStore(STORE).clear();
-        tx.oncomplete = resolve;
-        tx.onerror = resolve;
-      });
+    if (driver === "cloud") {
+      memory = {};
+      return cloud.clearAll();
     }
-    if (hasLocalStorage()) {
-      var toRemove = [];
-      for (var j = 0; j < localStorage.length; j++) {
-        var fullKey = localStorage.key(j);
-        if (fullKey && fullKey.indexOf(MIRROR_PREFIX) === 0) toRemove.push(fullKey);
+    if (driver === "indexeddb") {
+      await idbClear();
+      if (hasLocalStorage()) {
+        for (var i = localStorage.length - 1; i >= 0; i--) {
+          var full = localStorage.key(i);
+          if (full && full.indexOf(MIRROR_PREFIX) === 0) localStorage.removeItem(full);
+        }
       }
-      toRemove.forEach(function (k) {
-        localStorage.removeItem(k);
-      });
+      return true;
+    }
+    if (driver === "localstorage") {
+      for (var j = localStorage.length - 1; j >= 0; j--) {
+        var key = localStorage.key(j);
+        if (key && key.indexOf(MIRROR_PREFIX) === 0) localStorage.removeItem(key);
+      }
+      return true;
     }
     memory = {};
+    return true;
   }
 
   return {
@@ -240,6 +377,12 @@
     clearAll: clearAll,
     driver: function () {
       return driver;
-    }
+    },
+    isCloud: function () {
+      return driver === "cloud";
+    },
+    cloud: function () {
+      return cloud;
+    },
   };
 });

@@ -27,7 +27,9 @@
     "web:build": "node web/build.js",
     "web:test": "node --test web/tests/core.test.js web/tests/store.test.js && node web/tests/e2e.test.js",
     "app:build": "node app/build.js",
-    "app:test": "node --test app/tests/auth.test.js && node app/tests/e2e.test.js"
+    "app:test": "node --test app/tests/auth.test.js && node app/tests/e2e.test.js",
+    "cloud:test": "cd cloud && node --test tests/api.test.mjs",
+    "cloud:e2e": "node cloud/tests/cloud-flow.test.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "0.5.15",

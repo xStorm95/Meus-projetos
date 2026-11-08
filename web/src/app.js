@@ -96,30 +96,46 @@
 
   /* ============================== ACESSO ============================== */
 
-  /** Senha única de acesso (sem cadastro, sem e-mail). */
-  var ACCESS_PASSWORD = "admin123";
-  var ACCESS_ALT = "admin";
   var SESSION_HOURS = 12;
 
+  function isCloud() {
+    return store && typeof store.isCloudMode === "function" && store.isCloudMode();
+  }
+
   function authView() {
+    var online = isCloud();
     return (
       '<div class="auth-shell">' +
         '<aside class="auth-brand">' +
           '<div class="auth-brand-inner">' +
             '<div class="auth-logo"><span class="auth-logo-mark">P</span> Palco</div>' +
             '<h1 class="auth-headline">Sua loja inteira<br>em um só <em>palco</em>.</h1>' +
-            '<p class="auth-sub">PDV, estoque, clientes, financeiro e relatórios — num único arquivo, funcionando offline.</p>' +
+            '<p class="auth-sub">' +
+              (online
+                ? "Crie sua conta e entre: produtos, vendas, clientes e sua foto ficam salvos no servidor e abrem em qualquer aparelho."
+                : "PDV, estoque, clientes, financeiro e relatórios — num único arquivo, funcionando offline.") +
+            '</p>' +
             '<div class="auth-features">' +
-              feature("shield", "Acesso protegido por senha") +
-              feature("camera", "Foto de perfil salva no aparelho") +
-              feature("database", "Produtos, vendas e clientes salvos offline") +
+              feature("shield", online ? "Senha criptografada no servidor" : "Acesso protegido por senha") +
+              feature("camera", online ? "Foto de perfil salva na nuvem" : "Foto de perfil salva no aparelho") +
+              feature("database", online ? "Dados no banco de dados, fora do navegador" : "Produtos, vendas e clientes salvos offline") +
               feature("reports", "Relatórios e backup em CSV") +
             '</div>' +
           '</div>' +
-          '<p class="auth-foot">Seus dados ficam neste navegador (IndexedDB). Nada é enviado para servidores.<br>Faça backup em Perfil → Backup para não perder ao limpar o navegador.</p>' +
+          '<p class="auth-foot">' +
+            (online
+              ? "Seus dados ficam no servidor do Palco, ligados à sua conta.<br>Entre com o mesmo e-mail e senha em qualquer dispositivo."
+              : "Seus dados ficam neste navegador (IndexedDB). Nada é enviado para servidores.<br>Faça backup em Perfil → Backup para não perder ao limpar o navegador.") +
+          '</p>' +
         '</aside>' +
         '<section class="auth-panel">' +
           '<div class="auth-card">' +
+            (online
+              ? '<div class="auth-tabs" role="tablist">' +
+                  '<button class="auth-tab" role="tab" data-authtab="login" aria-selected="true">Entrar</button>' +
+                  '<button class="auth-tab" role="tab" data-authtab="signup" aria-selected="false">Criar conta</button>' +
+                '</div>'
+              : "") +
             '<div id="auth-forms"></div>' +
           '</div>' +
         '</section>' +
@@ -132,34 +148,105 @@
   }
 
   function loginForm() {
+    var online = isCloud();
     return (
       '<form class="auth-form" id="form-login" novalidate>' +
-        '<div><h2 style="font-family:var(--font-display);font-size:26px;font-weight:500">Entrar no Palco</h2>' +
-        '<p class="small muted mt-8">Digite a senha de acesso da loja.</p></div>' +
-        '<div class="field"><label for="login-password">Senha de acesso</label>' +
+        '<div><h2 style="font-family:var(--font-display);font-size:26px;font-weight:500">' + (online ? "Bem-vindo de volta" : "Entrar no Palco") + '</h2>' +
+        '<p class="small muted mt-8">' + (online ? "Entre com o e-mail e a senha da sua conta." : "Digite a senha de acesso da loja.") + '</p></div>' +
+        (online
+          ? '<div class="field"><label for="login-email">E-mail</label>' +
+              '<div class="input-group"><span class="icon-left">' + Icons.icon("mail", 16) + "</span>" +
+              '<input class="input" id="login-email" name="email" type="email" autocomplete="email" placeholder="voce@loja.com" required></div>' +
+              '<span class="field-error" data-error="email"></span></div>'
+          : "") +
+        '<div class="field"><label for="login-password">Senha</label>' +
           '<div class="input-group"><span class="icon-left">' + Icons.icon("lock", 16) + "</span>" +
-          '<input class="input" id="login-password" name="password" type="password" autocomplete="current-password" placeholder="Sua senha" required autofocus>' +
+          '<input class="input" id="login-password" name="password" type="password" autocomplete="current-password" placeholder="Sua senha" required>' +
           '<button class="icon-right" type="button" aria-label="Mostrar senha" data-toggle-password="login-password">' + Icons.icon("eye", 16) + "</button></div>" +
           '<span class="field-error" data-error="password"></span></div>' +
         '<button class="btn btn-primary btn-lg btn-block" type="submit" id="login-submit">Entrar</button>' +
-        '<p class="tiny faint center">A senha padrão é <strong>admin123</strong>. Você pode trocá-la em<br>Meu perfil → Segurança.</p>' +
+        (online
+          ? '<p class="tiny faint center">Não tem conta ainda? Use a aba <strong>Criar conta</strong>.</p>'
+          : '<p class="tiny faint center">A senha padrão é <strong>admin123</strong>. Você pode trocá-la em<br>Meu perfil → Segurança.</p>') +
+      "</form>"
+    );
+  }
+
+  function signupForm() {
+    return (
+      '<form class="auth-form" id="form-signup" novalidate>' +
+        '<div><h2 style="font-family:var(--font-display);font-size:26px;font-weight:500">Criar sua conta</h2>' +
+        '<p class="small muted mt-8">Sua conta guarda os dados da loja no servidor.</p></div>' +
+        '<div class="field"><label for="su-name">Nome completo</label>' +
+          '<input class="input" id="su-name" name="name" autocomplete="name" placeholder="Seu nome" required>' +
+          '<span class="field-error" data-error="name"></span></div>' +
+        '<div class="field"><label for="su-email">E-mail</label>' +
+          '<input class="input" id="su-email" name="email" type="email" autocomplete="email" placeholder="voce@loja.com" required>' +
+          '<span class="field-error" data-error="email"></span></div>' +
+        '<div class="grid grid-2" style="gap:12px">' +
+          '<div class="field"><label for="su-phone">Telefone (opcional)</label>' +
+            '<input class="input" id="su-phone" name="phone" inputmode="tel" placeholder="(31) 99999-8888">' +
+            '<span class="field-error" data-error="phone"></span></div>' +
+          '<div class="field"><label for="su-city">Cidade (opcional)</label>' +
+            '<input class="input" id="su-city" name="city" placeholder="Ipatinga, MG">' +
+            '<span class="field-error" data-error="city"></span></div>' +
+        "</div>" +
+        '<div class="field"><label for="su-password">Senha</label>' +
+          '<div class="input-group"><span class="icon-left">' + Icons.icon("lock", 16) + "</span>" +
+          '<input class="input" id="su-password" name="password" type="password" autocomplete="new-password" placeholder="Mínimo 8 caracteres com número" required>' +
+          '<button class="icon-right" type="button" aria-label="Mostrar senha" data-toggle-password="su-password">' + Icons.icon("eye", 16) + "</button></div>" +
+          '<div class="password-meter" data-meter="su-password" data-score="0"><span></span><span></span><span></span><span></span></div>' +
+          '<span class="field-error" data-error="password"></span></div>' +
+        '<div class="field"><label for="su-password2">Confirmar senha</label>' +
+          '<input class="input" id="su-password2" name="passwordConfirm" type="password" autocomplete="new-password" placeholder="Repita a senha" required>' +
+          '<span class="field-error" data-error="passwordConfirm"></span></div>' +
+        '<button class="btn btn-primary btn-lg btn-block" type="submit" id="signup-submit">Criar conta e entrar</button>' +
+        '<p class="tiny faint center">Sua senha é criptografada no servidor. Nunca guardamos texto puro.</p>' +
       "</form>"
     );
   }
 
   function bindAuth() {
     var forms = document.getElementById("auth-forms");
-    forms.innerHTML = loginForm();
-    ui.$$("[data-toggle-password]").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        var input = document.getElementById(btn.dataset.togglePassword);
-        input.type = input.type === "password" ? "text" : "password";
-        btn.innerHTML = Icons.icon(input.type === "password" ? "eye" : "eyeOff", 16);
+    var online = isCloud();
+    var mode = online && aux.authTab === "signup" ? "signup" : "login";
+
+    function paint() {
+      forms.innerHTML = mode === "login" ? loginForm() : signupForm();
+      ui.$$("[data-authtab]").forEach(function (tab) {
+        tab.setAttribute("aria-selected", tab.dataset.authtab === mode ? "true" : "false");
+      });
+      ui.$$("[data-toggle-password]").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          var input = document.getElementById(btn.dataset.togglePassword);
+          input.type = input.type === "password" ? "text" : "password";
+          btn.innerHTML = Icons.icon(input.type === "password" ? "eye" : "eyeOff", 16);
+        });
+      });
+      if (mode === "signup") {
+        ui.applyMask(document.getElementById("su-phone"), ui.phoneMask);
+        var pwd = document.getElementById("su-password");
+        pwd.addEventListener("input", function () {
+          var meter = document.querySelector("[data-meter]");
+          if (meter) meter.dataset.score = String(core.passwordScore(pwd.value));
+        });
+        document.getElementById("form-signup").addEventListener("submit", onSubmitSignup);
+      } else {
+        document.getElementById("form-login").addEventListener("submit", onSubmitLogin);
+      }
+      var first = forms.querySelector("input");
+      if (first) first.focus();
+    }
+
+    ui.$$("[data-authtab]").forEach(function (tab) {
+      tab.addEventListener("click", function () {
+        mode = tab.dataset.authtab;
+        aux.authTab = mode;
+        paint();
       });
     });
-    document.getElementById("form-login").addEventListener("submit", onSubmitLogin);
-    var first = forms.querySelector("input");
-    if (first) first.focus();
+
+    paint();
   }
 
   async function onSubmitLogin(event) {
@@ -167,20 +254,29 @@
     var form = event.target;
     var button = document.getElementById("login-submit");
     ui.clearErrors(form);
+    var online = isCloud();
+    var email = online ? fieldValue(form, "email").trim() : "";
     var password = fieldValue(form, "password");
-    if (!password) return ui.showFieldErrors({ password: "Digite a senha de acesso." }, form);
+
+    if (online) {
+      if (!core.isValidEmail(email)) return ui.showFieldErrors({ email: "Informe um e-mail válido." }, form);
+      if (!password) return ui.showFieldErrors({ password: "Informe sua senha." }, form);
+    } else if (!password) {
+      return ui.showFieldErrors({ password: "Digite a senha de acesso." }, form);
+    }
 
     button.disabled = true;
     button.textContent = "Entrando...";
     try {
-      var ok = await store.loginWithPassword(password);
+      var ok = online ? await store.login(email, password) : await store.loginWithPassword(password);
       if (!ok) {
-        ui.showFieldErrors({ password: "Senha incorreta." }, form);
-        ui.toast("Senha incorreta.", "error", "Não foi possível entrar");
+        ui.showFieldErrors({ password: online ? "E-mail ou senha incorretos." : "Senha incorreta." }, form);
+        ui.toast("E-mail ou senha incorretos.", "error", "Não foi possível entrar");
         return;
       }
-      ui.toast("Acesso liberado. Bom trabalho!", "success", "Bem-vinda");
+      ui.toast("Login realizado. Bom trabalho!", "success", "Bem-vindo");
       cart = [];
+      aux = {};
       render();
     } catch (err) {
       ui.showFieldErrors({ password: err.message }, form);
@@ -189,6 +285,39 @@
       if (button) {
         button.disabled = false;
         button.textContent = "Entrar";
+      }
+    }
+  }
+
+  async function onSubmitSignup(event) {
+    event.preventDefault();
+    var form = event.target;
+    var button = document.getElementById("signup-submit");
+    ui.clearErrors(form);
+    var payload = {
+      name: fieldValue(form, "name"),
+      email: fieldValue(form, "email"),
+      phone: fieldValue(form, "phone"),
+      city: fieldValue(form, "city"),
+      password: fieldValue(form, "password"),
+      passwordConfirm: fieldValue(form, "passwordConfirm")
+    };
+    var validation = core.validateSignup(payload, []);
+    if (!validation.valid) return ui.showFieldErrors(validation.errors, form);
+
+    button.disabled = true;
+    button.textContent = "Criando conta...";
+    try {
+      await store.signup(payload);
+      ui.toast("Conta criada! Seus dados agora ficam salvos na nuvem.", "success", "Bem-vindo ao Palco");
+      render();
+    } catch (err) {
+      if (err.fields && Object.keys(err.fields).length) ui.showFieldErrors(err.fields, form);
+      else ui.toast(err.message, "error");
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = "Criar conta e entrar";
       }
     }
   }
@@ -229,7 +358,7 @@
           '<div class="sidebar-store">' + ui.escapeHtml(settings.storeName || "Minha loja") + "</div>" +
           '<nav class="nav">' + nav + "</nav>" +
           '<div class="sidebar-foot">' +
-            '<div class="storage-chip"><strong>' + ui.escapeHtml(storageLabel()) + "</strong><br>dados salvos neste dispositivo</div>" +
+            '<div class="storage-chip"><strong>' + ui.escapeHtml(storageLabel()) + "</strong><br>" + (isCloud() ? "dados salvos na sua conta" : "dados salvos neste dispositivo") + "</div>" +
             '<button class="nav-item" data-action="logout">' + Icons.icon("logout", 17) + "<span>Sair</span></button>" +
           "</div>" +
         "</aside>" +
@@ -249,6 +378,7 @@
 
   function storageLabel() {
     var driver = dbLib.driver();
+    if (driver === "cloud") return "Nuvem (PostgreSQL)";
     if (driver === "indexeddb") return "IndexedDB ativo";
     if (driver === "localstorage") return "Armazenamento local";
     return "Modo temporário";
@@ -297,7 +427,8 @@
     if (!ok) return;
     await store.logout();
     cart = [];
-    aux = {};
+    aux = { authTab: "login" };
+    view = "dashboard";
     render();
     ui.toast("Você saiu da conta.", "info", "Até logo");
   }
@@ -1387,6 +1518,7 @@
           '<div class="card"><div class="card-head"><span class="card-title">Dados pessoais</span></div>' +
             '<div class="card-body"><form class="stack" id="form-profile" novalidate>' +
               profileField("Nome de exibição", "name", user.name) +
+              (isCloud() ? accountEmailField(user.email) : "") +
               '<div class="grid grid-2" style="gap:12px">' +
                 profileField("Telefone", "phone", user.phone ? ui.phoneMask(user.phone) : "", "tel") +
                 profileField("CPF/CNPJ", "document", user.document ? (user.document.length > 11 ? core.maskCNPJ(user.document) : core.maskCPF(user.document)) : "", "text") +
@@ -1408,9 +1540,13 @@
                   profileField("Nova senha", "newPassword", "", "password") +
                   profileField("Confirmar", "newPasswordConfirm", "", "password") +
                 "</div>" +
-                '<div class="banner banner-info">' + Icons.icon("shield", 16) + "<div>Senha de acesso guardada com hash PBKDF2 (210.000 iterações). A padrão é <strong>admin123</strong>.</div></div>" +
+                '<div class="banner banner-info">' + Icons.icon("shield", 16) + "<div>" +
+                  (isCloud()
+                    ? "Sua senha é criptografada (scrypt) no servidor e nunca volta para o navegador."
+                    : "Senha de acesso guardada com hash PBKDF2 (210.000 iterações). A padrão é <strong>admin123</strong>.") +
+                "</div></div>" +
                 '<div class="row gap-8 wrap"><button class="btn btn-outline" type="submit">Alterar senha</button>' +
-                '<button class="btn btn-ghost btn-sm" type="button" id="reset-password">Voltar para admin123</button></div>' +
+                (isCloud() ? "" : '<button class="btn btn-ghost btn-sm" type="button" id="reset-password">Voltar para admin123</button>') + "</div>" +
               "</form></div></div>" +
 
             '<div class="card"><div class="card-head"><span class="card-title">Backup dos seus dados</span></div>' +
@@ -1442,6 +1578,13 @@
       products: state.products.length,
       customers: state.customers.length
     };
+  }
+
+  function accountEmailField(email) {
+    return '<div class="field"><label>E-mail da conta</label>' +
+      '<input class="input" name="email" value="' + ui.escapeHtml(email || "") + '" type="email" autocomplete="email">' +
+      '<span class="hint">É o e-mail usado para entrar. Trocar aqui muda seu login.</span>' +
+      '<span class="field-error" data-error="email"></span></div>';
   }
 
   function profileField(label, name, value, type) {
@@ -1493,7 +1636,7 @@
       try {
         await store.updateProfile({
           name: fieldValue(form, "name"),
-          email: fieldValue(form, "email"),
+          email: isCloud() ? fieldValue(form, "email") : undefined,
           phone: fieldValue(form, "phone"),
           document: fieldValue(form, "document"),
           birthDate: fieldValue(form, "birthDate"),
@@ -1616,7 +1759,7 @@
             '<div class="card"><div class="card-head"><span class="card-title">Armazenamento</span></div>' +
               '<div class="card-body stack">' +
                 '<div class="row-between small"><span class="muted">Tecnologia</span><span class="bold">' + ui.escapeHtml(storageLabel()) + "</span></div>" +
-                '<div class="row-between small"><span class="muted">Senha de acesso</span><span class="bold">' + (store.getState().settings.passwordChanged ? "personalizada" : "padrão (admin123)") + "</span></div>" +
+                '<div class="row-between small"><span class="muted">' + (isCloud() ? "Conta" : "Senha de acesso") + '</span><span class="bold">' + (isCloud() ? ui.escapeHtml(session.user.email) : (store.getState().settings.passwordChanged ? "personalizada" : "padrão (admin123)")) + "</span></div>" +
                 '<div class="row-between small"><span class="muted">Tamanho dos dados</span><span class="bold">' + storageSize() + "</span></div>" +
                 '<div class="banner banner-warning">' + Icons.icon("alert", 16) + "<div>Limpar os dados do navegador apaga o sistema. Faça backup em <strong>Meu perfil</strong> antes.</div></div>" +
               "</div></div>" +

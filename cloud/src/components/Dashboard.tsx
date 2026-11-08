@@ -243,6 +243,12 @@ export function Dashboard({
           <button className="icon-btn" onClick={toggle} type="button" aria-label="Alternar tema" title="Alternar tema">
             {theme === "dark" ? "☀" : "☾"}
           </button>
+          <a className="btn btn-primary btn-sm" href="/app">
+            Abrir o sistema
+          </a>
+          <a className="btn btn-ghost btn-sm" href="/perfil">
+            Minha conta
+          </a>
           <button className="btn btn-ghost btn-sm" onClick={logout} disabled={busy === "logout"} type="button">
             {busy === "logout" ? <span className="spinner" /> : null}
             Sair

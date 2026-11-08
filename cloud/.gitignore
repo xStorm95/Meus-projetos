@@ -4,6 +4,4 @@ node_modules
 .env.local
 .vercel
 *.log
-node_modules
-node_modules
 .dev/pgdata
