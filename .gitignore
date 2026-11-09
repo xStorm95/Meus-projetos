@@ -8,6 +8,7 @@ coverage/
 .env.local
 .env*.local
 .pgdata/
+.pgdata-*/
 *.log
 .DS_Store
 next-env.d.ts
