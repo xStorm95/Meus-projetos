@@ -2,6 +2,7 @@ import { z } from "zod";
 import { apiHandler, ok } from "@/server/lib/api";
 import { getSettings, updateSettings } from "@/server/services/settings";
 import { writeAudit } from "@/server/lib/audit";
+import { normalizeHex, customAccentValue } from "@/server/lib/color";
 
 const schema = z.object({
   logoUrl: z
@@ -10,7 +11,20 @@ const schema = z.object({
     .nullable()
     .optional(),
   appName: z.string().trim().min(2).max(40).optional(),
-  accentColor: z.enum(["gold", "rose", "emerald", "indigo", "graphite"]).optional(),
+  /**
+   * Paletas prontas ("gold", "rose", "emerald", "navy", "indigo", "graphite")
+   * ou cor livre da logo no formato "custom:#rrggbb".
+   */
+  accentColor: z
+    .string()
+    .max(20)
+    .refine(
+      (value) =>
+        ["gold", "rose", "emerald", "navy", "indigo", "graphite"].includes(value) ||
+        (value.startsWith("custom:") && normalizeHex(value.slice(7)) !== null),
+      "Cor inválida. Use uma paleta pronta ou um hex como custom:#c9a227.",
+    )
+    .optional(),
 });
 
 /** Personalização da marca: nome do sistema, logo (data URL validada) e cor. */
@@ -23,7 +37,11 @@ export const PATCH = apiHandler({ permission: "settings.manage", body: schema },
     patch.logoUrl = body.logoUrl;
   }
   if (body.appName) patch.appName = body.appName;
-  if (body.accentColor) patch.accentColor = body.accentColor;
+  if (body.accentColor) {
+    patch.accentColor = body.accentColor.startsWith("custom:")
+      ? customAccentValue(body.accentColor.slice(7))
+      : body.accentColor;
+  }
 
   const updated = Object.keys(patch).length ? await updateSettings(patch as never) : await getSettings();
   await writeAudit({

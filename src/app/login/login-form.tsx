@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Eye, EyeOff, LogIn, Mail, Lock, ShieldCheck, Terminal } from "lucide-react";
+import { Eye, EyeOff, LogIn, Mail, Lock, ShieldCheck, Terminal, Store, ArrowLeft, Pipette } from "lucide-react";
 import { api, errorMessage } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Input, Field } from "@/components/ui/form";
@@ -16,7 +16,8 @@ export function LoginForm({ setupRequired }: { setupRequired: boolean }) {
   const [showPassword, setShowPassword] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
-  const [mode, setMode] = React.useState<"login" | "forgot">("login");
+  const [mode, setMode] = React.useState<"login" | "forgot" | "signup">("login");
+  const [signup, setSignup] = React.useState({ storeName: "", ownerName: "", password2: "", accentHex: "#c9a227" });
   const [forgotMessage, setForgotMessage] = React.useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -27,6 +28,31 @@ export function LoginForm({ setupRequired }: { setupRequired: boolean }) {
       await api.post("/api/auth/login", { email, password });
       const next = params.get("next");
       router.replace(next && next.startsWith("/") ? next : "/");
+      router.refresh();
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleSignup(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    if (signup.password2 !== password) {
+      setError("As senhas não conferem.");
+      return;
+    }
+    setLoading(true);
+    try {
+      await api.post("/api/auth/signup", {
+        storeName: signup.storeName,
+        ownerName: signup.ownerName,
+        email,
+        password,
+        accentHex: signup.accentHex,
+      });
+      router.replace("/");
       router.refresh();
     } catch (err) {
       setError(errorMessage(err));
@@ -125,12 +151,14 @@ export function LoginForm({ setupRequired }: { setupRequired: boolean }) {
           </div>
 
           <h2 className="text-xl font-semibold tracking-tight text-[var(--text-primary)]">
-            {mode === "login" ? "Acessar o sistema" : "Recuperar senha"}
+            {mode === "login" ? "Acessar o sistema" : mode === "signup" ? "Criar a minha loja" : "Recuperar senha"}
           </h2>
           <p className="mt-1 text-sm text-[var(--text-muted)]">
             {mode === "login"
               ? "Entre com suas credenciais para continuar."
-              : "Informe seu e-mail cadastrado para receber as instruções."}
+              : mode === "signup"
+                ? "Nome da loja, sua cor e uma senha. Leva menos de um minuto."
+                : "Informe seu e-mail cadastrado para receber as instruções."}
           </p>
 
           {setupRequired && (
@@ -154,7 +182,108 @@ export function LoginForm({ setupRequired }: { setupRequired: boolean }) {
             </Alert>
           )}
 
-          {mode === "login" ? (
+          {mode === "signup" ? (
+            <form onSubmit={handleSignup} className="mt-6 space-y-4">
+              <Field label="Nome da loja" htmlFor="store-name">
+                <Input
+                  id="store-name"
+                  autoFocus
+                  required
+                  leftIcon={<Store className="h-4 w-4" />}
+                  placeholder="Passarela da Moda"
+                  value={signup.storeName}
+                  onChange={(e) => setSignup({ ...signup, storeName: e.target.value })}
+                />
+              </Field>
+
+              <Field label="Seu nome" htmlFor="owner-name">
+                <Input
+                  id="owner-name"
+                  required
+                  placeholder="Maria Silva"
+                  value={signup.ownerName}
+                  onChange={(e) => setSignup({ ...signup, ownerName: e.target.value })}
+                />
+              </Field>
+
+              <Field label="E-mail" htmlFor="email">
+                <Input
+                  id="email"
+                  type="email"
+                  autoComplete="username"
+                  required
+                  leftIcon={<Mail className="h-4 w-4" />}
+                  placeholder="seu@email.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </Field>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Senha" htmlFor="password">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="new-password"
+                    required
+                    minLength={8}
+                    leftIcon={<Lock className="h-4 w-4" />}
+                    placeholder="mínimo 8 caracteres"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                </Field>
+                <Field label="Repetir senha" htmlFor="password2">
+                  <Input
+                    id="password2"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="new-password"
+                    required
+                    placeholder="repita a senha"
+                    value={signup.password2}
+                    onChange={(e) => setSignup({ ...signup, password2: e.target.value })}
+                  />
+                </Field>
+              </div>
+
+              <div className="rounded-xl border border-[var(--border-default)] bg-[var(--bg-muted)]/60 p-3">
+                <p className="flex items-center gap-1.5 text-[11px] font-semibold text-[var(--text-secondary)]">
+                  <Pipette className="h-3.5 w-3.5" /> Cor da minha logo
+                </p>
+                <div className="mt-2 flex items-center gap-2">
+                  <input
+                    type="color"
+                    aria-label="Cor da logo"
+                    value={signup.accentHex}
+                    onChange={(e) => setSignup({ ...signup, accentHex: e.target.value })}
+                    className="h-9 w-12 cursor-pointer rounded-lg border border-[var(--border-default)] bg-transparent p-0.5"
+                  />
+                  <span className="font-mono text-[11px] uppercase text-[var(--text-muted)]">{signup.accentHex}</span>
+                  <span className="ml-auto rounded-md px-2 py-1 text-[10.5px] font-medium" style={{ background: signup.accentHex, color: "#fff" }}>
+                    cor do site
+                  </span>
+                </div>
+                <p className="mt-1.5 text-[10.5px] text-[var(--text-muted)]">
+                  Escolha a cor da sua marca. Dá para trocar (ou enviar a logo) depois em Configurações.
+                </p>
+              </div>
+
+              <Button type="submit" size="lg" className="w-full" loading={loading} leftIcon={<Store className="h-4 w-4" />}>
+                Criar loja e entrar
+              </Button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("login");
+                  setError(null);
+                }}
+                className="flex w-full items-center justify-center gap-1.5 text-[11.5px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" /> Já tenho conta
+              </button>
+            </form>
+          ) : mode === "login" ? (
             <form onSubmit={handleSubmit} className="mt-6 space-y-4">
               <Field label="E-mail" htmlFor="email">
                 <Input
@@ -210,6 +339,17 @@ export function LoginForm({ setupRequired }: { setupRequired: boolean }) {
               <Button type="submit" size="lg" className="w-full" loading={loading} leftIcon={<LogIn className="h-4 w-4" />}>
                 Entrar
               </Button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("signup");
+                  setError(null);
+                }}
+                className="w-full text-center text-xs font-semibold text-[var(--accent)] hover:underline"
+              >
+                Não tenho conta — criar a minha loja
+              </button>
 
               <p className="flex items-center justify-center gap-1.5 pt-2 text-[11px] text-[var(--text-muted)]">
                 <ShieldCheck className="h-3.5 w-3.5" />

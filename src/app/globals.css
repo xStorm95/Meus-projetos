@@ -106,6 +106,24 @@ html.dark {
 }
 
 /* Paletas de destaque configuráveis (Configurações > Aparência) */
+
+/* ============================================================
+ * COR PERSONALIZADA — a cor da logo vira a cor do site.
+ * O servidor grava o hex em data-accent-hex e calcula o contraste
+ * (data-accent-tone = "light" | "dark"); estas regras derivam o
+ * tom suave, o texto sobre a cor e a versão para tema escuro.
+ * ============================================================ */
+html[data-accent-hex] {
+  --accent: var(--accent-custom);
+  --accent-soft: var(--accent-custom-soft);
+  --accent-contrast: var(--accent-custom-contrast);
+  --accent-strong: var(--accent-custom-strong);
+}
+html.dark[data-accent-hex] {
+  --accent: var(--accent-custom-dark);
+  --accent-soft: var(--accent-custom-soft-dark);
+}
+
 html[data-accent="rose"] {
   --accent: #c2707f;
   --accent-soft: #fdf4f5;

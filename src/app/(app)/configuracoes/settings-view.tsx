@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import {
-  Store, Sliders, Palette, FileCheck2, ShieldCheck, Save, Upload, Trash2, Info, Database,
+  Store, Sliders, Palette, FileCheck2, ShieldCheck, Save, Upload, Trash2, Info, Database, Pipette, Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { api, errorMessage } from "@/lib/api-client";
@@ -11,6 +11,7 @@ import { cn, maskDocument, maskPhone, maskZip } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, Badge, Modal, Tabs } from "@/components/ui/primitives";
 import { Field, Input, Select, Switch, Textarea } from "@/components/ui/form";
+import { extractLogoColors, type ExtractedColor } from "@/components/settings/logo-colors";
 
 type Settings = {
   appName: string;
@@ -109,6 +110,15 @@ export function SettingsView({
     whatsappEnabled: settings.whatsappEnabled,
   });
   const [branding, setBranding] = React.useState({ logoUrl: settings.logoUrl, accentColor: settings.accentColor, appName: settings.appName });
+  /** Cor livre (a cor da logo) — guardada como "custom:#rrggbb". */
+  const [customHex, setCustomHex] = React.useState<string>(
+    settings.accentColor?.startsWith("custom:") ? settings.accentColor.slice(7) : "#c9a227",
+  );
+  const [customActive, setCustomActive] = React.useState<boolean>(
+    Boolean(settings.accentColor?.startsWith("custom:")),
+  );
+  const [logoSuggestions, setLogoSuggestions] = React.useState<ExtractedColor[]>([]);
+  const [readingLogo, setReadingLogo] = React.useState(false);
   const [fiscal, setFiscal] = React.useState({
     fiscalProvider: settings.fiscalProvider ?? "",
     fiscalEnvironment: settings.fiscalEnvironment,
@@ -162,15 +172,66 @@ export function SettingsView({
     }
   }
 
+  /** Aplica a cor na hora (prévia ao vivo, antes de salvar). */
+  function previewAccent(hex: string) {
+    const root = document.documentElement;
+    const value = `custom:${hex}`;
+    setBranding((prev) => ({ ...prev, accentColor: value }));
+    setCustomActive(true);
+    setCustomHex(hex);
+    // Prévia: tons derivados rapidamente no cliente (o servidor refaz ao salvar).
+    root.setAttribute("data-accent-hex", hex);
+    const rgb = hex.replace("#", "").match(/.{2}/g);
+    if (rgb) {
+      const [r, g, b] = rgb.map((v) => parseInt(v, 16) / 255);
+      const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      root.style.setProperty("--accent-custom", hex);
+      root.style.setProperty("--accent-custom-soft", `rgba(${Math.round(r * 255)},${Math.round(g * 255)},${Math.round(b * 255)},0.10)`);
+      root.style.setProperty("--accent-custom-contrast", lum > 0.55 ? "#14140f" : "#ffffff");
+      root.style.setProperty("--accent-custom-dark", lum < 0.28 ? `color-mix(in srgb, ${hex} 58%, white)` : hex);
+      root.style.setProperty("--accent-custom-soft-dark", `rgba(${Math.round(r * 255)},${Math.round(g * 255)},${Math.round(b * 255)},0.16)`);
+    }
+    root.setAttribute("data-accent-tone", "light");
+  }
+
+  /** Lê as cores dominantes da logo (tudo no navegador, nada é enviado). */
+  async function readLogoColors(image: string | null) {
+    if (!image) return setLogoSuggestions([]);
+    setReadingLogo(true);
+    try {
+      const colors = await extractLogoColors(image, 6);
+      setLogoSuggestions(colors);
+      if (colors.length === 0) toast.info("A logo é neutra (preto/branco) — escolha a cor na paleta.");
+    } catch {
+      setLogoSuggestions([]);
+    } finally {
+      setReadingLogo(false);
+    }
+  }
+
+  React.useEffect(() => {
+    // Ao abrir a aba, sugere as cores da logo que já está salva.
+    if (tab === "BRANDING" && branding.logoUrl && logoSuggestions.length === 0) {
+      void readLogoColors(branding.logoUrl);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, branding.logoUrl]);
+
   async function saveBranding() {
     setSaving(true);
     try {
+      const accentColor = customActive ? `custom:${customHex}` : branding.accentColor;
       await api.patch("/api/settings/branding", {
         logoUrl: branding.logoUrl,
         appName: branding.appName,
-        accentColor: branding.accentColor,
+        accentColor,
       });
-      document.documentElement.setAttribute("data-accent", branding.accentColor);
+      document.documentElement.setAttribute("data-accent", accentColor.replace(/[^a-z]/g, "") || "gold");
+      if (customActive) {
+        document.documentElement.setAttribute("data-accent-hex", customHex);
+      } else {
+        document.documentElement.removeAttribute("data-accent-hex");
+      }
       toast.success("Identidade visual atualizada.");
       router.refresh();
     } catch (err) {
@@ -212,7 +273,11 @@ export function SettingsView({
       return toast.error("Use PNG, JPG, WEBP ou SVG.");
     }
     const reader = new FileReader();
-    reader.onload = () => setBranding((prev) => ({ ...prev, logoUrl: String(reader.result) }));
+    reader.onload = () => {
+      const dataUrl = String(reader.result);
+      setBranding((prev) => ({ ...prev, logoUrl: dataUrl }));
+      void readLogoColors(dataUrl);
+    };
     reader.readAsDataURL(file);
   }
 
@@ -386,9 +451,60 @@ export function SettingsView({
 
       {tab === "BRANDING" && (
         <Card className="space-y-4 p-4">
-          <div className="flex items-center gap-2">
-            <Palette className="h-4 w-4 text-[var(--accent-strong)]" />
-            <h2 className="text-sm font-semibold">Identidade visual</h2>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Palette className="h-4 w-4 text-[var(--accent-strong)]" />
+              <h2 className="text-sm font-semibold">Identidade visual</h2>
+            </div>
+            <label className="flex items-center gap-2 text-[11px] text-[var(--text-muted)]">
+              Nome da loja
+              <Input
+                value={branding.appName}
+                disabled={readOnly}
+                onChange={(e) => setBranding({ ...branding, appName: e.target.value })}
+                className="h-8 w-44"
+                placeholder="Passarela da Moda"
+              />
+            </label>
+          </div>
+
+          {/* Prévia: como a marca aparece no menu e nos botões */}
+          <div className="flex flex-wrap items-center gap-4 rounded-xl border border-[var(--border-default)] bg-[var(--bg-muted)]/50 p-3">
+            <div className="flex items-center gap-3 rounded-lg bg-[var(--bg-surface)] px-3 py-2 shadow-sm">
+              <span
+                className="grid h-10 w-10 place-items-center overflow-hidden rounded-lg text-[13px] font-bold"
+                style={{ background: customActive ? customHex : "var(--accent)", color: "var(--accent-contrast)" }}
+              >
+                {branding.logoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={branding.logoUrl} alt="" className="h-full w-full object-contain" />
+                ) : (
+                  (branding.appName || "P").trim().charAt(0).toUpperCase()
+                )}
+              </span>
+              <span className="leading-tight">
+                <span className="block text-[13px] font-semibold">{branding.appName || "Passarela da Moda"}</span>
+                <span className="block text-[10.5px] text-[var(--text-muted)]">
+                  {settings.companyName} · menu e cupons
+                </span>
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={readOnly}
+                className="rounded-lg px-3 py-1.5 text-[12px] font-semibold shadow-sm transition-transform hover:-translate-y-px"
+                style={{ background: "var(--accent)", color: "var(--accent-contrast)" }}
+              >
+                Nova venda
+              </button>
+              <span className="rounded-full px-2.5 py-1 text-[11px] font-medium" style={{ background: "var(--accent-soft)", color: "var(--accent-strong)" }}>
+                Etiqueta
+              </span>
+            </div>
+            <p className="flex-1 text-[10.5px] leading-relaxed text-[var(--text-muted)]">
+              Assim a marca aparece no dia a dia. A cor vale para o sistema todo — inclusive no cupom impresso.
+            </p>
           </div>
           <div className="grid gap-4 sm:grid-cols-[200px_1fr]">
             <div className="space-y-2">
@@ -426,21 +542,71 @@ export function SettingsView({
               </div>
             </div>
             <div className="space-y-3">
-              <Field label="Nome do sistema">
-                <Input value={branding.appName} disabled={readOnly} onChange={(e) => setBranding({ ...branding, appName: e.target.value })} />
-              </Field>
-              <div>
-                <p className="label">Cor de destaque</p>
-                <div className="flex flex-wrap gap-2">
+              <div className="space-y-2">
+                <p className="label">Cor da logo → cor do site</p>
+                {logoSuggestions.length > 0 ? (
+                  <>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {logoSuggestions.map((color) => (
+                        <button
+                          key={color.hex}
+                          type="button"
+                          disabled={readOnly}
+                          title={`Usar ${color.hex} (${Math.round(color.weight * 100)}% da logo)`}
+                          onClick={() => previewAccent(color.hex)}
+                          className={cn(
+                            "group relative h-9 w-9 rounded-xl border-2 transition-all hover:scale-105",
+                            customActive && customHex.toLowerCase() === color.hex.toLowerCase()
+                              ? "border-[var(--text-primary)] ring-2 ring-[var(--accent)] ring-offset-2 ring-offset-[var(--bg-surface)]"
+                              : "border-black/10",
+                          )}
+                          style={{ background: color.hex }}
+                        >
+                          <span className="absolute inset-x-0 -bottom-4 hidden text-[9px] text-[var(--text-muted)] group-hover:block">
+                            {Math.round(color.weight * 100)}%
+                          </span>
+                        </button>
+                      ))}
+                      <span className="ml-1 text-[11px] text-[var(--text-muted)]">
+                        {readingLogo ? "lendo a logo…" : "cores encontradas na sua logo"}
+                      </span>
+                    </div>
+                    <p className="text-[10.5px] text-[var(--text-muted)]">
+                      Clique numa cor para aplicar no sistema inteiro. A imagem é analisada aqui no seu navegador — nada é enviado.
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-[11px] text-[var(--text-muted)]">
+                    {readingLogo ? (
+                      <span className="inline-flex items-center gap-1.5"><Loader2 className="h-3 w-3 animate-spin" /> Lendo as cores da logo…</span>
+                    ) : branding.logoUrl ? (
+                      <button type="button" className="inline-flex items-center gap-1.5 text-[var(--accent-strong)] hover:underline" onClick={() => void readLogoColors(branding.logoUrl)}>
+                        <Pipette className="h-3 w-3" /> Ler as cores da logo
+                      </button>
+                    ) : (
+                      "Envie uma logo para o sistema sugerir as cores dela automaticamente."
+                    )}
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <p className="label">Ou escolha uma cor</p>
+                <div className="flex flex-wrap items-center gap-2">
                   {ACCENTS.map((accent) => (
                     <button
                       key={accent.value}
                       type="button"
                       disabled={readOnly}
-                      onClick={() => setBranding({ ...branding, accentColor: accent.value })}
+                      onClick={() => {
+                        setBranding({ ...branding, accentColor: accent.value });
+                        setCustomActive(false);
+                        document.documentElement.removeAttribute("data-accent-hex");
+                        document.documentElement.setAttribute("data-accent", accent.value);
+                      }}
                       className={cn(
                         "flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-[11px] font-medium transition-all",
-                        branding.accentColor === accent.value
+                        !customActive && branding.accentColor === accent.value
                           ? "border-[var(--accent)] bg-[var(--accent-soft)]"
                           : "border-[var(--border-default)] hover:bg-[var(--bg-muted)]",
                       )}
@@ -451,8 +617,48 @@ export function SettingsView({
                   ))}
                 </div>
               </div>
+
+              <div className="flex flex-wrap items-end gap-3 rounded-xl border border-[var(--border-default)] bg-[var(--bg-muted)]/60 p-3">
+                <label className="space-y-1">
+                  <span className="label block">Cor livre (hex)</span>
+                  <span className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      aria-label="Escolher cor"
+                      disabled={readOnly}
+                      value={customHex}
+                      onChange={(e) => previewAccent(e.target.value)}
+                      className="h-9 w-12 cursor-pointer rounded-lg border border-[var(--border-default)] bg-transparent p-0.5"
+                    />
+                    <input
+                      type="text"
+                      value={customHex}
+                      disabled={readOnly}
+                      onChange={(e) => {
+                        const value = e.target.value.startsWith("#") ? e.target.value : `#${e.target.value}`;
+                        setCustomHex(value);
+                        if (/^#[0-9a-f]{6}$/i.test(value)) previewAccent(value);
+                      }}
+                      className="input h-9 w-28 font-[family-name:var(--font-mono,monospace)] text-[12px] uppercase"
+                      placeholder="#C9A227"
+                    />
+                  </span>
+                </label>
+                <div className="flex-1 text-[11px] leading-relaxed text-[var(--text-muted)]">
+                  {customActive ? (
+                    <>
+                      Cor personalizada ativa — o sistema calcula o texto legível e o tom escuro automaticamente.
+                    </>
+                  ) : (
+                    <>
+                      Escolha a cor exata da sua marca. Vale para menu, botões, gráficos e cupons.
+                    </>
+                  )}
+                </div>
+              </div>
+
               <p className="text-[11px] text-[var(--text-muted)]">
-                A cor é aplicada em toda a interface para todos os usuários. O tema claro/escuro continua sendo escolha
+                A cor é aplicada em toda a interface para todos os usuários da loja. O tema claro/escuro continua sendo escolha
                 individual em cada dispositivo.
               </p>
             </div>
