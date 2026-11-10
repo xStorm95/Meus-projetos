@@ -10,6 +10,8 @@ import { auditLogs } from "../db/schema";
 export type AuditExecutor = Database | Parameters<Parameters<Database["transaction"]>[0]>[0];
 
 export type AuditInput = {
+  /** Loja do evento (obrigatório em multi-loja; sem ele não há como isolar). */
+  companyId?: string | null;
   userId?: string | null;
   userName?: string | null;
   action: string;
@@ -44,7 +46,7 @@ function sanitize(value: unknown): unknown {
 export async function writeAudit(input: AuditInput, executor?: AuditExecutor): Promise<void> {
   try {
     const target = executor ?? db;
-    await target.insert(auditLogs).values({
+    const gravar = () => target.insert(auditLogs).values({
       userId: input.userId ?? null,
       userName: input.userName ?? null,
       action: input.action,
@@ -56,6 +58,13 @@ export async function writeAudit(input: AuditInput, executor?: AuditExecutor): P
       ip: input.ip ?? null,
       userAgent: input.userAgent ?? null,
     });
+    // Multi-loja: o registro pertence à loja do evento.
+    if (input.companyId) {
+      const { withCompany } = await import("../db/tenant");
+      await withCompany(input.companyId, gravar);
+    } else {
+      await gravar();
+    }
   } catch (err) {
     // Auditoria nunca deve derrubar a operação principal
     console.error("[audit] falha ao registrar:", err);

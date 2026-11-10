@@ -8,12 +8,66 @@ Decimal.set({ precision: 20, rounding: Decimal.ROUND_HALF_UP, toExpNeg: -12, toE
 
 export type MoneyInput = string | number | Decimal | null | undefined;
 
+/**
+ * Converte texto digitado no padrão brasileiro para número.
+ * Aceita "1.234,56", "1234,56", "R$ 99,90", "99.90", "1,5".
+ * Regra: se há vírgula, ela é o separador decimal e os pontos são milhar.
+ */
+export function parseBRNumber(value: string): string | null {
+  const raw = value.trim();
+  if (!raw) return null;
+
+  // Remove tudo que não é dígito, separador ou sinal.
+  let s = raw.replace(/[^\d.,-]/g, "");
+  if (!s || !/\d/.test(s)) return null;
+
+  const negative = s.startsWith("-");
+  s = s.replace(/-/g, "");
+
+  if (s.includes(",")) {
+    // Padrão brasileiro: ponto = milhar, vírgula = decimal.
+    s = s.replace(/\./g, "").replace(",", ".");
+  } else if ((s.match(/\./g) ?? []).length > 1) {
+    // "1.234.567" sem vírgula: pontos são milhar.
+    s = s.replace(/\./g, "");
+  }
+
+  if (!/^\d*\.?\d*$/.test(s) || !/\d/.test(s)) return null;
+  return negative ? `-${s}` : s;
+}
+
+/**
+ * Converte qualquer entrada em Decimal. NUNCA lança exceção: valor inválido
+ * vira 0, e texto no padrão brasileiro ("99,90") é entendido corretamente.
+ * Isso é o que impede um campo mal digitado de virar "erro interno".
+ */
 export function d(value: MoneyInput): Decimal {
   if (value === null || value === undefined || value === "") return new Decimal(0);
   if (value instanceof Decimal) return value;
-  const n = new Decimal(value);
-  if (!n.isFinite()) return new Decimal(0);
-  return n;
+  if (typeof value === "number") return Number.isFinite(value) ? new Decimal(value) : new Decimal(0);
+
+  const normalized = parseBRNumber(value);
+  if (normalized === null) return new Decimal(0);
+  try {
+    const n = new Decimal(normalized);
+    return n.isFinite() ? n : new Decimal(0);
+  } catch {
+    return new Decimal(0);
+  }
+}
+
+/** Quantidade/medida (3 casas): mesma tolerância do dinheiro. */
+export function qty(value: MoneyInput): Decimal {
+  return d(value).toDecimalPlaces(3, Decimal.ROUND_HALF_UP);
+}
+
+/** Texto digitado é um número válido? (para validar antes de gravar) */
+export function isValidMoney(value: MoneyInput): boolean {
+  if (value === null || value === undefined) return true;
+  if (value instanceof Decimal) return true;
+  if (typeof value === "number") return Number.isFinite(value);
+  if (value.trim() === "") return true;
+  return parseBRNumber(value) !== null;
 }
 
 /** Arredonda para 2 casas (padrão monetário). */

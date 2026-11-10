@@ -5,7 +5,7 @@
  */
 import { beforeAll, describe, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
-import { db, adminActor, ensureTestSchema, purgeTestData, stamp, type TestActor } from "./helpers";
+import { db, adminActor, ensureTestSchema, inTestCompany, purgeTestData, stamp, type TestActor } from "./helpers";
 import { createProduct } from "@/server/services/products";
 import { setStockQuantity } from "@/server/services/stock-ops";
 import { cancelSale, createSale, previewSale, type Actor } from "@/server/services/sales";

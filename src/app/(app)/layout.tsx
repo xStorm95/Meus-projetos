@@ -15,6 +15,15 @@ export default async function AuthenticatedLayout({ children }: { children: Reac
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
+  // getCurrentUser já colocou a loja do usuário no contexto desta requisição
+  // (inclusive para as páginas, que o React renderiza em paralelo).
+  return renderShell(user, children);
+}
+
+async function renderShell(
+  user: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>,
+  children: React.ReactNode,
+) {
   let appName = "PASSARELA ERP";
   let companyName = "Minha Loja";
   let logoUrl: string | null = null;

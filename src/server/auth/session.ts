@@ -32,9 +32,15 @@ export function demoAutoLoginEnabled(): boolean {
 }
 
 async function findDemoUser() {
+  const { runAsSystem } = await import("../db/tenant");
+  return runAsSystem(findDemoUserUnsafe);
+}
+
+async function findDemoUserUnsafe() {
   const admin = await db
     .select({
       id: users.id,
+      companyId: users.companyId,
       name: users.name,
       email: users.email,
       role: users.role,
@@ -54,6 +60,7 @@ async function findDemoUser() {
   const anyUser = await db
     .select({
       id: users.id,
+      companyId: users.companyId,
       name: users.name,
       email: users.email,
       role: users.role,
@@ -74,6 +81,7 @@ async function findDemoUser() {
 /** Monta o objeto de sessão a partir da linha do usuário. */
 function toSessionUser(row: {
   id: string;
+  companyId: string;
   name: string;
   email: string;
   role: string;
@@ -87,6 +95,7 @@ function toSessionUser(row: {
   const role = row.role as UserRole;
   return {
     id: row.id,
+    companyId: row.companyId,
     name: row.name,
     email: row.email,
     role,
@@ -105,6 +114,8 @@ function toSessionUser(row: {
 
 export type SessionUser = {
   id: string;
+  /** Loja do usuário — base de todo isolamento de dados. */
+  companyId: string;
   name: string;
   email: string;
   role: UserRole;
@@ -122,6 +133,7 @@ function hashToken(token: string): string {
 
 export async function createSession(params: {
   userId: string;
+  companyId: string;
   ip?: string | null;
   userAgent?: string | null;
 }): Promise<string> {
@@ -129,13 +141,18 @@ export async function createSession(params: {
   const ttlHours = env().SESSION_TTL_HOURS;
   const expiresAt = new Date(Date.now() + ttlHours * 3600_000);
 
-  await db.insert(sessions).values({
-    userId: params.userId,
-    tokenHash: hashToken(token),
-    expiresAt,
-    ip: params.ip ?? null,
-    userAgent: params.userAgent ?? null,
-  });
+  // A sessão nasce dentro da loja do usuário (multi-loja).
+  const { withCompany } = await import("../db/tenant");
+  await withCompany(params.companyId, () =>
+    db.insert(sessions).values({
+      userId: params.userId,
+      companyId: params.companyId,
+      tokenHash: hashToken(token),
+      expiresAt,
+      ip: params.ip ?? null,
+      userAgent: params.userAgent ?? null,
+    }),
+  );
 
   const store = await cookies();
   store.set(SESSION_COOKIE, token, {
@@ -152,10 +169,13 @@ export async function destroySession(): Promise<void> {
   const store = await cookies();
   const token = store.get(SESSION_COOKIE)?.value;
   if (token) {
-    await db
-      .update(sessions)
-      .set({ revokedAt: new Date() })
-      .where(eq(sessions.tokenHash, hashToken(token)));
+    const { runAsSystem } = await import("../db/tenant");
+    await runAsSystem(() =>
+      db
+        .update(sessions)
+        .set({ revokedAt: new Date() })
+        .where(eq(sessions.tokenHash, hashToken(token))),
+    );
   }
   store.delete(SESSION_COOKIE);
 }
@@ -180,9 +200,13 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
     }
   }
 
-  const rows = await db
+  // Autenticação é o único caminho que pode cruzar lojas: o token ainda não
+  // diz de qual loja é. Depois de encontrar o usuário, tudo roda na loja dele.
+  const { runAsSystem } = await import("../db/tenant");
+  const rows = await runAsSystem(async () => db
     .select({
       userId: users.id,
+      companyId: users.companyId,
       name: users.name,
       email: users.email,
       role: users.role,
@@ -204,13 +228,20 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
         gt(sessions.expiresAt, new Date()),
       ),
     )
-    .limit(1);
+    .limit(1));
 
   const row = rows[0];
   if (!row || !row.isActive) return null;
 
+  // A partir daqui, tudo o que esta requisição fizer no banco roda na loja do
+  // usuário — inclusive as consultas das páginas, que o React renderiza em
+  // paralelo ao layout (ver enterCompany em ../db/tenant).
+  const { enterCompany } = await import("../db/tenant");
+  enterCompany(row.companyId);
+
   return toSessionUser({
     id: row.userId,
+    companyId: row.companyId,
     name: row.name,
     email: row.email,
     role: row.role,

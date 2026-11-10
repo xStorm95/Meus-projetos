@@ -4,6 +4,11 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   experimental: { serverActions: { bodySizeLimit: "8mb" } },
   serverExternalPackages: ["pg", "@electric-sql/pglite", "@electric-sql/pglite-socket"],
+  // Os arquivos de migração precisam existir no runtime do deployment: é neles
+  // que o app se baseia para atualizar o banco na primeira consulta.
+  outputFileTracingIncludes: {
+    "/**": ["./drizzle/**/*.sql"],
+  },
   // O PWA é registrado no cliente (public/manifest.webmanifest + src/components/pwa-register.tsx)
   async headers() {
     return [
