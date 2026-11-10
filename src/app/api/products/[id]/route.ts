@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { apiHandler, ok } from "@/server/lib/api";
 import { deleteProduct, getProduct, updateProduct } from "@/server/services/products";
+import { dataOpcional } from "@/server/lib/product-schema";
 
 type Params = { id: string };
 
@@ -32,8 +33,9 @@ const updateSchema = z.object({
   costPrice: z.union([z.string(), z.number()]).optional(),
   salePrice: z.union([z.string(), z.number()]).optional(),
   promoPrice: z.union([z.string(), z.number()]).nullable().optional(),
-  promoStartsAt: z.string().nullable().optional(),
-  promoEndsAt: z.string().nullable().optional(),
+  /** Colunas `date`: "" faria o Postgres recusar com 22007 (erro 500). */
+  promoStartsAt: dataOpcional(),
+  promoEndsAt: dataOpcional(),
   maxDiscountPercent: z.union([z.string(), z.number()]).nullable().optional(),
   lowStock: z.number().int().min(0).optional(),
   images: z.array(z.string().max(500)).max(8).optional(),

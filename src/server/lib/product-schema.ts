@@ -32,6 +32,13 @@ export const uuidOpcional = () =>
     .optional()
     .or(z.literal("").transform(() => null));
 
+/**
+ * Data opcional vinda de <input type="date">. Vazio ("") significa "sem data",
+ * mas a coluna é `date` e o Postgres recusaria "" com 22007 — por isso vira null.
+ */
+export const dataOpcional = () =>
+  z.preprocess((valor) => (valor === "" ? null : valor), z.string().nullable().optional());
+
 export const productSchema = z.object({
   name: z.string().trim().min(2, "Informe o nome do produto.").max(180),
   reference: z.string().trim().max(40).optional(),
@@ -54,8 +61,9 @@ export const productSchema = z.object({
   costPrice: z.union([z.string(), z.number()]),
   salePrice: z.union([z.string(), z.number()]),
   promoPrice: z.union([z.string(), z.number()]).nullable().optional(),
-  promoStartsAt: z.string().nullable().optional(),
-  promoEndsAt: z.string().nullable().optional(),
+  /** Colunas `date`: "" faria o Postgres recusar com 22007 (erro 500). */
+  promoStartsAt: dataOpcional(),
+  promoEndsAt: dataOpcional(),
   maxDiscountPercent: z.union([z.string(), z.number()]).nullable().optional(),
   lowStock: z.number().int().min(0).optional(),
   images: z.array(z.string().max(500)).max(8).optional(),
