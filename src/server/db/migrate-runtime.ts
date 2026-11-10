@@ -21,11 +21,17 @@ declare global {
 
 const PASTA = path.resolve(process.cwd(), "drizzle");
 
-async function aplicar(): Promise<void> {
+async function aplicar(opcoes: { obrigatorio?: boolean } = {}): Promise<void> {
   const connectionString = process.env.DATABASE_URL;
-  if (!connectionString) return;
+  if (!connectionString) {
+    if (opcoes.obrigatorio) throw new Error("DATABASE_URL não definida.");
+    return;
+  }
   if (!fs.existsSync(PASTA)) {
     // Sem os arquivos no deployment: o banco tem de já estar migrado.
+    if (opcoes.obrigatorio) {
+      throw new Error(`Pasta de migrações não encontrada: ${PASTA}`);
+    }
     return;
   }
 
@@ -83,4 +89,9 @@ export function ensureMigrations(): Promise<void> {
     });
   }
   return global.__passarelaMigrated;
+}
+
+/** Aplicação em primeiro plano, com erro visível (usada no build). */
+export async function migrateNow(): Promise<void> {
+  await aplicar({ obrigatorio: true });
 }
