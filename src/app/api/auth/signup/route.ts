@@ -16,13 +16,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/server/db/client";
-import { settings, users } from "@/server/db/schema";
+import { companies, settings, users } from "@/server/db/schema";
 import { hashPassword, validatePasswordStrength } from "@/server/auth/password";
 import { createSession } from "@/server/auth/session";
 import { writeAudit } from "@/server/lib/audit";
 import { normalizeHex, customAccentValue } from "@/server/lib/color";
 import { updateSettings } from "@/server/services/settings";
 import { toPublicError } from "@/server/lib/errors";
+import { uniqueSlug } from "@/server/lib/slug";
+import { seedCompanyDefaults } from "@/server/services/company-setup";
+import { withCompany } from "@/server/db/tenant";
 
 const schema = z.object({
   storeName: z.string().trim().min(2, "Informe o nome da loja.").max(120),
@@ -90,39 +93,41 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Este sistema roda em uma instalação = uma loja. O primeiro cadastro é o
-    // dono (ADMIN); os seguintes são bloqueados com instrução clara.
-    const anyUser = await db.select({ id: users.id }).from(users).limit(1);
-    if (anyUser.length > 0) {
-      return NextResponse.json(
-        {
-          error:
-            "Esta loja já tem conta. Entre com o seu e-mail e senha — novos usuários são criados em Configurações → Usuários.",
-          code: "STORE_TAKEN",
-        },
-        { status: 409 },
-      );
-    }
-
     const accentHex = parsed.data.accentHex ? normalizeHex(parsed.data.accentHex) : null;
 
-    const created = await db.transaction(async (tx) => {
-      const [user] = await tx
+    // Cada cadastro cria uma LOJA nova. Todos os dados do dono ficam presos a
+    // ela — outra loja nunca enxerga nada daqui.
+    const slug = await uniqueSlug(storeName);
+
+    // 1) cria a loja (tabela global — não exige contexto de loja)
+    const [company] = await db
+      .insert(companies)
+      .values({ name: storeName, slug, email: emailNorm })
+      .returning({ id: companies.id, name: companies.name, slug: companies.slug });
+
+    // 2) cria o dono DENTRO da loja nova: o guardião carimba company_id
+    const passwordHash = await hashPassword(password);
+    const created = await withCompany(company.id, async () => {
+      const [user] = await db
         .insert(users)
         .values({
+          companyId: company.id,
           name: ownerName,
           email: emailNorm,
-          passwordHash: await hashPassword(password),
+          passwordHash,
           role: "ADMIN",
           isActive: true,
         })
         .returning({ id: users.id, name: users.name, email: users.email });
-
-      return { user };
+      return { user, company };
     });
+
+    // Padrões da loja: tamanhos, cores, categorias, caixa, depósito.
+    await seedCompanyDefaults(created.company.id);
 
     // Identidade visual: nome da loja e a cor da logo escolhida no cadastro.
     await updateSettings({
+      companyId: created.company.id,
       appName: storeName.slice(0, 40),
       companyName: storeName,
       companyEmail: emailNorm,
@@ -130,6 +135,7 @@ export async function POST(req: NextRequest) {
     });
 
     await writeAudit({
+      companyId: created.company.id,
       userId: created.user.id,
       userName: created.user.name,
       action: "SIGNUP",
@@ -141,6 +147,7 @@ export async function POST(req: NextRequest) {
 
     await createSession({
       userId: created.user.id,
+      companyId: created.company.id,
       ip,
       userAgent: req.headers.get("user-agent"),
     });
@@ -148,7 +155,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       ok: true,
       user: { id: created.user.id, name: created.user.name, email: created.user.email },
-      store: { name: storeName },
+      store: { id: created.company.id, name: created.company.name, slug: created.company.slug },
     });
   } catch (err) {
     const { status, body } = toPublicError(err);

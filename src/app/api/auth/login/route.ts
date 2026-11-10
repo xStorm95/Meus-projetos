@@ -8,6 +8,7 @@ import { createSession } from "@/server/auth/session";
 import { effectivePermissions, ROLE_LABELS, type UserRole } from "@/server/auth/permissions";
 import { toPublicError } from "@/server/lib/errors";
 import { writeAudit } from "@/server/lib/audit";
+import { runAsSystem } from "@/server/db/tenant";
 
 const schema = z.object({
   email: z.string().min(1, "Informe o e-mail.").max(255),
@@ -31,11 +32,16 @@ export async function POST(req: NextRequest) {
     const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
     const userAgent = req.headers.get("user-agent");
 
-    const rows = await db
-      .select()
-      .from(users)
-      .where(sql`lower(${users.email}) = ${email.trim().toLowerCase()}`)
-      .limit(1);
+    // Login ainda não tem loja definida: a busca por e-mail é o único ponto
+    // do sistema que precisa cruzar lojas (e-mail é único por loja, então
+    // pode haver mais de um cadastro com o mesmo e-mail em lojas diferentes).
+    const rows = await runAsSystem(async () =>
+      db
+        .select()
+        .from(users)
+        .where(sql`lower(${users.email}) = ${email.trim().toLowerCase()}`)
+        .limit(1),
+    );
     const user = rows[0];
 
     // Mensagem genérica: não revelar se o e-mail existe
@@ -97,7 +103,7 @@ export async function POST(req: NextRequest) {
       .set({ failedAttempts: 0, lockedUntil: null, lastLoginAt: new Date() })
       .where(sql`${users.id} = ${user.id}`);
 
-    await createSession({ userId: user.id, ip, userAgent });
+    await createSession({ userId: user.id, companyId: user.companyId, ip, userAgent });
 
     await writeAudit({
       userId: user.id,

@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { ZodType, ZodTypeDef } from "zod";
 import { getCurrentUser, type SessionUser } from "../auth/session";
+import { withCompany } from "../db/tenant";
 import { ForbiddenError, toPublicError, UnauthorizedError, ValidationError } from "./errors";
 import type { Permission } from "../auth/permissions";
 import { writeAudit, type AuditInput } from "./audit";
@@ -126,8 +127,12 @@ export function apiHandler<TBody = unknown, TQuery = unknown, TParams = unknown>
         req.headers.get("x-real-ip") ??
         null;
 
+      // Toda rota autenticada roda DENTRO da loja do usuário: o guardião do
+      // banco passa a filtrar por ela automaticamente.
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      const result = await handler({ req, user: user as SessionUser, body, query, params, ip });
+      const result = await withCompany((user as SessionUser).companyId, async () =>
+        handler({ req, user: user as SessionUser, body, query, params, ip }),
+      );
       return result ?? NextResponse.json({ ok: true });
     } catch (err) {
       const { status, body } = toPublicError(err);
@@ -152,6 +157,7 @@ export function parseBody<T>(schema: ZodType<T, ZodTypeDef, unknown>, data: unkn
 export async function audit(user: SessionUser, input: AuditInput, ip?: string | null) {
   return writeAudit({
     ...input,
+    companyId: user.companyId,
     userId: user.id,
     userName: user.name,
     ip,

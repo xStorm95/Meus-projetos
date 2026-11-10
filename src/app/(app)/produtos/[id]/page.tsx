@@ -23,6 +23,8 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
       />
     );
   } catch {
+    // Não encontrado — inclusive quando o produto é de OUTRA loja: o filtro
+    // de isolamento não devolve o registro, então cai aqui.
     notFound();
   }
 }

@@ -29,6 +29,65 @@ import {
 import { relations, sql } from "drizzle-orm";
 
 /* ============================================================
+ * TABELAS POR LOJA (multi-loja)
+ * ------------------------------------------------------------
+ * Toda tabela desta lista tem `company_id` e é filtrada automaticamente
+ * pelo driver (ver ./tenant.ts e ./client.ts). Tabela nova de negócio
+ * precisa entrar aqui — o teste em tests/tenant.test.ts garante que
+ * nenhuma tabela com company_id ficou de fora.
+ * ============================================================ */
+export const TENANT_TABLES = [
+  "users",
+  "sessions",
+  "password_reset_tokens",
+  "audit_logs",
+  "settings",
+  "categories",
+  "brands",
+  "colors",
+  "sizes",
+  "collections",
+  "suppliers",
+  "products",
+  "product_variants",
+  "product_kit_items",
+  "price_histories",
+  "warehouses",
+  "stock_levels",
+  "stock_movements",
+  "stock_counts",
+  "stock_count_items",
+  "stock_transfers",
+  "stock_transfer_items",
+  "customers",
+  "sales",
+  "sale_items",
+  "sale_payments",
+  "quotes",
+  "quote_items",
+  "returns",
+  "return_items",
+  "cash_sessions",
+  "cash_movements",
+  "finance_categories",
+  "cost_centers",
+  "bank_accounts",
+  "payables",
+  "receivables",
+  "finance_entries",
+  "account_transfers",
+  "recurring_entries",
+  "credit_renegotiations",
+  "customer_credits",
+  "purchase_orders",
+  "purchase_items",
+  "fiscal_documents",
+  "notifications",
+] as const;
+
+export type TenantTable = (typeof TENANT_TABLES)[number];
+
+/* ============================================================
  * ENUMS
  * ============================================================ */
 export const userRoleEnum = pgEnum("user_role", [
@@ -157,10 +216,32 @@ export const invoiceFrequencyEnum = pgEnum("invoice_frequency", [
 /* ============================================================
  * USUÁRIOS, PERFIS E SEGURANÇA
  * ============================================================ */
+/**
+ * LOJAS (multi-loja) — cada cadastro público cria uma loja nova.
+ * Todo dado operacional pertence a uma loja e nunca é visível para outra.
+ */
+export const companies = pgTable("companies", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  slug: text("slug").notNull(),
+  email: text("email"),
+  phone: text("phone"),
+  document: text("document"),
+  /** Situação da loja: suspender uma loja não apaga os dados dela. */
+  status: text("status").notNull().default("ACTIVE"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const users = pgTable(
   "users",
   {
     id: uuid("id").primaryKey().defaultRandom(),
+    /** Loja à qual o usuário pertence (todo usuário tem exatamente uma). */
+    companyId: uuid("company_id")
+      .notNull()
+      .default(sql`'00000000-0000-0000-0000-000000000000'::uuid`)
+      .references(() => companies.id, { onDelete: "restrict" }),
     name: text("name").notNull(),
     email: text("email").notNull(),
     passwordHash: text("password_hash").notNull(),
@@ -181,7 +262,7 @@ export const users = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex("users_email_uq").on(sql`lower(${t.email})`)],
+  (t) => [uniqueIndex("users_company_email_uq").on(t.companyId, sql`lower(${t.email})`)],
 );
 
 export const sessions = pgTable(
@@ -191,6 +272,11 @@ export const sessions = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    /** Loja da sessão: amarrada no login e conferida em cada requisição. */
+    companyId: uuid("company_id")
+      .notNull()
+      .default(sql`'00000000-0000-0000-0000-000000000000'::uuid`)
+      .references(() => companies.id, { onDelete: "cascade" }),
     tokenHash: text("token_hash").notNull(),
     ip: text("ip"),
     userAgent: text("user_agent"),
@@ -207,6 +293,11 @@ export const sessions = pgTable(
 export const passwordResetTokens = pgTable(
   "password_reset_tokens",
   {
+    /** Loja dona do registro — filtro automático em toda consulta. */
+    companyId: uuid("company_id")
+      .notNull()
+      .default(sql`'00000000-0000-0000-0000-000000000000'::uuid`)
+      .references(() => companies.id, { onDelete: "cascade" }),
     id: uuid("id").primaryKey().defaultRandom(),
     userId: uuid("user_id")
       .notNull()
@@ -222,6 +313,11 @@ export const passwordResetTokens = pgTable(
 export const auditLogs = pgTable(
   "audit_logs",
   {
+    /** Loja dona do registro — filtro automático em toda consulta. */
+    companyId: uuid("company_id")
+      .notNull()
+      .default(sql`'00000000-0000-0000-0000-000000000000'::uuid`)
+      .references(() => companies.id, { onDelete: "cascade" }),
     id: uuid("id").primaryKey().defaultRandom(),
     userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
     userName: text("user_name"),
@@ -246,7 +342,11 @@ export const auditLogs = pgTable(
  * CONFIGURAÇÕES DA EMPRESA (registro único)
  * ============================================================ */
 export const settings = pgTable("settings", {
+  /** Uma linha de configurações por loja (o id é o id da loja). */
   id: text("id").primaryKey().default("default"),
+  companyId: uuid("company_id")
+    .notNull()
+    .references(() => companies.id, { onDelete: "cascade" }),
   appName: text("app_name").notNull().default("PASSARELA ERP"),
   companyName: text("company_name").notNull().default("Minha Loja"),
   companyLegalName: text("company_legal_name"),
@@ -314,6 +414,11 @@ export const settings = pgTable("settings", {
 export const categories = pgTable(
   "categories",
   {
+    /** Loja dona do registro — filtro automático em toda consulta. */
+    companyId: uuid("company_id")
+      .notNull()
+      .default(sql`'00000000-0000-0000-0000-000000000000'::uuid`)
+      .references(() => companies.id, { onDelete: "cascade" }),
     id: uuid("id").primaryKey().defaultRandom(),
     name: text("name").notNull(),
     parentId: uuid("parent_id").references((): AnyPgColumn => categories.id, {
@@ -324,33 +429,53 @@ export const categories = pgTable(
     isActive: boolean("is_active").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex("categories_name_parent_uq").on(t.name, t.parentId)],
+  (t) => [uniqueIndex("categories_company_name_parent_uq").on(t.companyId, t.name, t.parentId)],
 );
 
 export const brands = pgTable("brands", {
+    /** Loja dona do registro — filtro automático em toda consulta. */
+    companyId: uuid("company_id")
+      .notNull()
+      .default(sql`'00000000-0000-0000-0000-000000000000'::uuid`)
+      .references(() => companies.id, { onDelete: "cascade" }),
   id: uuid("id").primaryKey().defaultRandom(),
-  name: text("name").notNull().unique(),
+  name: text("name").notNull(),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const colors = pgTable("colors", {
+    /** Loja dona do registro — filtro automático em toda consulta. */
+    companyId: uuid("company_id")
+      .notNull()
+      .default(sql`'00000000-0000-0000-0000-000000000000'::uuid`)
+      .references(() => companies.id, { onDelete: "cascade" }),
   id: uuid("id").primaryKey().defaultRandom(),
-  name: text("name").notNull().unique(),
+  name: text("name").notNull(),
   hex: text("hex").notNull().default("#cccccc"),
   sortOrder: integer("sort_order").notNull().default(0),
 });
 
 export const sizes = pgTable("sizes", {
+    /** Loja dona do registro — filtro automático em toda consulta. */
+    companyId: uuid("company_id")
+      .notNull()
+      .default(sql`'00000000-0000-0000-0000-000000000000'::uuid`)
+      .references(() => companies.id, { onDelete: "cascade" }),
   id: uuid("id").primaryKey().defaultRandom(),
-  name: text("name").notNull().unique(),
+  name: text("name").notNull(),
   type: text("type").notNull().default("APPAREL"), // APPAREL | NUMERIC | SHOE | FREE
   sortOrder: integer("sort_order").notNull().default(0),
 });
 
 export const collections = pgTable("collections", {
+    /** Loja dona do registro — filtro automático em toda consulta. */
+    companyId: uuid("company_id")
+      .notNull()
+      .default(sql`'00000000-0000-0000-0000-000000000000'::uuid`)
+      .references(() => companies.id, { onDelete: "cascade" }),
   id: uuid("id").primaryKey().defaultRandom(),
-  name: text("name").notNull().unique(),
+  name: text("name").notNull(),
   year: integer("year"),
   season: text("season"),
   isActive: boolean("is_active").notNull().default(true),
@@ -362,6 +487,11 @@ export const collections = pgTable("collections", {
 export const suppliers = pgTable(
   "suppliers",
   {
+    /** Loja dona do registro — filtro automático em toda consulta. */
+    companyId: uuid("company_id")
+      .notNull()
+      .default(sql`'00000000-0000-0000-0000-000000000000'::uuid`)
+      .references(() => companies.id, { onDelete: "cascade" }),
     id: uuid("id").primaryKey().defaultRandom(),
     legalName: text("legal_name").notNull(),
     tradeName: text("trade_name"),
@@ -391,6 +521,11 @@ export const suppliers = pgTable(
 export const products = pgTable(
   "products",
   {
+    /** Loja dona do registro — filtro automático em toda consulta. */
+    companyId: uuid("company_id")
+      .notNull()
+      .default(sql`'00000000-0000-0000-0000-000000000000'::uuid`)
+      .references(() => companies.id, { onDelete: "cascade" }),
     id: uuid("id").primaryKey().defaultRandom(),
     name: text("name").notNull(),
     reference: text("reference").notNull(),
@@ -432,8 +567,9 @@ export const products = pgTable(
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
   (t) => [
-    uniqueIndex("products_reference_uq").on(t.reference),
-    uniqueIndex("products_barcode_uq").on(t.barcode),
+    // Referência é única DENTRO da loja (duas lojas podem repetir).
+    uniqueIndex("products_company_reference_uq").on(t.companyId, t.reference),
+    uniqueIndex("products_company_barcode_uq").on(t.companyId, t.barcode),
     index("products_name_idx").on(sql`lower(${t.name})`),
     index("products_category_idx").on(t.categoryId),
     index("products_status_idx").on(t.status),
@@ -443,6 +579,11 @@ export const products = pgTable(
 export const productVariants = pgTable(
   "product_variants",
   {
+    /** Loja dona do registro — filtro automático em toda consulta. */
+    companyId: uuid("company_id")
+      .notNull()
+      .default(sql`'00000000-0000-0000-0000-000000000000'::uuid`)
+      .references(() => companies.id, { onDelete: "cascade" }),
     id: uuid("id").primaryKey().defaultRandom(),
     productId: uuid("product_id")
       .notNull()
@@ -464,8 +605,8 @@ export const productVariants = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    uniqueIndex("variants_sku_uq").on(t.sku),
-    uniqueIndex("variants_barcode_uq").on(t.barcode),
+    uniqueIndex("variants_company_sku_uq").on(t.companyId, t.sku),
+    uniqueIndex("variants_company_barcode_uq").on(t.companyId, t.barcode),
     index("variants_product_idx").on(t.productId),
     uniqueIndex("variants_product_color_size_uq").on(t.productId, t.colorId, t.sizeId),
   ],
@@ -474,6 +615,11 @@ export const productVariants = pgTable(
 export const productKitItems = pgTable(
   "product_kit_items",
   {
+    /** Loja dona do registro — filtro automático em toda consulta. */
+    companyId: uuid("company_id")
+      .notNull()
+      .default(sql`'00000000-0000-0000-0000-000000000000'::uuid`)
+      .references(() => companies.id, { onDelete: "cascade" }),
     id: uuid("id").primaryKey().defaultRandom(),
     kitProductId: uuid("kit_product_id")
       .notNull()
@@ -489,6 +635,11 @@ export const productKitItems = pgTable(
 export const priceHistories = pgTable(
   "price_histories",
   {
+    /** Loja dona do registro — filtro automático em toda consulta. */
+    companyId: uuid("company_id")
+      .notNull()
+      .default(sql`'00000000-0000-0000-0000-000000000000'::uuid`)
+      .references(() => companies.id, { onDelete: "cascade" }),
     id: uuid("id").primaryKey().defaultRandom(),
     productId: uuid("product_id")
       .notNull()
@@ -508,8 +659,13 @@ export const priceHistories = pgTable(
  * ESTOQUE
  * ============================================================ */
 export const warehouses = pgTable("warehouses", {
+    /** Loja dona do registro — filtro automático em toda consulta. */
+    companyId: uuid("company_id")
+      .notNull()
+      .default(sql`'00000000-0000-0000-0000-000000000000'::uuid`)
+      .references(() => companies.id, { onDelete: "cascade" }),
   id: uuid("id").primaryKey().defaultRandom(),
-  name: text("name").notNull().unique(),
+  name: text("name").notNull(),
   isDefault: boolean("is_default").notNull().default(false),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -518,6 +674,11 @@ export const warehouses = pgTable("warehouses", {
 export const stockLevels = pgTable(
   "stock_levels",
   {
+    /** Loja dona do registro — filtro automático em toda consulta. */
+    companyId: uuid("company_id")
+      .notNull()
+      .default(sql`'00000000-0000-0000-0000-000000000000'::uuid`)
+      .references(() => companies.id, { onDelete: "cascade" }),
     id: uuid("id").primaryKey().defaultRandom(),
     variantId: uuid("variant_id")
       .notNull()
@@ -534,6 +695,11 @@ export const stockLevels = pgTable(
 export const stockMovements = pgTable(
   "stock_movements",
   {
+    /** Loja dona do registro — filtro automático em toda consulta. */
+    companyId: uuid("company_id")
+      .notNull()
+      .default(sql`'00000000-0000-0000-0000-000000000000'::uuid`)
+      .references(() => companies.id, { onDelete: "cascade" }),
     id: uuid("id").primaryKey().defaultRandom(),
     variantId: uuid("variant_id")
       .notNull()
@@ -565,8 +731,13 @@ export const stockMovements = pgTable(
 );
 
 export const stockCounts = pgTable("stock_counts", {
+    /** Loja dona do registro — filtro automático em toda consulta. */
+    companyId: uuid("company_id")
+      .notNull()
+      .default(sql`'00000000-0000-0000-0000-000000000000'::uuid`)
+      .references(() => companies.id, { onDelete: "cascade" }),
   id: uuid("id").primaryKey().defaultRandom(),
-  code: text("code").notNull().unique(),
+  code: text("code").notNull(),
   warehouseId: uuid("warehouse_id")
     .notNull()
     .references(() => warehouses.id, { onDelete: "restrict" }),
@@ -583,6 +754,11 @@ export const stockCounts = pgTable("stock_counts", {
 export const stockCountItems = pgTable(
   "stock_count_items",
   {
+    /** Loja dona do registro — filtro automático em toda consulta. */
+    companyId: uuid("company_id")
+      .notNull()
+      .default(sql`'00000000-0000-0000-0000-000000000000'::uuid`)
+      .references(() => companies.id, { onDelete: "cascade" }),
     id: uuid("id").primaryKey().defaultRandom(),
     countId: uuid("count_id")
       .notNull()
@@ -597,8 +773,13 @@ export const stockCountItems = pgTable(
 );
 
 export const stockTransfers = pgTable("stock_transfers", {
+    /** Loja dona do registro — filtro automático em toda consulta. */
+    companyId: uuid("company_id")
+      .notNull()
+      .default(sql`'00000000-0000-0000-0000-000000000000'::uuid`)
+      .references(() => companies.id, { onDelete: "cascade" }),
   id: uuid("id").primaryKey().defaultRandom(),
-  code: text("code").notNull().unique(),
+  code: text("code").notNull(),
   fromWarehouseId: uuid("from_warehouse_id")
     .notNull()
     .references(() => warehouses.id, { onDelete: "restrict" }),
@@ -611,6 +792,11 @@ export const stockTransfers = pgTable("stock_transfers", {
 });
 
 export const stockTransferItems = pgTable("stock_transfer_items", {
+    /** Loja dona do registro — filtro automático em toda consulta. */
+    companyId: uuid("company_id")
+      .notNull()
+      .default(sql`'00000000-0000-0000-0000-000000000000'::uuid`)
+      .references(() => companies.id, { onDelete: "cascade" }),
   id: uuid("id").primaryKey().defaultRandom(),
   transferId: uuid("transfer_id")
     .notNull()
@@ -627,6 +813,11 @@ export const stockTransferItems = pgTable("stock_transfer_items", {
 export const customers = pgTable(
   "customers",
   {
+    /** Loja dona do registro — filtro automático em toda consulta. */
+    companyId: uuid("company_id")
+      .notNull()
+      .default(sql`'00000000-0000-0000-0000-000000000000'::uuid`)
+      .references(() => companies.id, { onDelete: "cascade" }),
     id: uuid("id").primaryKey().defaultRandom(),
     name: text("name").notNull(),
     document: text("document"),
@@ -669,6 +860,11 @@ export const customers = pgTable(
 export const sales = pgTable(
   "sales",
   {
+    /** Loja dona do registro — filtro automático em toda consulta. */
+    companyId: uuid("company_id")
+      .notNull()
+      .default(sql`'00000000-0000-0000-0000-000000000000'::uuid`)
+      .references(() => companies.id, { onDelete: "cascade" }),
     id: uuid("id").primaryKey().defaultRandom(),
     number: integer("number").notNull(),
     status: saleStatusEnum("status").notNull().default("OPEN"),
@@ -705,7 +901,8 @@ export const sales = pgTable(
     completedAt: timestamp("completed_at", { withTimezone: true }),
   },
   (t) => [
-    uniqueIndex("sales_number_uq").on(t.number),
+    // Numeração de venda é própria de cada loja.
+    uniqueIndex("sales_company_number_uq").on(t.companyId, t.number),
     index("sales_created_idx").on(t.createdAt),
     index("sales_status_idx").on(t.status),
     index("sales_customer_idx").on(t.customerId),
@@ -716,6 +913,11 @@ export const sales = pgTable(
 export const saleItems = pgTable(
   "sale_items",
   {
+    /** Loja dona do registro — filtro automático em toda consulta. */
+    companyId: uuid("company_id")
+      .notNull()
+      .default(sql`'00000000-0000-0000-0000-000000000000'::uuid`)
+      .references(() => companies.id, { onDelete: "cascade" }),
     id: uuid("id").primaryKey().defaultRandom(),
     saleId: uuid("sale_id")
       .notNull()
@@ -750,6 +952,11 @@ export const saleItems = pgTable(
 export const salePayments = pgTable(
   "sale_payments",
   {
+    /** Loja dona do registro — filtro automático em toda consulta. */
+    companyId: uuid("company_id")
+      .notNull()
+      .default(sql`'00000000-0000-0000-0000-000000000000'::uuid`)
+      .references(() => companies.id, { onDelete: "cascade" }),
     id: uuid("id").primaryKey().defaultRandom(),
     saleId: uuid("sale_id")
       .notNull()
@@ -776,8 +983,13 @@ export const salePayments = pgTable(
 export const quotes = pgTable(
   "quotes",
   {
+    /** Loja dona do registro — filtro automático em toda consulta. */
+    companyId: uuid("company_id")
+      .notNull()
+      .default(sql`'00000000-0000-0000-0000-000000000000'::uuid`)
+      .references(() => companies.id, { onDelete: "cascade" }),
     id: uuid("id").primaryKey().defaultRandom(),
-    code: text("code").notNull().unique(),
+    code: text("code").notNull(),
     customerId: uuid("customer_id").references(() => customers.id, { onDelete: "set null" }),
     userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
     status: quoteStatusEnum("status").notNull().default("OPEN"),
@@ -798,6 +1010,11 @@ export const quotes = pgTable(
 export const quoteItems = pgTable(
   "quote_items",
   {
+    /** Loja dona do registro — filtro automático em toda consulta. */
+    companyId: uuid("company_id")
+      .notNull()
+      .default(sql`'00000000-0000-0000-0000-000000000000'::uuid`)
+      .references(() => companies.id, { onDelete: "cascade" }),
     id: uuid("id").primaryKey().defaultRandom(),
     quoteId: uuid("quote_id")
       .notNull()
@@ -822,8 +1039,13 @@ export const quoteItems = pgTable(
 export const returns = pgTable(
   "returns",
   {
+    /** Loja dona do registro — filtro automático em toda consulta. */
+    companyId: uuid("company_id")
+      .notNull()
+      .default(sql`'00000000-0000-0000-0000-000000000000'::uuid`)
+      .references(() => companies.id, { onDelete: "cascade" }),
     id: uuid("id").primaryKey().defaultRandom(),
-    code: text("code").notNull().unique(),
+    code: text("code").notNull(),
     type: returnTypeEnum("type").notNull(),
     saleId: uuid("sale_id").references(() => sales.id, { onDelete: "set null" }),
     customerId: uuid("customer_id").references(() => customers.id, { onDelete: "set null" }),
@@ -850,6 +1072,11 @@ export const returns = pgTable(
 export const returnItems = pgTable(
   "return_items",
   {
+    /** Loja dona do registro — filtro automático em toda consulta. */
+    companyId: uuid("company_id")
+      .notNull()
+      .default(sql`'00000000-0000-0000-0000-000000000000'::uuid`)
+      .references(() => companies.id, { onDelete: "cascade" }),
     id: uuid("id").primaryKey().defaultRandom(),
     returnId: uuid("return_id")
       .notNull()
@@ -871,8 +1098,13 @@ export const returnItems = pgTable(
 export const cashSessions = pgTable(
   "cash_sessions",
   {
+    /** Loja dona do registro — filtro automático em toda consulta. */
+    companyId: uuid("company_id")
+      .notNull()
+      .default(sql`'00000000-0000-0000-0000-000000000000'::uuid`)
+      .references(() => companies.id, { onDelete: "cascade" }),
     id: uuid("id").primaryKey().defaultRandom(),
-    code: text("code").notNull().unique(),
+    code: text("code").notNull(),
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "restrict" }),
@@ -898,6 +1130,11 @@ export const cashSessions = pgTable(
 export const cashMovements = pgTable(
   "cash_movements",
   {
+    /** Loja dona do registro — filtro automático em toda consulta. */
+    companyId: uuid("company_id")
+      .notNull()
+      .default(sql`'00000000-0000-0000-0000-000000000000'::uuid`)
+      .references(() => companies.id, { onDelete: "cascade" }),
     id: uuid("id").primaryKey().defaultRandom(),
     sessionId: uuid("session_id")
       .notNull()
@@ -923,6 +1160,11 @@ export const cashMovements = pgTable(
  * FINANCEIRO
  * ============================================================ */
 export const financeCategories = pgTable("finance_categories", {
+    /** Loja dona do registro — filtro automático em toda consulta. */
+    companyId: uuid("company_id")
+      .notNull()
+      .default(sql`'00000000-0000-0000-0000-000000000000'::uuid`)
+      .references(() => companies.id, { onDelete: "cascade" }),
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
   type: financeTypeEnum("type").notNull(),
@@ -932,12 +1174,22 @@ export const financeCategories = pgTable("finance_categories", {
 });
 
 export const costCenters = pgTable("cost_centers", {
+    /** Loja dona do registro — filtro automático em toda consulta. */
+    companyId: uuid("company_id")
+      .notNull()
+      .default(sql`'00000000-0000-0000-0000-000000000000'::uuid`)
+      .references(() => companies.id, { onDelete: "cascade" }),
   id: uuid("id").primaryKey().defaultRandom(),
-  name: text("name").notNull().unique(),
+  name: text("name").notNull(),
   isActive: boolean("is_active").notNull().default(true),
 });
 
 export const bankAccounts = pgTable("bank_accounts", {
+    /** Loja dona do registro — filtro automático em toda consulta. */
+    companyId: uuid("company_id")
+      .notNull()
+      .default(sql`'00000000-0000-0000-0000-000000000000'::uuid`)
+      .references(() => companies.id, { onDelete: "cascade" }),
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
   type: accountTypeEnum("type").notNull().default("BANK"),
@@ -957,6 +1209,11 @@ export const bankAccounts = pgTable("bank_accounts", {
 export const payables = pgTable(
   "payables",
   {
+    /** Loja dona do registro — filtro automático em toda consulta. */
+    companyId: uuid("company_id")
+      .notNull()
+      .default(sql`'00000000-0000-0000-0000-000000000000'::uuid`)
+      .references(() => companies.id, { onDelete: "cascade" }),
     id: uuid("id").primaryKey().defaultRandom(),
     description: text("description").notNull(),
     supplierId: uuid("supplier_id").references(() => suppliers.id, { onDelete: "set null" }),
@@ -995,6 +1252,11 @@ export const payables = pgTable(
 export const receivables = pgTable(
   "receivables",
   {
+    /** Loja dona do registro — filtro automático em toda consulta. */
+    companyId: uuid("company_id")
+      .notNull()
+      .default(sql`'00000000-0000-0000-0000-000000000000'::uuid`)
+      .references(() => companies.id, { onDelete: "cascade" }),
     id: uuid("id").primaryKey().defaultRandom(),
     customerId: uuid("customer_id").references(() => customers.id, { onDelete: "set null" }),
     saleId: uuid("sale_id").references(() => sales.id, { onDelete: "set null" }),
@@ -1033,6 +1295,11 @@ export const receivables = pgTable(
 export const financeEntries = pgTable(
   "finance_entries",
   {
+    /** Loja dona do registro — filtro automático em toda consulta. */
+    companyId: uuid("company_id")
+      .notNull()
+      .default(sql`'00000000-0000-0000-0000-000000000000'::uuid`)
+      .references(() => companies.id, { onDelete: "cascade" }),
     id: uuid("id").primaryKey().defaultRandom(),
     kind: text("kind").notNull(), // PAYMENT (pagamento) | RECEIPT (recebimento)
     payableId: uuid("payable_id").references(() => payables.id, { onDelete: "set null" }),
@@ -1054,6 +1321,11 @@ export const financeEntries = pgTable(
 );
 
 export const accountTransfers = pgTable("account_transfers", {
+    /** Loja dona do registro — filtro automático em toda consulta. */
+    companyId: uuid("company_id")
+      .notNull()
+      .default(sql`'00000000-0000-0000-0000-000000000000'::uuid`)
+      .references(() => companies.id, { onDelete: "cascade" }),
   id: uuid("id").primaryKey().defaultRandom(),
   fromAccountId: uuid("from_account_id")
     .notNull()
@@ -1069,6 +1341,11 @@ export const accountTransfers = pgTable("account_transfers", {
 });
 
 export const recurringEntries = pgTable("recurring_entries", {
+    /** Loja dona do registro — filtro automático em toda consulta. */
+    companyId: uuid("company_id")
+      .notNull()
+      .default(sql`'00000000-0000-0000-0000-000000000000'::uuid`)
+      .references(() => companies.id, { onDelete: "cascade" }),
   id: uuid("id").primaryKey().defaultRandom(),
   description: text("description").notNull(),
   type: financeTypeEnum("type").notNull(),
@@ -1086,6 +1363,11 @@ export const recurringEntries = pgTable("recurring_entries", {
 });
 
 export const creditRenegotiations = pgTable("credit_renegotiations", {
+    /** Loja dona do registro — filtro automático em toda consulta. */
+    companyId: uuid("company_id")
+      .notNull()
+      .default(sql`'00000000-0000-0000-0000-000000000000'::uuid`)
+      .references(() => companies.id, { onDelete: "cascade" }),
   id: uuid("id").primaryKey().defaultRandom(),
   customerId: uuid("customer_id")
     .notNull()
@@ -1108,6 +1390,11 @@ export const creditRenegotiations = pgTable("credit_renegotiations", {
 export const customerCredits = pgTable(
   "customer_credits",
   {
+    /** Loja dona do registro — filtro automático em toda consulta. */
+    companyId: uuid("company_id")
+      .notNull()
+      .default(sql`'00000000-0000-0000-0000-000000000000'::uuid`)
+      .references(() => companies.id, { onDelete: "cascade" }),
     id: uuid("id").primaryKey().defaultRandom(),
     customerId: uuid("customer_id")
       .notNull()
@@ -1131,8 +1418,13 @@ export const customerCredits = pgTable(
 export const purchaseOrders = pgTable(
   "purchase_orders",
   {
+    /** Loja dona do registro — filtro automático em toda consulta. */
+    companyId: uuid("company_id")
+      .notNull()
+      .default(sql`'00000000-0000-0000-0000-000000000000'::uuid`)
+      .references(() => companies.id, { onDelete: "cascade" }),
     id: uuid("id").primaryKey().defaultRandom(),
-    code: text("code").notNull().unique(),
+    code: text("code").notNull(),
     supplierId: uuid("supplier_id")
       .notNull()
       .references(() => suppliers.id, { onDelete: "restrict" }),
@@ -1161,6 +1453,11 @@ export const purchaseOrders = pgTable(
 export const purchaseItems = pgTable(
   "purchase_items",
   {
+    /** Loja dona do registro — filtro automático em toda consulta. */
+    companyId: uuid("company_id")
+      .notNull()
+      .default(sql`'00000000-0000-0000-0000-000000000000'::uuid`)
+      .references(() => companies.id, { onDelete: "cascade" }),
     id: uuid("id").primaryKey().defaultRandom(),
     purchaseOrderId: uuid("purchase_order_id")
       .notNull()
@@ -1183,6 +1480,11 @@ export const purchaseItems = pgTable(
 export const fiscalDocuments = pgTable(
   "fiscal_documents",
   {
+    /** Loja dona do registro — filtro automático em toda consulta. */
+    companyId: uuid("company_id")
+      .notNull()
+      .default(sql`'00000000-0000-0000-0000-000000000000'::uuid`)
+      .references(() => companies.id, { onDelete: "cascade" }),
     id: uuid("id").primaryKey().defaultRandom(),
     saleId: uuid("sale_id").references(() => sales.id, { onDelete: "set null" }),
     model: text("model").notNull().default("65"), // 65 = NFC-e, 55 = NF-e
@@ -1205,7 +1507,7 @@ export const fiscalDocuments = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    uniqueIndex("fiscal_model_series_number_uq").on(t.model, t.series, t.number),
+    uniqueIndex("fiscal_company_model_series_number_uq").on(t.companyId, t.model, t.series, t.number),
     index("fiscal_sale_idx").on(t.saleId),
   ],
 );
@@ -1216,6 +1518,11 @@ export const fiscalDocuments = pgTable(
 export const notifications = pgTable(
   "notifications",
   {
+    /** Loja dona do registro — filtro automático em toda consulta. */
+    companyId: uuid("company_id")
+      .notNull()
+      .default(sql`'00000000-0000-0000-0000-000000000000'::uuid`)
+      .references(() => companies.id, { onDelete: "cascade" }),
     id: uuid("id").primaryKey().defaultRandom(),
     type: text("type").notNull(),
     severity: notificationSeverityEnum("severity").notNull().default("INFO"),
@@ -1230,7 +1537,7 @@ export const notifications = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    uniqueIndex("notifications_dedupe_uq").on(t.dedupeKey),
+    uniqueIndex("notifications_company_dedupe_uq").on(t.companyId, t.dedupeKey),
     index("notifications_read_idx").on(t.isRead),
     index("notifications_created_idx").on(t.createdAt),
   ],
