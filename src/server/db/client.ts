@@ -13,6 +13,7 @@ import { Pool } from "pg";
 import * as schema from "./schema";
 import { TENANT_TABLES } from "./schema";
 import { currentCompanyIdSync, isSystemContext, SYSTEM } from "./tenant";
+import { ensureMigrations } from "./migrate-runtime";
 import { env } from "../env";
 
 export type Database = NodePgDatabase<typeof schema>;
@@ -25,6 +26,11 @@ declare global {
 }
 
 const TENANT_SET = new Set<string>(TENANT_TABLES);
+
+/** Migrações: aplicadas uma vez por processo, no primeiro acesso ao banco. */
+async function migrationsReady(): Promise<void> {
+  await ensureMigrations();
+}
 
 /** Marca de "já passou pelo guardião" — evita aplicar o filtro duas vezes. */
 const GUARD_MARK = "/*passarela-tenant*/";
@@ -79,6 +85,9 @@ function withTenantGuard(pool: Pool): Pool {
   const originalQuery = pool.query.bind(pool) as (...args: unknown[]) => any;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (pool as any).query = async (...args: any[]) => {
+    // A Vercel não roda as migrações no deploy; o primeiro acesso do processo
+    // aplica o que estiver pendente (ver ./migrate-runtime.ts).
+    await migrationsReady();
     const guarded = await guardQueryArgs(args);
     return originalQuery(...(guarded ?? args));
   };
