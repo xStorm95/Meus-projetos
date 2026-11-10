@@ -146,7 +146,7 @@ export async function runReport(params: {
     }
     case "sales-by-product": {
       const result = await db.execute(sql`
-        SELECT si.description AS product, si.sku,
+        SELECT si.description AS "produto", si.sku,
                SUM(si.quantity)::text AS qty,
                SUM(si.total)::text AS revenue,
                SUM(si.unit_cost * si.quantity)::text AS cost,
@@ -163,7 +163,7 @@ export async function runReport(params: {
       const rows = rowsFrom(result);
       return {
         ...base,
-        columns: [textCol("product", "Produto"), textCol("sku", "SKU"), numCol("qty", "Qtd"), numCol("sales", "Vendas"), moneyCol("revenue", "Faturamento"), moneyCol("cost", "Custo"), moneyCol("profit", "Lucro")],
+        columns: [textCol("produto", "Produto"), textCol("sku", "SKU"), numCol("qty", "Qtd"), numCol("sales", "Vendas"), moneyCol("revenue", "Faturamento"), moneyCol("cost", "Custo"), moneyCol("profit", "Lucro")],
         rows,
         summary: [
           { label: "Itens vendidos", value: String(rows.reduce((a, r) => a + Number(r.qty ?? 0), 0)) },
@@ -334,7 +334,7 @@ export async function runReport(params: {
       const rows = rowsFrom(result);
       return {
         ...base,
-        columns: [textCol("product", "Produto"), textCol("reference", "Ref."), textCol("sku", "SKU"), textCol("color_name", "Cor"), textCol("size_name", "Tam."), textCol("category", "Categoria"), numCol("stock_qty", "Saldo"), moneyCol("cost_price", "Custo"), moneyCol("sale_price", "Venda"), moneyCol("value_cost", "Valor a custo")],
+        columns: [textCol("produto", "Produto"), textCol("reference", "Ref."), textCol("sku", "SKU"), textCol("color_name", "Cor"), textCol("size_name", "Tam."), textCol("category", "Categoria"), numCol("stock_qty", "Saldo"), moneyCol("cost_price", "Custo"), moneyCol("sale_price", "Venda"), moneyCol("value_cost", "Valor a custo")],
         rows,
         summary: [
           { label: "Variações", value: String(rows.length) },
@@ -359,7 +359,7 @@ export async function runReport(params: {
       const rows = rowsFrom(result);
       return {
         ...base,
-        columns: [textCol("product", "Produto"), textCol("sku", "SKU"), textCol("color_name", "Cor"), textCol("size_name", "Tam."), numCol("stock_qty", "Saldo"), numCol("min_stock", "Mínimo"), textCol("supplier", "Fornecedor")],
+        columns: [textCol("produto", "Produto"), textCol("sku", "SKU"), textCol("color_name", "Cor"), textCol("size_name", "Tam."), numCol("stock_qty", "Saldo"), numCol("min_stock", "Mínimo"), textCol("supplier", "Fornecedor")],
         rows,
         summary: [
           { label: "Itens críticos", value: String(rows.length) },
@@ -382,7 +382,7 @@ export async function runReport(params: {
       const rows = rowsFrom(result);
       return {
         ...base,
-        columns: [dateCol("created_at", "Data"), textCol("type", "Tipo"), textCol("product", "Produto"), textCol("sku", "SKU"), numCol("quantity", "Qtd"), numCol("balance_after", "Saldo"), textCol("reason", "Motivo"), textCol("user_name", "Usuário")],
+        columns: [dateCol("created_at", "Data"), textCol("type", "Tipo"), textCol("produto", "Produto"), textCol("sku", "SKU"), numCol("quantity", "Qtd"), numCol("balance_after", "Saldo"), textCol("reason", "Motivo"), textCol("user_name", "Usuário")],
         rows,
         summary: [
           { label: "Movimentações", value: String(rows.length) },
