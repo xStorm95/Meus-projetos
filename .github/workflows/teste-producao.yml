@@ -46,3 +46,41 @@ jobs:
           curl -sf -b /tmp/ca.txt "$B/api/settings" -o /tmp/sa.json -w "settings A: %{http_code}\n"
           curl -sf -b /tmp/cb.txt "$B/api/settings" -o /tmp/sb.json -w "settings B: %{http_code}\n"
           node -e "const a=require('/tmp/sa.json').settings,b=require('/tmp/sb.json').settings;console.log('A:',a.companyName,'| B:',b.companyName);if(a.id===b.id){console.error('ERRO: mesma loja!');process.exit(1)}"
+
+      - name: Produto, busca, relatórios e perfil (bugs corrigidos)
+        run: |
+          set -e
+          B="https://meus-projetos-qzoj.vercel.app"
+          E="teste.c.$RANDOM@exemplo.com"
+
+          curl -sf -c /tmp/cc.txt -X POST "$B/api/auth/signup" -H "Content-Type: application/json" \
+            -d "{\"storeName\":\"Loja C $RANDOM\",\"ownerName\":\"Dono C\",\"email\":\"$E\",\"password\":\"MinhaLoja2026!\"}" \
+            -o /dev/null -w "cadastro C: %{http_code}\n"
+
+          echo "== produto com preço quebrado (349,90)"
+          curl -sf -b /tmp/cc.txt -X POST "$B/api/products" -H "Content-Type: application/json" \
+            -d '{"name":"Bolsa de Couro","salePrice":349.9,"costPrice":120,"variants":[{"colorId":null,"sizeId":null,"costPrice":120,"salePrice":349.9,"stockQty":4}]}' \
+            -o /tmp/pc.json -w "criar produto: %{http_code}\n"
+          node -e "const p=require('/tmp/pc.json').product;if(Number(p.salePrice)!==349.9){console.error('ERRO preço:',p.salePrice);process.exit(1)}console.log('preço gravado:',p.salePrice)"
+
+          echo "== busca de produtos (era 500 no guardião multi-loja)"
+          curl -sf -b /tmp/cc.txt "$B/api/products?search=Bolsa" -o /tmp/busca.json -w "busca: %{http_code}\n"
+          node -e "const r=require('/tmp/busca.json');const i=r.items[0];if(!i){console.error('ERRO: busca vazia');process.exit(1)}if(Number(i.salePrice)!==349.9){console.error('ERRO preço na busca:',i.salePrice);process.exit(1)}console.log('busca trouxe',r.items.length,'item(s), preço',i.salePrice)"
+
+          echo "== relatórios que davam 500"
+          for K in sales-by-product suppliers-purchases stock-positions; do
+            curl -sf -b /tmp/cc.txt "$B/api/reports/run?kind=$K&limit=50" -o /tmp/r.json -w "  $K: %{http_code}\n"
+          done
+
+          echo "== página de perfil (era 404)"
+          curl -sf -b /tmp/cc.txt "$B/perfil" -o /tmp/perfil.html -w "perfil: %{http_code}\n"
+          grep -qi "Meu perfil" /tmp/perfil.html && echo "  conteúdo ok"
+
+          echo "== perfil: foto e dados"
+          curl -sf -b /tmp/cc.txt -X PATCH "$B/api/profile" -H "Content-Type: application/json" \
+            -d '{"name":"Dono C Atualizado","phone":"31999990000"}' -o /dev/null -w "  atualizar: %{http_code}\n"
+          curl -sf -b /tmp/cc.txt "$B/api/profile" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const p=JSON.parse(d).profile;if(p.name!=='Dono C Atualizado'){console.error('ERRO nome',p.name);process.exit(1)}console.log('  nome salvo:',p.name)})"
+
+          echo "== id malformado vira 404 (não 500)"
+          C=$(curl -s -o /dev/null -w "%{http_code}" -b /tmp/cc.txt "$B/api/products/abc")
+          test "$C" = "404" && echo "  /api/products/abc → 404"
