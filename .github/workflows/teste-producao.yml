@@ -1,0 +1,48 @@
+name: Teste da produção
+
+# Verifica o site publicado: cadastro aberto, login e isolamento entre lojas.
+# Roda no GitHub Actions porque o ambiente de desenvolvimento não alcança a
+# internet por TLS até a Vercel.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cadastro, login e isolamento entre duas lojas
+        run: |
+          set -e
+          B="https://meus-projetos-qzoj.vercel.app"
+          E1="teste.a.$RANDOM@exemplo.com"
+          E2="teste.b.$RANDOM@exemplo.com"
+
+          echo "== cadastro loja A"
+          curl -sf -X POST "$B/api/auth/signup" -H "Content-Type: application/json" \
+            -d "{\"storeName\":\"Loja A $RANDOM\",\"ownerName\":\"Dono A\",\"email\":\"$E1\",\"password\":\"MinhaLoja2026!\"}" \
+            -o /tmp/a.json -w "HTTP %{http_code}\n"
+          cat /tmp/a.json; echo
+
+          echo "== cadastro loja B"
+          curl -sf -X POST "$B/api/auth/signup" -H "Content-Type: application/json" \
+            -d "{\"storeName\":\"Loja B $RANDOM\",\"ownerName\":\"Dono B\",\"email\":\"$E2\",\"password\":\"MinhaLoja2026!\"}" \
+            -o /tmp/b.json -w "HTTP %{http_code}\n"
+          cat /tmp/b.json; echo
+
+          echo "== login A e B"
+          curl -sf -c /tmp/ca.txt -X POST "$B/api/auth/login" -H "Content-Type: application/json" \
+            -d "{\"email\":\"$E1\",\"password\":\"MinhaLoja2026!\"}" -o /dev/null -w "login A: %{http_code}\n"
+          curl -sf -c /tmp/cb.txt -X POST "$B/api/auth/login" -H "Content-Type: application/json" \
+            -d "{\"email\":\"$E2\",\"password\":\"MinhaLoja2026!\"}" -o /dev/null -w "login B: %{http_code}\n"
+
+          echo "== cada loja vê só os próprios produtos"
+          curl -sf -b /tmp/ca.txt "$B/api/products" -o /tmp/pa.json -w "produtos A: %{http_code}\n"
+          curl -sf -b /tmp/cb.txt "$B/api/products" -o /tmp/pb.json -w "produtos B: %{http_code}\n"
+          echo "A: $(cat /tmp/pa.json)"; echo "B: $(cat /tmp/pb.json)"
+
+          echo "== configurações de cada loja (nome próprio?)"
+          curl -sf -b /tmp/ca.txt "$B/api/settings" -o /tmp/sa.json -w "settings A: %{http_code}\n"
+          curl -sf -b /tmp/cb.txt "$B/api/settings" -o /tmp/sb.json -w "settings B: %{http_code}\n"
+          node -e "const a=require('/tmp/sa.json').settings,b=require('/tmp/sb.json').settings;console.log('A:',a.companyName,'| B:',b.companyName);if(a.id===b.id){console.error('ERRO: mesma loja!');process.exit(1)}"
