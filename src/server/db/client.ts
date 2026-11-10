@@ -500,16 +500,21 @@ function addTenantCondition(
 
   // A tabela aparece fora de subconsulta? Então o filtro principal resolve
   // (subconsultas correlacionadas herdam a referência da tabela externa).
-  const alvo = ref.quoted ? `"${table}"` : table;
+  //
+  // A busca é por PALAVRA INTEIRA: `COALESCE(...) AS open_payables` contém
+  // "payables" dentro do nome da coluna, e o indexOf simples considerava a
+  // tabela no nível principal — gerando `where p."company_id" = $x` quando `p`
+  // só existia dentro da subconsulta ("missing FROM-clause entry for table p",
+  // relatório "Compras por fornecedor" com 500).
   const depthAt = depths(text);
+  const mostrar = ref.quoted ? `"${table}"` : `\\b${table}\\b`;
+  const reOcorrencia = new RegExp(mostrar, "gi");
   let principal = false;
-  let idx = text.indexOf(alvo);
-  while (idx >= 0) {
-    if (depthAt[idx] === 0) {
+  for (let m = reOcorrencia.exec(text); m; m = reOcorrencia.exec(text)) {
+    if (depthAt[m.index] === 0) {
       principal = true;
       break;
     }
-    idx = text.indexOf(alvo, idx + 1);
   }
 
   if (principal) {
@@ -550,8 +555,22 @@ function addTenantCondition(
   let aplicadas = 0;
   for (const [de, ate] of alvos.reverse()) {
     const inner = sql.slice(de + 1, ate);
-    if (inner.includes(`${table}."company_id"`)) continue;
-    const condition = montar();
+    /*
+     * Cada subconsulta pode usar um alias DIFERENTE para a mesma tabela.
+     * `COALESCE((SELECT SUM(pv.stock_qty) FROM product_variants pv ...))
+     *  ... EXISTS (SELECT 1 FROM product_variants pv3 ...)`
+     * antes recebia `pv."company_id"` nas duas — e a segunda quebrava com
+     * "missing FROM-clause entry for table pv" (500 na busca de produtos).
+     * O alias tem de ser lido do próprio trecho onde a condição entra.
+     */
+    const refInterno = tableRef(inner, table);
+    const qualificadorInterno = refInterno
+      ? refInterno.quoted
+        ? `"${refInterno.alias}"`
+        : refInterno.alias
+      : qualifier;
+    if (inner.includes(`${qualificadorInterno}."company_id"`)) continue;
+    const condition = `${qualificadorInterno}."company_id" = ${nextPlaceholder()}`;
     const comFiltro = /\swhere\s/i.test(inner)
       ? `${inner} and ${condition}`
       : `${inner} where ${condition}`;

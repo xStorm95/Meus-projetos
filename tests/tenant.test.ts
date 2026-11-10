@@ -194,6 +194,59 @@ describe("guardião: alias não pode ser capturado fora do FROM/JOIN", () => {
     expect(sql).toContain('s."company_id"');
   });
 
+  /**
+   * Regressão: duas subconsultas da MESMA tabela com aliases diferentes.
+   *
+   * `COALESCE((SELECT SUM(pv.stock_qty) FROM product_variants pv ...))
+   *  ... EXISTS (SELECT 1 FROM product_variants pv3 ...)`
+   * recebia `pv."company_id"` nas duas e a busca de produtos estourava com
+   * "missing FROM-clause entry for table pv" (500 em /api/products?search=).
+   */
+  it("cada subconsulta usa o próprio alias da tabela", () => {
+    const sql = guardado(
+      `select "products"."id", COALESCE((SELECT SUM(pv.stock_qty) FROM product_variants pv ` +
+        `WHERE pv.product_id = "products"."id"), 0)::text from "products" ` +
+        `where EXISTS (SELECT 1 FROM product_variants pv3 WHERE pv3.product_id = "products"."id")`,
+    );
+    expect(sql).toContain('pv."company_id"');
+    expect(sql).toContain('pv3."company_id"');
+    // O alias de uma subconsulta nunca pode aparecer na outra
+    expect(sql).not.toMatch(/pv3\.product_id[^)]*pv\."company_id"/);
+    expect(sql).toContain('"products"."company_id"');
+  });
+
+  /**
+   * Regressão: nome de coluna que CONTÉM o nome de uma tabela.
+   *
+   * `COALESCE((SELECT SUM(p.amount) FROM payables p ...)) AS open_payables`
+   * fazia o guardião achar que `payables` estava no nível principal (porque
+   * "open_payables" contém "payables") e escrever `where p."company_id"` no
+   * WHERE externo — "missing FROM-clause entry for table p" (500 no
+   * relatório "Compras por fornecedor").
+   */
+  it("não confunde nome de coluna com nome de tabela", () => {
+    const sql = guardado(
+      `SELECT s.id, COALESCE((SELECT SUM(p.amount) FROM payables p WHERE p.supplier_id = s.id), 0)::text AS open_payables ` +
+        `FROM suppliers s`,
+    );
+    expect(sql).toContain('p."company_id"');
+    expect(sql).toContain('s."company_id"');
+    // A condição de `p` precisa estar DENTRO da subconsulta (antes do FROM externo)
+    const ondeSubconsultaFecha = sql.lastIndexOf(")");
+    const antesDoFromExterno = sql.slice(0, sql.lastIndexOf("FROM suppliers"));
+    expect(antesDoFromExterno).toContain('p."company_id"');
+    expect(sql.slice(sql.lastIndexOf("FROM suppliers"))).not.toContain('p."company_id"');
+    expect(ondeSubconsultaFecha).toBeGreaterThan(0);
+  });
+
+  it("subconsulta correlacionada mantém o próprio alias", () => {
+    const sql = guardado(
+      `select (select count(*) from sale_items si where si.sale_id = "sales"."id") from "sales"`,
+    );
+    expect(sql).toContain('si."company_id"');
+    expect(sql).toContain('"sales"."company_id"');
+  });
+
   it("continua filtrando tabela citada com aspas (SQL do Drizzle)", () => {
     const sql = guardado('select "products"."id" from "products" where "products"."deleted_at" is null');
     expect(sql).toContain('"company_id"');

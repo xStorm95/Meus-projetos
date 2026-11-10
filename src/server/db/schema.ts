@@ -250,6 +250,9 @@ export const users = pgTable(
     extraPermissions: jsonb("extra_permissions").$type<string[]>().notNull().default([]),
     deniedPermissions: jsonb("denied_permissions").$type<string[]>().notNull().default([]),
     phone: text("phone"),
+    /** Foto de perfil (data URL) e data de nascimento. */
+    avatarUrl: text("avatar_url"),
+    birthDate: date("birth_date"),
     commissionRate: numeric("commission_rate", { precision: 6, scale: 3 })
       .notNull()
       .default("0"),

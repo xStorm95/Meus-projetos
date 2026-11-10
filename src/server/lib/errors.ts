@@ -90,7 +90,19 @@ export function toPublicError(err: unknown): { status: number; body: { error: st
   if (pg?.code === "23505") {
     return { status: 409, body: { error: "Registro duplicado.", code: "DUPLICATED" } };
   }
-  if (pg?.code === "22P02") {
+  /*
+   * O Drizzle embrulha o erro do driver: o código 22P02 fica em `cause`.
+   * Antes disso, um id malformado na URL (`/api/products/abc`) virava 500.
+   */
+  const causa = (err as { cause?: { code?: string; message?: string } })?.cause;
+  const codigo = pg?.code ?? causa?.code;
+  const mensagem = causa?.message ?? (err as Error)?.message ?? "";
+  if (codigo === "22P02") {
+    // `invalid input syntax for type uuid` = endereço com id inexistente →
+    // 404 é a resposta honesta (o recurso não existe).
+    if (/uuid/i.test(mensagem)) {
+      return { status: 404, body: { error: "Registro não encontrado.", code: "NOT_FOUND" } };
+    }
     return { status: 422, body: { error: "Formato de dado inválido.", code: "INVALID_FORMAT" } };
   }
   if (pg?.code === "23514") {

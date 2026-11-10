@@ -734,7 +734,9 @@ export function PdvView({
                 >
                   Em aberto (F8)
                 </Button>
-                <Link href="/orcamentos/novo">
+                {/* A página /orcamentos/novo nunca existiu: orçamento é criado
+                    no modal da lista de orçamentos. Link corrigido. */}
+                <Link href="/orcamentos">
                   <Button variant="outline" size="sm" className="w-full" leftIcon={<Sparkles className="h-3.5 w-3.5" />}>
                     Orçamento
                   </Button>

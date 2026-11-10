@@ -377,9 +377,18 @@ export function AppShell({
                 }}
                 className="flex items-center gap-2 rounded-xl p-1 pr-2 transition-colors hover:bg-[var(--bg-muted)]"
               >
-                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--accent)] text-[11px] font-bold text-[var(--accent-contrast)]">
-                  {initials(user.name)}
-                </span>
+                {user.avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={user.avatarUrl}
+                    alt={user.name}
+                    className="h-8 w-8 rounded-lg object-cover ring-1 ring-[var(--border-default)]"
+                  />
+                ) : (
+                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--accent)] text-[11px] font-bold text-[var(--accent-contrast)]">
+                    {initials(user.name)}
+                  </span>
+                )}
                 <span className="hidden text-left sm:block">
                   <span className="block max-w-[120px] truncate text-xs font-semibold leading-tight">
                     {user.name}
@@ -393,12 +402,26 @@ export function AppShell({
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setUserMenuOpen(false)} />
                   <div className="animate-scale-in absolute right-0 z-50 mt-2 w-56 overflow-hidden rounded-2xl border border-[var(--border-default)] bg-[var(--bg-surface)] shadow-xl">
-                    <div className="border-b border-[var(--border-default)] px-4 py-3">
+                    <div className="flex items-center gap-3 border-b border-[var(--border-default)] px-4 py-3">
+                      {user.avatarUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={user.avatarUrl}
+                          alt={user.name}
+                          className="h-9 w-9 shrink-0 rounded-lg object-cover"
+                        />
+                      ) : (
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--accent)] text-xs font-bold text-[var(--accent-contrast)]">
+                          {initials(user.name)}
+                        </span>
+                      )}
+                      <div className="min-w-0">
                       <p className="truncate text-sm font-semibold">{user.name}</p>
                       <p className="truncate text-[11px] text-[var(--text-muted)]">{user.email}</p>
                       <Badge tone="gold" className="mt-1.5">
                         {user.roleLabel}
                       </Badge>
+                      </div>
                     </div>
                     <div className="p-1">
                       <Link

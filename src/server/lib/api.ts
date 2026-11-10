@@ -7,9 +7,10 @@ import { NextRequest, NextResponse } from "next/server";
 import type { ZodType, ZodTypeDef } from "zod";
 import { getCurrentUser, type SessionUser } from "../auth/session";
 import { withCompany } from "../db/tenant";
-import { ForbiddenError, toPublicError, UnauthorizedError, ValidationError } from "./errors";
+import { ForbiddenError, NotFoundError, toPublicError, UnauthorizedError, ValidationError } from "./errors";
 import type { Permission } from "../auth/permissions";
 import { writeAudit, type AuditInput } from "./audit";
+import { isUuid } from "./uuid";
 
 export type RouteContext<TParams> = { params: Promise<TParams> };
 
@@ -122,6 +123,15 @@ export function apiHandler<TBody = unknown, TQuery = unknown, TParams = unknown>
       }
 
       const params = context?.params ? await context.params : ({} as TParams);
+      /*
+       * Id de rota malformado (ex.: /api/products/undefined) não deve chegar ao
+       * banco: o PostgreSQL recusa e viraria erro 500. A resposta correta é 404.
+       */
+      for (const [chave, valor] of Object.entries(params as Record<string, unknown>)) {
+        if (typeof valor !== "string") continue;
+        if (!isIdDeRota(chave)) continue;
+        if (!isUuid(valor)) throw new NotFoundError("Registro");
+      }
       const ip =
         req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
         req.headers.get("x-real-ip") ??
@@ -139,6 +149,14 @@ export function apiHandler<TBody = unknown, TQuery = unknown, TParams = unknown>
       return NextResponse.json(body, { status });
     }
   };
+}
+
+/**
+ * O parâmetro é um id de registro? (`[id]`, `[saleId]`, `[customer_id]`)
+ * Só esses são validados como UUID; slugs e códigos passam direto.
+ */
+function isIdDeRota(nome: string): boolean {
+  return /^id$|Id$|_id$/.test(nome);
 }
 
 /** Atalho: valida um corpo JSON avulso dentro de handlers. */
