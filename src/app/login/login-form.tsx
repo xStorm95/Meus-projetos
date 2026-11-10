@@ -2,13 +2,13 @@
 
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Eye, EyeOff, LogIn, Mail, Lock, ShieldCheck, Terminal, Store, ArrowLeft, Pipette } from "lucide-react";
+import { Eye, EyeOff, LogIn, Mail, Lock, ShieldCheck, Store, ArrowLeft, Pipette } from "lucide-react";
 import { api, errorMessage } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Input, Field } from "@/components/ui/form";
 import { Alert } from "@/components/ui/primitives";
 
-export function LoginForm({ setupRequired }: { setupRequired: boolean }) {
+export function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
   const [email, setEmail] = React.useState("");
@@ -160,15 +160,6 @@ export function LoginForm({ setupRequired }: { setupRequired: boolean }) {
                 ? "Nome da loja, sua cor e uma senha. Leva menos de um minuto."
                 : "Informe seu e-mail cadastrado para receber as instruções."}
           </p>
-
-          {setupRequired && (
-            <Alert tone="warning" title="Primeiro acesso" className="mt-5">
-              Nenhum usuário cadastrado. Crie o administrador inicial executando no servidor:
-              <code className="mt-1.5 flex items-center gap-1.5 rounded-md bg-black/10 px-2 py-1 font-mono text-[11px]">
-                <Terminal className="h-3 w-3" /> npm run admin:create
-              </code>
-            </Alert>
-          )}
 
           {error && (
             <Alert tone="danger" className="mt-5">

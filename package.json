@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "dev:next": "next dev -H 0.0.0.0 -p 3000",
-    "build": "next build",
+    "build": "node scripts/migrate-build.mjs && next build",
     "start": "node scripts/start.mjs",
     "db:server": "tsx scripts/db-server.ts",
     "db:generate": "drizzle-kit generate",

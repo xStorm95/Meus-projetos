@@ -1,7 +1,4 @@
 import { redirect } from "next/navigation";
-import { eq, sql } from "drizzle-orm";
-import { db } from "@/server/db/client";
-import { users } from "@/server/db/schema";
 import { demoAutoLoginEnabled, getCurrentUser } from "@/server/auth/session";
 import { LoginForm } from "./login-form";
 
@@ -16,16 +13,7 @@ export default async function LoginPage() {
   const user = await getCurrentUser();
   if (user) redirect("/");
 
-  let setupRequired = false;
-  let totalUsers = 0;
-  try {
-    const rows = await db.select({ count: sql<number>`count(*)::int` }).from(users);
-    totalUsers = Number(rows[0]?.count ?? 0);
-    setupRequired = totalUsers === 0;
-  } catch {
-    setupRequired = false;
-  }
-  void eq;
-
-  return <LoginForm setupRequired={setupRequired} />;
+  // Multi-loja: o cadastro é aberto, então "banco sem usuário" não é mais uma
+  // instalação pela metade — cada pessoa cria a própria loja nesta tela.
+  return <LoginForm />;
 }
