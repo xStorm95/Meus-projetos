@@ -4,14 +4,23 @@ import { deleteProduct, getProduct, updateProduct } from "@/server/services/prod
 
 type Params = { id: string };
 
+/** Mesmo critério do cadastro: "" vindo de <select> vira null, não erro. */
+const uuidOpcional = () =>
+  z
+    .string()
+    .uuid()
+    .nullable()
+    .optional()
+    .or(z.literal("").transform(() => null));
+
 const updateSchema = z.object({
   name: z.string().trim().min(2).max(180).optional(),
   description: z.string().max(4000).nullable().optional(),
-  categoryId: z.string().uuid().nullable().optional(),
-  subcategoryId: z.string().uuid().nullable().optional(),
-  brandId: z.string().uuid().nullable().optional(),
-  supplierId: z.string().uuid().nullable().optional(),
-  collectionId: z.string().uuid().nullable().optional(),
+  categoryId: uuidOpcional(),
+  subcategoryId: uuidOpcional(),
+  brandId: uuidOpcional(),
+  supplierId: uuidOpcional(),
+  collectionId: uuidOpcional(),
   material: z.string().max(120).nullable().optional(),
   composition: z.string().max(240).nullable().optional(),
   origin: z.string().max(2).optional(),

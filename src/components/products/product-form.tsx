@@ -73,6 +73,16 @@ type GridCell = {
   barcode: string;
 };
 
+/**
+ * Os campos de seleção guardam "" quando nada foi escolhido (o <option> vazio),
+ * mas a API espera null para "sem categoria/marca/fornecedor" — enviar "" faz o
+ * Zod recusar com "Invalid uuid".
+ */
+function uuidOuNulo(valor?: string | null): string | null {
+  const v = (valor ?? "").trim();
+  return v === "" ? null : v;
+}
+
 export function ProductForm({
   mode,
   initial,
@@ -319,6 +329,11 @@ export function ProductForm({
       if (mode === "create") {
         const payload = {
           ...form,
+          categoryId: uuidOuNulo(form.categoryId),
+          subcategoryId: uuidOuNulo(form.subcategoryId),
+          brandId: uuidOuNulo(form.brandId),
+          supplierId: uuidOuNulo(form.supplierId),
+          collectionId: uuidOuNulo(form.collectionId),
           promoPrice: form.promoPrice === "" ? null : form.promoPrice,
           maxDiscountPercent: form.maxDiscountPercent === "" ? null : form.maxDiscountPercent,
           barcode: form.barcode || null,
@@ -338,6 +353,11 @@ export function ProductForm({
       } else {
         const payload = {
           ...form,
+          categoryId: uuidOuNulo(form.categoryId),
+          subcategoryId: uuidOuNulo(form.subcategoryId),
+          brandId: uuidOuNulo(form.brandId),
+          supplierId: uuidOuNulo(form.supplierId),
+          collectionId: uuidOuNulo(form.collectionId),
           promoPrice: form.promoPrice === "" ? null : form.promoPrice,
           maxDiscountPercent: form.maxDiscountPercent === "" ? null : form.maxDiscountPercent,
           barcode: form.barcode || null,
