@@ -36,6 +36,17 @@ export const uuidOpcional = () =>
  * Data opcional vinda de <input type="date">. Vazio ("") significa "sem data",
  * mas a coluna é `date` e o Postgres recusaria "" com 22007 — por isso vira null.
  */
+/**
+ * Id opcional vindo de <select>/<input>. Vazio ("") significa "nenhum",
+ * mas colunas uuid não aceitam "" — vira null. Texto que não é uuid continua
+ * sendo recusado (não é um "aceita tudo").
+ */
+export const idOpcional = () =>
+  z.preprocess(
+    (valor) => (typeof valor === "string" && valor.trim() === "" ? null : valor),
+    z.string().uuid().nullable().optional(),
+  );
+
 export const dataOpcional = () =>
   z.preprocess((valor) => (valor === "" ? null : valor), z.string().nullable().optional());
 

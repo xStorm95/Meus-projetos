@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { apiHandler, ok } from "@/server/lib/api";
 import { createQuote, listQuotes, refreshExpiredQuotes } from "@/server/services/quotes";
+import { idOpcional } from "@/server/lib/product-schema";
 
 const itemSchema = z.object({
   variantId: z.string().uuid("Produto inválido."),
@@ -10,7 +11,7 @@ const itemSchema = z.object({
 });
 
 const quoteSchema = z.object({
-  customerId: z.string().uuid().nullable().optional(),
+  customerId: idOpcional(),
   validUntil: z.string().nullable().optional(),
   items: z.array(itemSchema).min(1, "Adicione ao menos um produto."),
   discountAmount: z.number().min(0).optional(),

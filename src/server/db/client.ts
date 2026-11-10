@@ -434,19 +434,28 @@ function splitTopLevel(values: string): string[] {
  * costuma usar `products` ou `products p`.
  */
 function tableRef(text: string, table: string): { quoted: boolean; alias: string } | null {
-  const quotedRe = new RegExp(`"${table}"(?:\\s+(?:as\\s+)?"([a-z0-9_]+)")?`, "i");
-  const quoted = text.match(quotedRe);
-  if (quoted) return { quoted: true, alias: quoted[1] ?? table };
+  // O nome da tabela pode aparecer ANTES do FROM em dois casos comuns:
+  //  1. alias de coluna igual ao nome de outra tabela —
+  //     `COUNT(DISTINCT si.sale_id) AS sales ... FROM sale_items si JOIN sales s`
+  //     fazia o guardião casar o `sales` do SELECT e capturar "FROM" como
+  //     alias, gerando `and FROM."company_id" = $1` (erro de sintaxe 42601);
+  //  2. o id da própria linha no SELECT.
+  // Por isso o alias só é procurado a partir da posição em que a tabela
+  // realmente é referenciada (FROM / JOIN / UPDATE / INTO).
+  const refRe = new RegExp(
+    `(?:\\bfrom|\\bjoin|\\bupdate|\\binto)\\s+(?:only\\s+)?(?:"${table}"|\\b${table}\\b)` +
+      `(?:\\s+(?:as\\s+)?(?!where\\b|group\\b|order\\b|limit\\b|offset\\b|join\\b|left\\b|right\\b|inner\\b|full\\b|on\\b|and\\b|or\\b|set\\b|values\\b|returning\\b|union\\b|using\\b|window\\b|having\\b)([a-z_][a-z0-9_]*))?`,
+    "i",
+  );
+  const m = text.match(refRe);
+  if (!m) return null;
 
-  const bareRe = new RegExp(`\\b${table}\\b(?:\\s+(?:as\\s+)?([a-z_][a-z0-9_]*))?`, "i");
-  const bare = text.match(bareRe);
-  if (bare) {
-    const candidate = bare[1];
-    // "from products where" não tem alias: WHERE/ON/etc. não são aliases.
-    const palavras = /^(where|group|order|limit|offset|join|left|right|inner|full|on|and|or|set|values|returning|union)$/i;
-    return { quoted: false, alias: candidate && !palavras.test(candidate) ? candidate : table };
-  }
-  return null;
+  const referenciadaComAspas = new RegExp(
+    `(?:\\bfrom|\\bjoin|\\bupdate|\\binto)\\s+(?:only\\s+)?"${table}"`,
+    "i",
+  ).test(text);
+
+  return { quoted: referenciadaComAspas, alias: m[1] ?? table };
 }
 
 /**

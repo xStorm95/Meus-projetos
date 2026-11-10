@@ -12,7 +12,7 @@
  *   8. registra auditoria
  * Se qualquer etapa falhar, NADA é gravado.
  */
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, isNull, ne, or, sql } from "drizzle-orm";
 import { db } from "../db/client";
 import {
   cashMovements,
@@ -441,7 +441,59 @@ export async function createSale(input: CreateSaleInput, actor: Actor) {
       }
     }
 
-    // Uso de crédito de troca/devolução
+    /*
+     * Limite de crédito (crediário da loja).
+     *
+     * O campo `creditLimit` do cliente era gravado mas NUNCA usado: o PDV
+     * oferecia "Crediário", a venda era recusada com "Saldo de crédito
+     * insuficiente" (comparando com crédito de troca, que é outra coisa) e
+     * ninguém conseguia vender no crediário.
+     *
+     * Regra: limite disponível = creditLimit - dívida em aberto.
+     */
+    if (creditUsed.gt(0) && input.customerId) {
+      const [cliente] = await tx
+        .select({ creditLimit: customers.creditLimit })
+        .from(customers)
+        .where(eq(customers.id, input.customerId))
+        .limit(1);
+      if (!cliente) throw new BusinessRuleError("Cliente não encontrado para o crediário.");
+
+      /*
+       * Cuidado: as parcelas DESTA venda já foram gravadas acima (mesma
+       * transação). Somá-las aqui fazia a compra ser comparada consigo mesma
+       * e recusar vendas dentro do limite (limite 300, compra 250 → "em
+       * aberto: 250"). Só a dívida ANTERIOR consome o limite.
+       */
+      const [divida] = await tx
+        .select({ total: sql<string>`COALESCE(SUM(${receivables.amount} - ${receivables.paidAmount}), 0)::text` })
+        .from(receivables)
+        .where(
+          and(
+            eq(receivables.customerId, input.customerId),
+            sql`${receivables.status} IN ('PENDING','PARTIAL','OVERDUE')`,
+            or(isNull(receivables.saleId), ne(receivables.saleId, sale.id)),
+          ),
+        );
+
+      const limite = d(cliente.creditLimit);
+      const emAberto = d(divida?.total ?? "0");
+      const disponivel = limite.minus(emAberto);
+
+      if (disponivel.lte(0) || creditUsed.gt(disponivel)) {
+        throw new BusinessRuleError(
+          `Limite de crédito insuficiente. Limite: R$ ${money(limite)}, em aberto: R$ ${money(emAberto)}, ` +
+            `disponível: R$ ${money(disponivel.lt(0) ? 0 : disponivel)}. Ajuste o limite na ficha do cliente ou use outra forma de pagamento.`,
+        );
+      }
+    }
+
+    /*
+     * Crédito de TROCA/DEVOLUÇÃO (customer_credits) — é o que o PDV consome
+     * automaticamente. Se a loja usa o limite do cliente (creditLimit) em vez
+     * de crédito de troca, o bloco de limite acima já validou; aqui só falha
+     * se não houver saldo de troca E o cliente não tiver limite cadastrado.
+     */
     if (creditUsed.gt(0)) {
       if (!input.customerId) {
         throw new BusinessRuleError("Uso de crédito exige cliente identificado.");
@@ -469,8 +521,16 @@ export async function createSale(input: CreateSaleInput, actor: Actor) {
         remaining = remaining.minus(use);
       }
       if (remaining.gt(0)) {
+        // Se o cliente paga pelo LIMITE do crediário (e não por crédito de
+        // troca), o saldo de "troca" é irrelevante: a validação já aconteceu.
+        const usaCreditoDeTroca = credits.length > 0;
+        if (!usaCreditoDeTroca) {
+          remaining = d(0);
+        }
+      }
+      if (remaining.gt(0)) {
         throw new BusinessRuleError(
-          `Saldo de crédito insuficiente. Faltam R$ ${money(remaining)}.`,
+          `Saldo de crédito de troca insuficiente. Faltam R$ ${money(remaining)}.`,
         );
       }
     }

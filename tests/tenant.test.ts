@@ -158,3 +158,51 @@ describe("isolamento entre lojas", () => {
     expect(vendasB).toHaveLength(0);
   });
 });
+
+/**
+ * Regressão: alias de coluna igual ao nome de outra tabela.
+ *
+ * `COUNT(DISTINCT si.sale_id) AS sales ... JOIN sales s` fazia o guardião casar
+ * o `sales` do SELECT e capturar o "FROM" como alias, gerando
+ * `and FROM."company_id" = $1` — erro de sintaxe 42601 que derrubava o
+ * relatório "Produtos mais vendidos" com 500.
+ */
+describe("guardião: alias não pode ser capturado fora do FROM/JOIN", () => {
+  const COMPANY = "11111111-1111-1111-1111-111111111111";
+  const guardado = (sql: string, params: unknown[] = []) =>
+    guardQueryForTests({ sql, params }, COMPANY)?.sql ?? "";
+
+  it("não gera FROM como alias quando uma coluna tem alias igual a outra tabela", () => {
+    const sql = guardado(
+      `SELECT si.description AS "produto", COUNT(DISTINCT si.sale_id)::int AS sales
+         FROM sale_items si JOIN sales s ON s.id = si.sale_id
+        WHERE s.status = 'COMPLETED'
+        GROUP BY si.description`,
+    );
+    expect(sql).not.toMatch(/FROM\."company_id"/);
+    expect(sql).toContain('si."company_id"');
+    expect(sql).toContain('s."company_id"');
+  });
+
+  it("continua filtrando tabela sem alias", () => {
+    const sql = guardado("SELECT description, total FROM sale_items WHERE total > 0");
+    expect(sql).toContain('sale_items."company_id"');
+  });
+
+  it("continua filtrando tabela com alias simples", () => {
+    const sql = guardado("SELECT s.id FROM sales s WHERE s.status = 'COMPLETED'");
+    expect(sql).toContain('s."company_id"');
+  });
+
+  it("continua filtrando tabela citada com aspas (SQL do Drizzle)", () => {
+    const sql = guardado('select "products"."id" from "products" where "products"."deleted_at" is null');
+    expect(sql).toContain('"company_id"');
+  });
+
+  it("coluna chamada igual à tabela não vira alias", () => {
+    // `sales` como nome de coluna no SELECT, sem alias nenhum.
+    const sql = guardado("SELECT sales, id FROM sales WHERE id = $1", ["x"]);
+    expect(sql).not.toMatch(/FROM\."company_id"/);
+    expect(sql).toContain('sales."company_id"');
+  });
+});

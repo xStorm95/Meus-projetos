@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { idOpcional } from "@/server/lib/product-schema";
 import { apiHandler, ok } from "@/server/lib/api";
 import { createPurchaseOrder, listPurchaseOrders } from "@/server/services/purchases";
 
