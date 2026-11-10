@@ -1,43 +1,63 @@
-# Multi-loja — como funciona e como publicar
+# Passarela ERP — no ar
 
-Cada pessoa cria a própria loja em `/cadastro` e **nunca** vê dados de outra.
-O isolamento é aplicado no driver do banco: toda consulta ganha
-`company_id = <loja da sessão>` automaticamente (ver `src/server/db/tenant.ts`
-e `src/server/db/client.ts`). Sem loja no contexto, nada é lido nem gravado.
+**Endereço:** https://meus-projetos-qzoj.vercel.app
 
-## O que já foi testado (ambiente de desenvolvimento)
+Cada pessoa cria a própria loja e **nunca** vê dados de outra.
+
+## Para usar (nada a instalar)
+
+1. Abra https://meus-projetos-qzoj.vercel.app
+2. Clique em **"Não tenho conta — criar a minha loja"**
+3. Preencha nome da loja, seu nome, e-mail e senha
+4. Pronto: você cai no painel da sua loja, já com categorias, tamanhos, cores, caixa e depósito criados.
+
+Pode mandar esse link para qualquer pessoa: cada cadastro abre uma loja separada.
+
+## O que está garantido (testado no site publicado)
+
+O workflow **Teste da produção** (GitHub Actions) cria duas lojas no site real,
+entra nas duas e confere que cada uma vê somente os próprios dados. Passou.
+
+No ambiente de desenvolvimento também foi verificado:
 
 | Verificação | Resultado |
 |---|---|
-| Cadastro de duas lojas | `Passarela da Moda` e `Bella Boutique` — HTTP 200 |
-| Login das duas contas | HTTP 200, cada uma na sua loja |
-| Produto criado em cada loja | 201 (o bug do `99,90` foi corrigido) |
-| Maria vê | `Vestido da Maria R$199.90` |
-| Joana vê | `Blusa da Joana R$89.90` |
-| Joana abrindo o produto da Maria pela URL | 404 |
-| Joana excluindo/alterando produto da Maria | 404 (nada muda) |
-| Caixa | o da Maria aberto; o da Joana fechado |
-| DRE | Maria R$199,90 (CMV R$50,00); Joana R$0,00 |
-| Páginas do sistema | 23 de 23 em HTTP 200 |
+| Cadastro de duas lojas | 200 / 200 |
+| Login das duas contas | 200 / 200, cada uma na sua loja |
+| Produto em cada loja | 201 / 201 |
+| Maria vê | `Vestido da Maria R$199.90` (só o dela) |
+| Joana vê | `Blusa da Joana R$89.90` (só o dela) |
+| Joana abrindo produto da Maria pela URL | 404 |
+| Joana alterando/excluindo produto da Maria | 404, nada muda |
+| Caixa e DRE por loja | Maria com caixa aberto e DRE R$199,90; Joana zerada |
+| Páginas do sistema | 23 de 23 em 200 |
 | Testes automatizados | 57 de 57 |
-| Build de produção | 58 rotas compiladas sem erro |
-| Migração em banco COM dados | 2 produtos, 1 cliente, 1 usuário preservados e carimbados na loja criada; rodar de novo não quebra |
+| Migração em banco **com dados** | nada perdido, tudo carimbado na loja; reexecutar não quebra |
 
-## Publicar (uma vez)
+## Como o isolamento funciona
 
-1. **Trocar a senha do Neon** (a antiga apareceu em conversa):
-   painel do Neon → projeto → *Roles* → `neondb_owner` → *Reset password*.
-2. Na Vercel → projeto → *Settings* → *Environment Variables*: atualizar
-   `DATABASE_URL` com a senha nova (a mesma URL, senha trocada).
-3. Aplicar a migração no banco de produção (uma vez):
-   ```bash
-   npm run db:migrate
-   ```
-   Rodar de novo é seguro: a migração não apaga nada e não duplica loja.
-4. Deploy (push na branch ou *Redeploy* no painel da Vercel).
+- Tabela `companies` (lojas) e `company_id` em todas as 46 tabelas de loja.
+- `src/server/db/client.ts` reescreve **toda** consulta que passa pelo driver,
+  acrescentando a loja da sessão — em `SELECT`, `UPDATE`, `DELETE` e `INSERT`,
+  inclusive dentro de subconsultas, `UNION` e `LEFT JOIN`.
+- Sem loja no contexto: leitura devolve vazio, gravação é bloqueada.
+- O cadastro em `/api/auth/signup` cria a loja, o dono e os dados padrão dela.
 
-## Dia a dia
+## Deploy
 
-- Cadastro aberto: `https://SEU-SITE/cadastro`
-- Cada dono entra com o próprio e-mail e senha e cai na própria loja.
-- O nome e a cor da loja ficam em **Configurações**.
+- Cada push em `main` publica na Vercel automaticamente.
+- **A migração do banco roda no build** (`scripts/migrate-build.mjs`): se o
+  banco estiver atrasado, é atualizado antes do site subir; se a migração
+  falhar, o build falha — melhor não publicar do que publicar quebrado.
+- O app também aplica migrações pendentes no primeiro acesso de cada processo
+  (`src/server/db/migrate-runtime.ts`), como rede de segurança.
+
+## Se precisar mexer no código
+
+```bash
+npm run dev          # site local (porta 3000)
+npm test             # 57 testes
+npm run db:migrate   # aplica migrações no banco de DATABASE_URL
+```
+
+Detalhes da migração multi-loja: `drizzle/0001_multi_loja.sql`.
