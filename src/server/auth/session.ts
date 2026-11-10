@@ -48,6 +48,7 @@ async function findDemoUserUnsafe() {
       extraPermissions: users.extraPermissions,
       deniedPermissions: users.deniedPermissions,
       phone: users.phone,
+      avatarUrl: users.avatarUrl,
       commissionRate: users.commissionRate,
       monthlyGoal: users.monthlyGoal,
     })
@@ -68,6 +69,7 @@ async function findDemoUserUnsafe() {
       extraPermissions: users.extraPermissions,
       deniedPermissions: users.deniedPermissions,
       phone: users.phone,
+      avatarUrl: users.avatarUrl,
       commissionRate: users.commissionRate,
       monthlyGoal: users.monthlyGoal,
     })
@@ -89,6 +91,7 @@ function toSessionUser(row: {
   extraPermissions: string[];
   deniedPermissions: string[];
   phone: string | null;
+  avatarUrl: string | null;
   commissionRate: string;
   monthlyGoal: string;
 }): SessionUser {
@@ -107,6 +110,7 @@ function toSessionUser(row: {
     }),
     mustChangePassword: row.mustChangePassword,
     phone: row.phone,
+    avatarUrl: row.avatarUrl,
     commissionRate: row.commissionRate,
     monthlyGoal: row.monthlyGoal,
   };
@@ -123,6 +127,8 @@ export type SessionUser = {
   permissions: Permission[];
   mustChangePassword: boolean;
   phone: string | null;
+  /** Foto de perfil (data URL) — null usa as iniciais. */
+  avatarUrl: string | null;
   commissionRate: string;
   monthlyGoal: string;
 };
@@ -215,6 +221,7 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
       extraPermissions: users.extraPermissions,
       deniedPermissions: users.deniedPermissions,
       phone: users.phone,
+      avatarUrl: users.avatarUrl,
       commissionRate: users.commissionRate,
       monthlyGoal: users.monthlyGoal,
       sessionId: sessions.id,
@@ -249,6 +256,7 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
     extraPermissions: row.extraPermissions,
     deniedPermissions: row.deniedPermissions,
     phone: row.phone,
+    avatarUrl: row.avatarUrl,
     commissionRate: row.commissionRate,
     monthlyGoal: row.monthlyGoal,
   });
