@@ -18,7 +18,7 @@ import {
 } from "../db/schema";
 import { BusinessRuleError, NotFoundError } from "../lib/errors";
 import { d, money } from "../lib/money";
-import { addDaysKey, todayKey } from "../lib/dates";
+import { addDaysKey, inicioDoDia, todayKey } from "../lib/dates";
 import { writeAudit } from "../lib/audit";
 import { nextSequence, formatCode } from "../lib/sequences";
 import { createSale, type Actor } from "./sales";
@@ -246,8 +246,8 @@ export async function listQuotes(params: {
   const conds = [];
   if (params.status && params.status !== "ALL") conds.push(eq(quotes.status, params.status as never));
   if (params.customerId) conds.push(eq(quotes.customerId, params.customerId));
-  if (params.from) conds.push(sql`${quotes.createdAt} >= ${`${params.from}T00:00:00Z`}::timestamptz`);
-  if (params.to) conds.push(sql`${quotes.createdAt} <= ${`${params.to}T23:59:59Z`}::timestamptz`);
+  if (params.from) conds.push(sql`${quotes.createdAt} >= ${inicioDoDia(params.from).toISOString()}::timestamptz`);
+  if (params.to) conds.push(sql`${quotes.createdAt} <= ${inicioDoDia(addDaysKey(params.to, 1)).toISOString()}::timestamptz`);
   if (params.search) {
     const term = `%${params.search.toLowerCase()}%`;
     conds.push(sql`(lower(${quotes.code}) LIKE ${term} OR lower(${customers.name}) LIKE ${term})`);
@@ -435,7 +435,7 @@ export async function quoteStats(from: string, to: string) {
            COALESCE(SUM(total) FILTER (WHERE status = 'CONVERTED'), 0)::text AS converted_value,
            COALESCE(SUM(total) FILTER (WHERE status = 'OPEN'), 0)::text AS open_value
       FROM quotes
-     WHERE created_at >= ${`${from}T00:00:00Z`}::timestamptz AND created_at <= ${`${to}T23:59:59Z`}::timestamptz
+     WHERE created_at >= ${inicioDoDia(from).toISOString()}::timestamptz AND created_at <= ${inicioDoDia(addDaysKey(to, 1)).toISOString()}::timestamptz
   `);
   const r = (rows.rows as Array<Record<string, string | number>>)[0] ?? {};
   const total = Number(r.total ?? 0);

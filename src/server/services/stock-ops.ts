@@ -24,6 +24,7 @@ import { money, d } from "../lib/money";
 import { adjustStock, getDefaultWarehouse, moveStock } from "./stock";
 import { writeAudit } from "../lib/audit";
 import { nextSequence, formatCode } from "../lib/sequences";
+import { addDaysKey, inicioDoDia } from "../lib/dates";
 
 export type StockActor = { id: string; name: string };
 
@@ -148,8 +149,8 @@ export async function listMovements(params: {
   if (params.variantId) conds.push(eq(stockMovements.variantId, params.variantId));
   if (params.productId) conds.push(eq(stockMovements.productId, params.productId));
   if (params.type && params.type !== "ALL") conds.push(eq(stockMovements.type, params.type as never));
-  if (params.from) conds.push(gte(stockMovements.createdAt, new Date(`${params.from}T00:00:00Z`)));
-  if (params.to) conds.push(lt(stockMovements.createdAt, new Date(`${params.to}T23:59:59Z`)));
+  if (params.from) conds.push(gte(stockMovements.createdAt, inicioDoDia(params.from)));
+  if (params.to) conds.push(lt(stockMovements.createdAt, inicioDoDia(addDaysKey(params.to, 1))));
   const where = conds.length ? and(...conds) : undefined;
 
   const [items, totals] = await Promise.all([

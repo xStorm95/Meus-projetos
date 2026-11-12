@@ -24,7 +24,7 @@ import {
 } from "../db/schema";
 import { BusinessRuleError, NotFoundError } from "../lib/errors";
 import { calculateLateCharges, d, money, splitInstallments } from "../lib/money";
-import { addDaysKey, addMonthsKey, todayKey } from "../lib/dates";
+import { addDaysKey, addMonthsKey, todayKey, inicioDoDia } from "../lib/dates";
 import { getSettingsCached } from "./settings";
 import { writeAudit } from "../lib/audit";
 
@@ -579,8 +579,8 @@ export async function cashFlow(params: { from: string; to: string }) {
       .where(
         and(
           eq(financeEntries.kind, "RECEIPT"),
-          gte(financeEntries.paidAt, new Date(`${params.from}T00:00:00Z`)),
-          lt(financeEntries.paidAt, new Date(`${addDaysKey(params.to, 1)}T00:00:00Z`)),
+          gte(financeEntries.paidAt, inicioDoDia(params.from)),
+          lt(financeEntries.paidAt, inicioDoDia(addDaysKey(params.to, 1))),
         ),
       ),
     db
@@ -591,8 +591,8 @@ export async function cashFlow(params: { from: string; to: string }) {
       .where(
         and(
           eq(financeEntries.kind, "PAYMENT"),
-          gte(financeEntries.paidAt, new Date(`${params.from}T00:00:00Z`)),
-          lt(financeEntries.paidAt, new Date(`${addDaysKey(params.to, 1)}T00:00:00Z`)),
+          gte(financeEntries.paidAt, inicioDoDia(params.from)),
+          lt(financeEntries.paidAt, inicioDoDia(addDaysKey(params.to, 1))),
         ),
       ),
     db
@@ -604,8 +604,8 @@ export async function cashFlow(params: { from: string; to: string }) {
       .where(
         and(
           eq(sales.status, "COMPLETED"),
-          gte(sales.completedAt, new Date(`${params.from}T00:00:00Z`)),
-          lt(sales.completedAt, new Date(`${addDaysKey(params.to, 1)}T00:00:00Z`)),
+          gte(sales.completedAt, inicioDoDia(params.from)),
+          lt(sales.completedAt, inicioDoDia(addDaysKey(params.to, 1))),
         ),
       ),
   ]);
@@ -618,18 +618,18 @@ export async function cashFlow(params: { from: string; to: string }) {
         SELECT date_trunc('day', created_at) AS day, 'SALE' AS tipo, total AS amount
           FROM sales
          WHERE status = 'COMPLETED'
-           AND completed_at >= ${`${params.from}T00:00:00Z`}::timestamptz
-           AND completed_at < ${`${addDaysKey(params.to, 1)}T00:00:00Z`}::timestamptz
+           AND completed_at >= ${inicioDoDia(params.from).toISOString()}::timestamptz
+           AND completed_at < ${inicioDoDia(addDaysKey(params.to, 1)).toISOString()}::timestamptz
         UNION ALL
         SELECT date_trunc('day', paid_at) AS day, 'IN' AS tipo, amount
           FROM finance_entries WHERE kind = 'RECEIPT'
-           AND paid_at >= ${`${params.from}T00:00:00Z`}::timestamptz
-           AND paid_at < ${`${addDaysKey(params.to, 1)}T00:00:00Z`}::timestamptz
+           AND paid_at >= ${inicioDoDia(params.from).toISOString()}::timestamptz
+           AND paid_at < ${inicioDoDia(addDaysKey(params.to, 1)).toISOString()}::timestamptz
         UNION ALL
         SELECT date_trunc('day', paid_at) AS day, 'OUT' AS tipo, amount
           FROM finance_entries WHERE kind = 'PAYMENT'
-           AND paid_at >= ${`${params.from}T00:00:00Z`}::timestamptz
-           AND paid_at < ${`${addDaysKey(params.to, 1)}T00:00:00Z`}::timestamptz
+           AND paid_at >= ${inicioDoDia(params.from).toISOString()}::timestamptz
+           AND paid_at < ${inicioDoDia(addDaysKey(params.to, 1)).toISOString()}::timestamptz
         UNION ALL
         SELECT date_trunc('day', due_date::timestamp) AS day, 'OUT' AS tipo,
                (amount - paid_amount)
@@ -663,8 +663,8 @@ export async function cashFlow(params: { from: string; to: string }) {
  * CMV = custo dos itens vendidos (sale_items.unit_cost * quantity)
  */
 export async function dre(params: { from: string; to: string }) {
-  const fromTs = new Date(`${params.from}T00:00:00Z`);
-  const toTs = new Date(`${addDaysKey(params.to, 1)}T00:00:00Z`);
+  const fromTs = inicioDoDia(params.from);
+  const toTs = inicioDoDia(addDaysKey(params.to, 1));
 
   const revenueRows = await db
     .select({

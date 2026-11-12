@@ -5,18 +5,24 @@
 import { and, eq, gte, lt, sql, type SQL } from "drizzle-orm";
 import { db } from "../db/client";
 import { customers, productVariants, products, sales } from "../db/schema";
-import { addDaysKey, daysBetween, previousPeriod, todayKey } from "../lib/dates";
+import { addDaysKey, daysBetween, inicioDoDia, previousPeriod, rangeToTimestamps, todayKey } from "../lib/dates";
 import { d, money, pct } from "../lib/money";
 import { cashBalanceToday } from "./cash";
 import { overdueSummary } from "./finance";
 
 export type DashboardResult = Awaited<ReturnType<typeof getDashboard>>;
 
+/**
+ * Janela única de todo indicador do dashboard.
+ *
+ * ANTES existiam duas: `periodTs` (aqui) e outra montada dentro de
+ * `getDashboard` com `todayKey().slice(0,7)`. Como `todayKey()` usava UTC, o
+ * card do período e o card do mês podiam apontar para meses diferentes — o
+ * caso do "R$ 600,00 / 1 venda" ao lado de "R$ 0,00 / 0 vendas".
+ * Agora as duas usam `rangeToTimestamps` (fuso America/Sao_Paulo).
+ */
 function periodTs(from: string, to: string) {
-  return {
-    gte: new Date(`${from}T00:00:00Z`),
-    lt: new Date(`${addDaysKey(to, 1)}T00:00:00Z`),
-  };
+  return rangeToTimestamps(from, to);
 }
 
 export async function salesSummary(from: string, to: string) {
@@ -74,15 +80,19 @@ export async function getDashboard(params: { from: string; to: string }) {
     salesSummary(from, to),
     salesSummary(prev.from, prev.to),
     salesSummary(today, today),
+    // "Faturamento do mês": primeiro dia do mês corrente até hoje — mesmas
+    // datas e mesmo critério (só COMPLETED) do card do período.
     salesSummary(`${today.slice(0, 7)}-01`, today),
 
+    // O dia do gráfico é o dia da LOJA: `AT TIME ZONE` antes do date_trunc,
+    // senão a venda das 22h cai no dia seguinte (UTC).
     db.execute(sql`
       SELECT to_char(day, 'DD/MM') AS label,
              to_char(day, 'YYYY-MM-DD') AS day,
              COALESCE(SUM(total), 0)::text AS receita,
              COUNT(*)::int AS vendas
         FROM (
-          SELECT date_trunc('day', completed_at) AS day, total
+          SELECT date_trunc('day', completed_at AT TIME ZONE 'America/Sao_Paulo') AS day, total
             FROM sales
            WHERE status = 'COMPLETED'
              AND completed_at >= ${ts.gte} AND completed_at < ${ts.lt}
@@ -341,4 +351,4 @@ export async function monthlyEvolution(months = 6) {
 }
 
 export const dashboardPeriodWhere = (from: string, to: string): SQL =>
-  sql`completed_at >= ${`${from}T00:00:00Z`}::timestamptz AND completed_at < ${`${addDaysKey(to, 1)}T00:00:00Z`}::timestamptz`;
+  sql`completed_at >= ${inicioDoDia(from).toISOString()}::timestamptz AND completed_at < ${inicioDoDia(addDaysKey(to, 1)).toISOString()}::timestamptz`;

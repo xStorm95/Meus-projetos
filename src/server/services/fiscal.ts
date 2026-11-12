@@ -15,6 +15,7 @@ import { BusinessRuleError, NotFoundError } from "../lib/errors";
 import { money } from "../lib/money";
 import { writeAudit } from "../lib/audit";
 import { getSettingsCached } from "./settings";
+import { addDaysKey, inicioDoDia } from "../lib/dates";
 
 type Actor = { id: string; name: string };
 
@@ -88,8 +89,8 @@ export async function listFiscalDocuments(params: {
   const conds = [];
   if (params.status && params.status !== "ALL") conds.push(eq(fiscalDocuments.status, params.status as never));
   if (params.model && params.model !== "ALL") conds.push(eq(fiscalDocuments.model, params.model));
-  if (params.from) conds.push(gte(fiscalDocuments.createdAt, new Date(`${params.from}T00:00:00Z`)));
-  if (params.to) conds.push(lt(fiscalDocuments.createdAt, new Date(`${params.to}T23:59:59Z`)));
+  if (params.from) conds.push(gte(fiscalDocuments.createdAt, inicioDoDia(params.from)));
+  if (params.to) conds.push(lt(fiscalDocuments.createdAt, inicioDoDia(addDaysKey(params.to, 1))));
   const where = conds.length ? and(...conds) : undefined;
 
   const [items, totals] = await Promise.all([

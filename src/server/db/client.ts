@@ -571,13 +571,70 @@ function addTenantCondition(
       : qualifier;
     if (inner.includes(`${qualificadorInterno}."company_id"`)) continue;
     const condition = `${qualificadorInterno}."company_id" = ${nextPlaceholder()}`;
-    const comFiltro = /\swhere\s/i.test(inner)
-      ? `${inner} and ${condition}`
-      : `${inner} where ${condition}`;
+
+    /*
+     * O filtro tem de entrar no WHERE — nunca depois de GROUP BY / ORDER BY /
+     * HAVING / LIMIT. Antes ele era concatenado no fim do parêntese:
+     *
+     *   ... GROUP BY c.id
+     *   and c."company_id" = $2 and s."company_id" = $3) t
+     *
+     * o que gera "argument of AND must be type boolean, not type uuid" e
+     * derrubava o dashboard (consulta de novos/recorrentes/inativos).
+     * Se o trecho tem GROUP BY, a condição vai logo após o WHERE; se não tem
+     * WHERE, o primeiro GROUP BY recebe a cláusula antes dele.
+     */
+    const comFiltro = inserirAntesDoGroup(inner, condition);
+    if (!comFiltro) continue;
     sql = `${sql.slice(0, de + 1)}${comFiltro}${sql.slice(ate)}`;
     aplicadas++;
   }
   return aplicadas ? { sql, conditions: aplicadas } : null;
+}
+
+/**
+ * Põe a condição no WHERE de um trecho de subconsulta, respeitando a ordem
+ * das cláusulas: o WHERE vem antes de GROUP BY / ORDER BY / HAVING / LIMIT /
+ * UNION, então a condição nunca pode ser colada no fim.
+ * Devolve null quando não há WHERE e a subconsulta já tem GROUP BY (sem WHERE
+ * o GROUP BY não pode virar "WHERE ... GROUP BY" sem apagar o resto).
+ */
+function inserirAntesDoGroup(texto: string, condition: string): string | null {
+  const prof = depths(texto);
+  const nivel = 0;
+
+  const acha = (re: RegExp): number => {
+    const r = new RegExp(re.source, "gi");
+    for (let m = r.exec(texto); m; m = r.exec(texto)) {
+      if (prof[m.index] === nivel) return m.index;
+    }
+    return -1;
+  };
+
+  const ondeWhere = acha(/\bwhere\b/);
+  const ondeGroup = acha(/\bgroup\s+by\b/);
+
+  if (ondeWhere >= 0) {
+    // Coloca a condição no fim do WHERE, antes da próxima cláusula.
+    const limites = [
+      acha(/\bgroup\s+by\b/),
+      acha(/\border\s+by\b/),
+      acha(/\bhaving\b/),
+      acha(/\blimit\b/),
+      acha(/\boffset\b/),
+      acha(/\breturning\b/),
+    ].filter((i) => i > ondeWhere);
+    const fim = limites.length ? Math.min(...limites) : texto.length;
+    const corpo = texto.slice(0, fim).replace(/\s+$/, "");
+    return `${corpo} and ${condition} ${texto.slice(fim)}`;
+  }
+
+  if (ondeGroup === 0) return null;
+  if (ondeGroup > 0) {
+    // Sem WHERE: a cláusula entra imediatamente antes do GROUP BY.
+    return `${texto.slice(0, ondeGroup)}where ${condition} ${texto.slice(ondeGroup)}`;
+  }
+  return `${texto} where ${condition}`;
 }
 
 /**

@@ -4,6 +4,7 @@ import { apiHandler } from "@/server/lib/api";
 import { csvResponse, csvDate, csvDateTime, csvNumber, jsonResponse } from "@/server/lib/export";
 import { db } from "@/server/db/client";
 import { customers, saleItems, salePayments, sales, users } from "@/server/db/schema";
+import { addDaysKey, inicioDoDia } from "@/server/lib/dates";
 
 const querySchema = z.object({
   format: z.enum(["csv", "json"]).default("csv"),
@@ -16,8 +17,8 @@ const querySchema = z.object({
 export const GET = apiHandler(
   { permission: ["reports.export", "sales.view"], query: querySchema },
   async ({ query }) => {
-    const from = new Date(`${query.from}T00:00:00Z`);
-    const to = new Date(`${query.to}T23:59:59Z`);
+    const from = inicioDoDia(query.from);
+    const to = inicioDoDia(addDaysKey(query.to, 1));
     const conds = [gte(sales.createdAt, from), lt(sales.createdAt, to)];
     if (query.status && query.status !== "ALL") conds.push(eq(sales.status, query.status as never));
     const where = and(...conds);
