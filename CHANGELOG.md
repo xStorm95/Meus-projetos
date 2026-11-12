@@ -95,3 +95,46 @@ Formato: um bloco por etapa do rebrand. Cada etapa é um commit.
   versão em Excel é que leva número puro.
 - Testes: `export-xlsx` (6, inclui leitor de ZIP próprio) e `curva-abc` (6).
   Suíte: **125 testes em 14 arquivos**.
+
+## Etapa 5 — Pix, etiquetas, cupom fiscal e PDV offline
+
+- **Pix estático** (BR Code) gerado no próprio projeto (`src/server/lib/pix.ts`):
+  payload EMV com CRC16-CCITT-FALSE, chave, recebedor, cidade, valor e `txid`
+  derivado da venda (`VENDA<numero>`). Sem provedor, sem taxa e sem internet no
+  caixa — o QR é só texto.
+- **QR Code próprio** (`src/lib/qr.ts`), sem biblioteca: versões 1–15, correção
+  de erro M, escolha de máscara por penalidade, tabela de blocos e padrões de
+  alinhamento completos. Validado lendo os SVG com ZXing em 28 combinações.
+- `/api/pix` devolve a configuração e, com `?valor=&venda=`, a cobrança pronta.
+  A tela do PDV mostra o QR, o valor, o `txid`, botão **Copiar** e **Baixar SVG**.
+  Valor zero é recusado com explicação (não é erro de sistema).
+- **Configurações → Pagamentos e etiquetas**: chave, nome do recebedor e cidade
+  do Pix; tamanho da etiqueta (60x40 / 50x30), preço, código de barras e texto
+  extra. PATCH por seção (`payments` / `labels`).
+- **Etiquetas** em `/produtos/[id]/etiquetas`: prévia fiel ao papel, quantidade
+  por variação, impressão em folha A4 com CSS `@media print` (sem PDF, sem
+  dependência) e preferências vindas das configurações.
+- **Cupom do documento fiscal** (DANFE simplificado, 80 mm) em
+  `/api/fiscal/documents/[id]/danfe`: emitente, destinatário, itens com NCM e
+  CSOSN, totais, pagamentos, chave em grupos de quatro e tributos aproximados
+  (`DANFE_TAX_PERCENT`, opcional). **Tarja honesta**: “SEM VALOR FISCAL —
+  PENDENTE DE AUTORIZAÇÃO” enquanto não houver autorização da SEFAZ, e
+  “HOMOLOGAÇÃO” / “CANCELADO” / “AUTORIZADO” conforme o status real.
+  Botão **Imprimir cupom** na tela `/fiscal`.
+- **Numeração fiscal corrigida em duas frentes**: (1) `settings.fiscalNextNumberNfce`
+  é número inicial, não contador — agora o número vem de `MAX(number)` por
+  modelo+série, com retry em `23505`; (2) o índice único herdado da migração
+  inicial era **global**, então só a primeira loja da instalação conseguia
+  emitir — a migração `0004` troca por `(company_id, model, series, number)`.
+- **PDV offline** (`src/lib/pdv-offline.ts`): venda sem rede entra numa fila em
+  `localStorage`, o topo do PDV mostra o estado (online / N na fila), com
+  **Enviar agora** e **Descartar** por venda. Só vale para venda à vista: com
+  crediário ou pagamento dividido o PDV avisa e não enfileira (o limite de
+  crédito e a baixa de estoque precisam do servidor). A fila é por navegador —
+  não sincroniza entre máquinas. Desligável em Configurações.
+- **Referência de produto**: a referência automática usava os últimos 4 dígitos
+  do relógio e colidia em criações na mesma janela de 10 s (teste instável).
+  Agora, quando a referência é automática, o sistema tenta outros sufixos;
+  referência digitada pelo usuário continua dando erro de duplicidade.
+- Testes: `qr-code` (7), `pix-brcode` (9), `danfe` (9). Suíte:
+  **150 testes em 17 arquivos**.

@@ -183,3 +183,25 @@ congelado, autofiltro e largura de coluna calculada.
 - **Consentimento de marketing não é presumido** (LGPD): `lgpdConsent: false` e
   a tela informa quantos cadastros entraram sem consentimento.
 - Limite de 2.000 linhas por importação e 2 MB por arquivo.
+
+---
+
+## Etapa 5 — Pix, etiquetas, cupom e offline
+
+| Tema | Decisão | Motivo |
+| --- | --- | --- |
+| Pix | BR Code estático gerado no projeto, sem gateway | Não tem taxa, não tem chave de API, não depende de internet no caixa e o lojista não precisa de conta em banco novo. O payload é só texto; a conferência é do banco |
+| Pix | Sem `txid` inventado para venda inexistente | `txid` sai da venda (`VENDA2048`). Cobrança solta usa `ORION` + horário. Sem isso o lojista não sabe qual venda o comprovante quita |
+| Pix | Valor zero é recusado | QR sem valor obriga o cliente a digitar o valor — e um QR em branco impresso na parede vira doação. O PDV manda o valor da venda |
+| QR Code | Codificador próprio em vez de biblioteca | O projeto já evita dependência nova para conferir cada byte. O QR do Pix é lido pelo app do banco: precisa de spec correta, não de conveniência |
+| Etiquetas | Impressão via navegador (CSS `@media print`) | Impressora térmica de etiqueta e impressora comum já aceitam HTML. Driver/PDF próprio é peso e quebra por modelo de impressora |
+| Etiquetas | Preferências em `settings`, não por produto | A loja compra um rolo de papel e mantém o padrão; quem quer variar muda a quantidade na hora da impressão |
+| Cupom | 80 mm em HTML gerado na rota, sem PDF | Mesma razão das etiquetas. E o cupom sai pelo navegador do caixa, que é onde a impressora está |
+| Cupom | Tarja **PENDENTE DE AUTORIZAÇÃO** em vez de “DANFE válido” | Sem autorização da SEFAZ o cupom não é documento fiscal. Fingir que é gera multa para o lojista. A tarja muda para HOMOLOGAÇÃO/CANCELADO/AUTORIZADO conforme o status real |
+| Cupom | Tributos aproximados opcionais (`DANFE_TAX_PERCENT`) | A transparência tributária depende de alíquota que varia por produto e por estado. Sem configurar, a linha simplesmente não aparece — melhor que mostrar número inventado |
+| Numeração fiscal | `MAX(number)` por modelo+série com retry em `23505` | `settings.fiscalNextNumberNfce` é o número *inicial*; tratá-lo como contador dava 500 na segunda emissão. O `MAX` respeita números já emitidos e não reusa após exclusão |
+| Numeração fiscal | Migração `0004` troca o índice único global por `(company_id, model, series, number)` | A migração multi-loja criou o índice por loja mas não removeu o antigo: **só uma loja por instalação conseguia emitir**. Cada loja tem sua própria numeração, como a SEFAZ exige |
+| Offline | Fila em `localStorage`, por navegador | É o único armazenamento que o caixa tem sem servidor. Não sincroniza entre máquinas — está escrito na tela e no changelog para não virar surpresa |
+| Offline | Só venda à vista entra na fila | Crediário precisa do limite do cliente e pagamento dividido precisa ratear o total: os dois dependem de dado que pode ter mudado. Enfileirar isso daria saldo errado, e saldo errado é pior que venda não registrada |
+| Offline | Desligável em Configurações | Loja com estoque volátil prefere perder a venda a ter venda fora do estoque. A decisão é do lojista, não do sistema |
+| Produto | Referência automática tenta novos sufixos antes de falhar | Colisão de referência automática é problema do sistema, não do usuário. Referência digitada à mão continua sendo erro claro de duplicidade |

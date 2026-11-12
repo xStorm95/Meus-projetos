@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import {
+  Printer,
   FileCheck2, ShieldAlert, AlertTriangle, CheckCircle2, XCircle, Clock, Ban, Search, Settings2,
   FileText, Info,
 } from "lucide-react";
@@ -200,7 +201,17 @@ export function FiscalView({
       header: "",
       align: "right",
       cell: (d) => (
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-1">
+          <a
+            href={`/api/fiscal/documents/${d.id}/danfe`}
+            target="_blank"
+            rel="noreferrer"
+            title="Imprimir cupom (DANFE simplificada)"
+          >
+            <Button variant="ghost" size="icon-sm" title="Imprimir cupom">
+              <Printer className="h-3.5 w-3.5" />
+            </Button>
+          </a>
           {permissions.canCancel && d.status !== "CANCELED" && (
             <Button variant="ghost" size="icon-sm" title="Cancelar documento" onClick={() => setCancelTarget(d)}>
               <Ban className="h-3.5 w-3.5 text-[var(--danger)]" />

@@ -405,6 +405,20 @@ export const settings = pgTable("settings", {
   fiscalDefaultCfop: text("fiscal_default_cfop").notNull().default("5102"),
   fiscalDefaultNcm: text("fiscal_default_ncm"),
   fiscalDefaultCsosn: text("fiscal_default_csosn").notNull().default("102"),
+  /* PIX — BR Code (chave estática do lojista) */
+  /** Chave Pix: CPF/CNPJ (só dígitos), e-mail, telefone (+55...) ou aleatória. */
+  pixKey: text("pix_key"),
+  /** Nome do recebedor no app do banco (máx. 25, sem acento). */
+  pixReceiverName: text("pix_receiver_name"),
+  pixCity: text("pix_city"),
+  /* Etiquetas de produto */
+  /** Papel da etiqueta: "60x40", "50x30", "100x50" (mm). */
+  labelSize: text("label_size").notNull().default("60x40"),
+  labelShowPrice: boolean("label_show_price").notNull().default(true),
+  labelShowBarcode: boolean("label_show_barcode").notNull().default(true),
+  labelExtraText: text("label_extra_text"),
+  /* Vendas no modo offline */
+  offlineSalesEnabled: boolean("offline_sales_enabled").notNull().default(true),
   whatsappEnabled: boolean("whatsapp_enabled").notNull().default(false),
   lgpdPrivacyContact: text("lgpd_privacy_contact"),
   lgpdRetentionMonths: integer("lgpd_retention_months").notNull().default(60),
@@ -1510,6 +1524,11 @@ export const fiscalDocuments = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
+    /*
+     * Numeração fiscal é única POR LOJA. O índice global antigo
+     * (`fiscal_model_series_number_uq`) fazia a segunda loja da instalação
+     * receber 500 ao emitir a própria nota nº 1 — ver migração 0004.
+     */
     uniqueIndex("fiscal_company_model_series_number_uq").on(t.companyId, t.model, t.series, t.number),
     index("fiscal_sale_idx").on(t.saleId),
   ],

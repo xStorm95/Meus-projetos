@@ -6,10 +6,20 @@ import Link from "next/link";
 import {
   Search, Plus, Minus, Trash2, User, UserPlus, CreditCard, Banknote, QrCode, Wallet,
   Check, X, ShoppingBag, Percent, Printer, Save, AlertTriangle, Loader2, ScanBarcode,
-  ChevronsRight, PackageOpen, Receipt, Sparkles, Clock,
+  ChevronsRight, PackageOpen, Receipt, Sparkles, Clock, WifiOff, RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { api, errorMessage } from "@/lib/api-client";
+import { PixQr } from "@/components/pix/pix-qr";
+import {
+  bloqueioOffline,
+  contarFila,
+  enfileirar,
+  listarFila,
+  removerDaFila,
+  sincronizarFila,
+  type VendaOffline,
+} from "@/lib/pdv-offline";
 import { brl, cn, num, maskDocument, maskPhone, todayISO } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, Badge, Modal, EmptyState, Alert } from "@/components/ui/primitives";
@@ -77,11 +87,12 @@ export function PdvView({
   sellerName: string;
   maxDiscount: number;
   canUnlimitedDiscount: boolean;
-  settings: { requireDiscountReason: boolean; creditInterestRate: string };
+  settings: { requireDiscountReason: boolean; creditInterestRate: string; offlineEnabled: boolean };
   openSales: Array<{ id: string; number: number; total: string; customerName: string | null; itemCount: number }>;
   permissions: { canCancel: boolean; canDiscount: boolean };
 }) {
   const router = useRouter();
+  const offlineEnabled = settings.offlineEnabled;
 
   /* --------- estados --------- */
   const [searchTerm, setSearchTerm] = React.useState("");
@@ -102,6 +113,15 @@ export function PdvView({
   const [openSalesModal, setOpenSalesModal] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [lastSale, setLastSale] = React.useState<{ id: string; number: number; change: string } | null>(null);
+  /*
+   * OFFLINE — três estados, todos na tela:
+   *  - online: conexão ativa (o navegador que manda, via eventos online/offline);
+   *  - fila: vendas guardadas no aparelho esperando envio;
+   *  - enviando: sincronização em andamento (evita disparar duas).
+   */
+  const [online, setOnline] = React.useState(true);
+  const [fila, setFila] = React.useState<VendaOffline[]>([]);
+  const [enviandoFila, setEnviandoFila] = React.useState(false);
 
   const searchRef = React.useRef<HTMLInputElement>(null);
 
@@ -326,12 +346,50 @@ export function PdvView({
       toast.error(`Faltam ${brl(remaining)} para completar o pagamento.`);
       return;
     }
+
+    const payload = buildPayload(true);
+    const semRede = !navigator.onLine || !online;
+
+    /*
+     * OFFLINE: guarda a venda no aparelho em vez de perder o atendimento.
+     * A tela avisa o operador — não é um sucesso "igual" ao normal, porque o
+     * estoque só será conferido quando a venda chegar ao servidor.
+     */
+    if (semRede) {
+      const bloqueio = bloqueioOffline({
+        payments: payments.map((p) => ({ method: p.method })),
+        discountAmount: manualDiscount,
+        discountPercent: effectiveDiscountPercent,
+      });
+      if (bloqueio) {
+        toast.error(`Não dá para salvar offline: ${bloqueio}`);
+        return;
+      }
+      if (!offlineEnabled) {
+        toast.error("Modo offline desligado nas configurações. Aguarde a conexão voltar.");
+        return;
+      }
+      const guardada = enfileirar(payload, {
+        total,
+        itens: totalItems,
+        cliente: customer?.name ?? null,
+      });
+      setFila(listarFila());
+      setPaymentOpen(false);
+      clearSale();
+      setLastSale(null);
+      toast.warning(
+        `Venda guardada neste aparelho (${brl(guardada.resumo.total)}). Será enviada quando a internet voltar.`,
+      );
+      return;
+    }
+
     setSaving(true);
     try {
       const res = await api.post<{
         sale: { id: string; number: number; total: string };
         change: string;
-      }>("/api/sales", buildPayload(true));
+      }>("/api/sales", payload);
       toast.success(`Venda #${res.sale.number} finalizada com sucesso!`);
       setPaymentOpen(false);
       clearSale();
@@ -357,6 +415,58 @@ export function PdvView({
       },
     ]);
   }
+
+  /* --------- offline: estado da conexão e fila local --------- */
+  const sincronizar = React.useCallback(async () => {
+    if (!offlineEnabled || enviandoFila) return;
+    if (listarFila().length === 0) return;
+    setEnviandoFila(true);
+    try {
+      const resultado = await sincronizarFila((payload) => api.post("/api/sales", payload));
+      if (resultado.enviadas > 0) {
+        toast.success(
+          `${resultado.enviadas} venda(s) offline enviada(s) para o servidor.`,
+        );
+        router.refresh();
+      }
+      if (resultado.falhas.length > 0) {
+        // Recusa de negócio (ex.: estoque acabou) mantém a venda na fila.
+        toast.error(
+          `${resultado.falhas.length} venda(s) offline não puderam ser enviadas. Veja a fila.`,
+        );
+      }
+    } finally {
+      setFila(listarFila());
+      setEnviandoFila(false);
+    }
+  }, [offlineEnabled, enviandoFila, router]);
+
+  React.useEffect(() => {
+    setOnline(navigator.onLine);
+    setFila(listarFila());
+
+    const atualizar = () => setFila(listarFila());
+    const aoVoltar = () => {
+      setOnline(true);
+      void sincronizar();
+    };
+    const aoCair = () => {
+      setOnline(false);
+      toast.warning("Sem conexão. As vendas ficam guardadas neste aparelho até a internet voltar.");
+    };
+
+    window.addEventListener("online", aoVoltar);
+    window.addEventListener("offline", aoCair);
+    window.addEventListener("orion:fila-offline", atualizar);
+    // Se a página abriu com fila pendente e já há rede, tenta agora.
+    if (navigator.onLine) void sincronizar();
+    return () => {
+      window.removeEventListener("online", aoVoltar);
+      window.removeEventListener("offline", aoCair);
+      window.removeEventListener("orion:fila-offline", atualizar);
+    };
+    // `sincronizar` muda quando a fila muda; evita laço usando o comprimento.
+  }, [sincronizar]);
 
   const searchInput = (
     <div className="relative">
@@ -447,6 +557,74 @@ export function PdvView({
 
   return (
     <div className="mx-auto max-w-[1600px]">
+      {/* Estado da conexão e da fila offline — sempre visível, nunca silencioso. */}
+      {(!online || fila.length > 0) && (
+        <div
+          className={cn(
+            "mb-3 flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2",
+            online
+              ? "border-[var(--warning)]/40 bg-[var(--warning)]/5"
+              : "border-[var(--danger)]/40 bg-[var(--danger-soft)]",
+          )}
+        >
+          <WifiOff className={cn("h-4 w-4 shrink-0", online ? "text-[var(--warning)]" : "text-[var(--danger)]")} />
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-semibold">
+              {online ? "Vendas aguardando envio" : "Sem conexão — vendas sendo guardadas neste aparelho"}
+            </p>
+            <p className="text-[10.5px] text-[var(--text-muted)]">
+              {fila.length === 0
+                ? "As vendas ficam seguras aqui e sobem sozinhas quando a internet voltar."
+                : `${fila.length} venda(s) na fila · ${brl(fila.reduce((a, v) => a + v.resumo.total, 0))}. O estoque é conferido no envio.`}
+            </p>
+          </div>
+          {fila.length > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              loading={enviandoFila}
+              disabled={!online}
+              onClick={() => void sincronizar()}
+              leftIcon={<RefreshCw className="h-3.5 w-3.5" />}
+            >
+              Enviar agora
+            </Button>
+          )}
+        </div>
+      )}
+
+      {fila.length > 0 && (
+        <div className="mb-3 space-y-1">
+          {fila.map((v) => (
+            <div
+              key={v.id}
+              className="flex flex-wrap items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-muted)]/40 px-3 py-1.5 text-[10.5px]"
+            >
+              <Clock className="h-3 w-3 text-[var(--text-muted)]" />
+              <span className="font-medium">{brl(v.resumo.total)}</span>
+              <span className="text-[var(--text-muted)]">
+                {v.resumo.itens} item(ns) · {v.resumo.cliente ?? "consumidor final"} ·{" "}
+                {new Date(v.criadoEm).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+              </span>
+              {v.ultimoErro && (
+                <span className="rounded bg-[var(--danger-soft)] px-1.5 py-0.5 text-[var(--danger)]">
+                  {v.ultimoErro}
+                </span>
+              )}
+              <button
+                onClick={() => {
+                  removerDaFila(v.id);
+                  setFila(listarFila());
+                }}
+                className="ml-auto text-[10px] text-[var(--text-muted)] underline underline-offset-2 hover:text-[var(--text-primary)]"
+              >
+                Descartar
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="font-[family-name:var(--font-display)] text-2xl font-semibold tracking-tight">
@@ -1097,6 +1275,12 @@ function PaymentModal({
           })}
         </div>
 
+        {payments.some((p) => p.method === "PIX") && (
+          <PixCobranca
+            valor={payments.filter((p) => p.method === "PIX").reduce((a, p) => a + p.amount, 0)}
+          />
+        )}
+
         {payments.length === 0 ? (
           <div className="rounded-xl border border-dashed border-[var(--border-strong)] py-6 text-center">
             <p className="text-xs text-[var(--text-muted)]">
@@ -1281,3 +1465,84 @@ function OpenSalesModal({
 void Percent;
 void AlertTriangle;
 void ScanBarcode;
+
+/**
+ * Cobrança Pix dentro do pagamento.
+ *
+ * O valor vem do campo do próprio pagamento, então o QR sempre bate com o que
+ * está na tela (se o operador mudar o valor, o QR é refeito). Sem chave
+ * configurada a tela manda para Configurações em vez de mostrar QR vazio.
+ */
+function PixCobranca({ valor }: { valor: number }) {
+  const [estado, setEstado] = React.useState<{
+    carregando: boolean;
+    payload: string | null;
+    configurado: boolean;
+    motivo?: string | null;
+    aviso?: string;
+    recebedor?: string;
+  }>({ carregando: true, payload: null, configurado: false });
+
+  React.useEffect(() => {
+    let cancelado = false;
+    if (!(valor > 0)) {
+      setEstado({ carregando: false, payload: null, configurado: false, motivo: "Informe o valor do Pix." });
+      return;
+    }
+    setEstado((e) => ({ ...e, carregando: true }));
+    const t = setTimeout(async () => {
+      try {
+        const r = await api.get<{
+          payload: string | null;
+          configurado: boolean;
+          motivo?: string | null;
+          aviso?: string;
+          recebedor?: string;
+        }>("/api/pix", { valor: valor.toFixed(2) });
+        if (!cancelado) setEstado({ carregando: false, ...r });
+      } catch (err) {
+        if (!cancelado)
+          setEstado({ carregando: false, payload: null, configurado: false, motivo: errorMessage(err) });
+      }
+    }, 350);
+    return () => {
+      cancelado = true;
+      clearTimeout(t);
+    };
+  }, [valor]);
+
+  if (estado.carregando) {
+    return (
+      <div className="flex items-center justify-center rounded-xl border border-dashed border-[var(--border-default)] py-6">
+        <p className="text-[11px] text-[var(--text-muted)]">Gerando QR do Pix…</p>
+      </div>
+    );
+  }
+
+  if (!estado.configurado || !estado.payload) {
+    return (
+      <div className="rounded-xl border border-[var(--warning)]/40 bg-[var(--warning)]/5 px-3 py-2.5">
+        <p className="text-[11px] font-semibold text-[var(--warning)]">Pix sem chave configurada</p>
+        <p className="mt-0.5 text-[10.5px] text-[var(--text-secondary)]">
+          {estado.motivo ?? "Cadastre a chave Pix para gerar o QR."}{" "}
+          <a href="/configuracoes" className="underline underline-offset-2">
+            Abrir Configurações
+          </a>
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-[var(--border-default)] bg-[var(--bg-muted)]/40 px-3 py-3">
+      <div className="flex items-center justify-between">
+        <p className="text-[11px] font-semibold">Cobrança Pix · {brl(valor)}</p>
+        <span className="text-[10px] text-[var(--text-muted)]">{estado.recebedor}</span>
+      </div>
+      <div className="mt-2">
+        <PixQr payload={estado.payload} tamanho={180} />
+      </div>
+      <p className="mt-1 text-center text-[10px] text-[var(--text-muted)]">{estado.aviso}</p>
+    </div>
+  );
+}

@@ -15,6 +15,20 @@
       "when": 1794265603583,
       "tag": "0001_multi_loja",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1795000000000,
+      "tag": "0003_pix_etiquetas",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1795100000000,
+      "tag": "0004_fiscal_indice_por_loja",
+      "breakpoints": true
     }
   ]
 }

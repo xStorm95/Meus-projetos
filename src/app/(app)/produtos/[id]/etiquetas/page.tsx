@@ -32,6 +32,12 @@ export default async function LabelsPage({ params }: { params: Promise<{ id: str
     <LabelsView
       product={{ id: rows[0].id, name: rows[0].name, reference: rows[0].reference }}
       companyName={settings.companyName}
+      preferencias={{
+        size: settings.labelSize,
+        showPrice: settings.labelShowPrice,
+        showBarcode: settings.labelShowBarcode,
+        extraText: settings.labelExtraText,
+      }}
       labels={variants
         .filter((v) => v.isActive)
         .map((v) => ({
