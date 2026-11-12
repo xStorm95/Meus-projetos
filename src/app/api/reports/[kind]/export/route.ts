@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { apiHandler } from "@/server/lib/api";
-import { csvResponse, csvDate, csvNumber, jsonResponse } from "@/server/lib/export";
+import { csvResponse, csvDate, csvNumber, jsonResponse, xlsxResponse } from "@/server/lib/export";
 import { ForbiddenError } from "@/server/lib/errors";
 import { REPORT_CATALOG, runReport } from "@/server/services/reports";
 
@@ -10,7 +10,7 @@ import { REPORT_CATALOG, runReport } from "@/server/services/reports";
  * A impressão/PDF é feita no cliente a partir da mesma consulta.
  */
 const querySchema = z.object({
-  format: z.enum(["csv", "json"]).default("csv"),
+  format: z.enum(["csv", "json", "xlsx"]).default("csv"),
   from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   limit: z.coerce.number().int().positive().max(20000).optional(),
@@ -45,6 +45,29 @@ export const GET = apiHandler<unknown, z.infer<typeof querySchema>, { kind: stri
         return String(value);
       }),
     );
+
+    // Excel: dinheiro/número vai como número (soma e filtro funcionam);
+    // data segue como texto DD/MM/AAAA para não depender da região do Excel.
+    if (query.format === "xlsx") {
+      const linhasXlsx = report.rows.map((row) =>
+        report.columns.map((column) => {
+          const value = row[column.key];
+          if (value === null || value === undefined || value === "") return "";
+          if (column.format === "money" || column.format === "number") {
+            const n = Number(value);
+            return Number.isFinite(n) ? n : String(value);
+          }
+          if (column.format === "date") return csvDate(String(value));
+          return String(value);
+        }),
+      );
+      return xlsxResponse(
+        `${catalog.kind}_${stamp}.xlsx`,
+        report.columns.map((c) => c.label),
+        linhasXlsx,
+        { sheetName: report.title ?? catalog.kind },
+      );
+    }
 
     return csvResponse(
       `${catalog.kind}_${stamp}.csv`,

@@ -118,3 +118,68 @@ quebrado. CNPJ/razão social não aparecem em nenhuma página pública.
 
 O domínio é mantido (`meus-projetos-qzoj.vercel.app`). Não há renomeação de
 projeto na Vercel para não invalidar links já compartilhados.
+
+## Etapa 4 — painéis, Excel e importação de clientes
+
+### Curva ABC: classe olha o acumulado ANTERIOR ao item
+
+A = itens que somam os primeiros 80% da receita, B até 95%, C o resto. O item
+que **cruza** a linha de 80% continua sendo A — é ele quem sustenta o
+faturamento. Se a classe olhasse o acumulado **depois** do item, uma loja com um
+campeão isolado (88% do faturamento) o classificaria como “B” e a classe A
+ficaria vazia: leitura errada da curva. As comparações usam tolerância
+(`Math.abs(x - 80) < 1e-9`) porque somas de decimais não fecham exatamente em
+80,0000. A curva é sempre **do período selecionado** — não existe “curva de
+sempre”, e a tela diz isso.
+
+### Metas: sem meta não há progresso
+
+`users.monthly_goal` já existia no cadastro de usuário. O painel mostra
+realizado, progresso e **projeção pela média diária do mês até hoje** (não uma
+regra de três sobre o período do dashboard, que pode ser de um dia só). Quem não
+tem meta aparece com “—”, nunca 0% nem 100%, e a tela oferece o atalho para
+cadastrar.
+
+### Comparativo de lojas: única exceção ao isolamento, e autorizada
+
+Comparar lojas exige ler mais de uma — o único ponto do produto que abre mão do
+guardião. Regras:
+
+- `runAsSystem` (não `runWithCompany(null)`: `null` significa “sem loja” e o
+  guardião falha fechado, devolvendo zero linhas);
+- autorização **no servidor** por `PLATFORM_ADMIN_EMAILS` ou pelo e-mail do
+  usuário da loja **mais antiga** (o dono natural da instalação);
+- a rota ainda exige `reports.view`;
+- o comparativo devolve **só totais por loja** (faturamento, vendas, ticket,
+  lucro, produtos, estoque). Nenhum cliente, venda ou item de outra loja aparece.
+- Sem base de comparação a variação é `null` → “—”. Com uma única loja, a tela
+  explica em vez de mostrar uma tabela de uma linha.
+
+### Excel (.xlsx) sem biblioteca nova
+
+`src/server/lib/export.ts` ganhou `xlsxResponse`, que monta o arquivo com um ZIP
+“stored” escrito na mão (CRC32 próprio) + os XML do formato. Zero dependência
+nova, funciona no runtime da Vercel, e o arquivo abre no Excel, Google Sheets e
+LibreOffice (validado com `openpyxl`). Recursos: cabeçalho em negrito e
+congelado, autofiltro e largura de coluna calculada.
+
+- **Números são números**: custo, preço, estoque, totais e quantidades viram
+  valor numérico, para somar e filtrar na planilha.
+- **CSV continua em pt-BR** (vírgula decimal, data DD/MM/AAAA): é o formato que
+  abre certo no Excel configurado em português. Por isso as duas saídas existem
+  — não é redundância, é o mesmo dado em duas convenções.
+
+### Importação de clientes: planilha real, LGPD respeitada
+
+- Colunas aceitas com ou sem acento e com sinônimos (`nome`/`cliente`,
+  `cpf`/`cnpj`/`documento`, `celular`/`telefone`), separador `;` ou `,`,
+  tolerância a aspas.
+- **Documento inválido é descartado com aviso**, não zerado: se entrasse como
+  “”, dois clientes diferentes colidiriam no mesmo documento e um seria
+  descartado como “duplicado” — pior do que não importar. O mesmo vale para UF
+  inexistente (“ZZ”) e e-mail malformado.
+- Documento repetido é **ignorado** (padrão), contado em `skipped`; a linha não
+  aborta a importação.
+- **Consentimento de marketing não é presumido** (LGPD): `lgpdConsent: false` e
+  a tela informa quantos cadastros entraram sem consentimento.
+- Limite de 2.000 linhas por importação e 2 MB por arquivo.

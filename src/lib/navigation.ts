@@ -18,6 +18,7 @@ export type NavItem = {
     | "finance"
     | "credit"
     | "reports"
+    | "insights"
     | "fiscal"
     | "users"
     | "settings"
@@ -67,6 +68,7 @@ export const NAVIGATION: NavGroup[] = [
   {
     title: "Análise",
     items: [
+      { label: "Painéis", href: "/paineis", icon: "insights", permission: "reports.view" },
       { label: "Relatórios", href: "/relatorios", icon: "reports", permission: "reports.view" },
       { label: "Fiscal", href: "/fiscal", icon: "fiscal", permission: "fiscal.view" },
     ],

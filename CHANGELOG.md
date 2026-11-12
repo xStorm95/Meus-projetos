@@ -71,3 +71,27 @@ Formato: um bloco por etapa do rebrand. Cada etapa é um commit.
   etiquetas/offline, 2FA/permissões/auditoria/CSP, rename final para ORION).
 - Dados reais ainda necessários para a landing: CNPJ, endereço, telefone/
   WhatsApp, e-mail e imagem de compartilhamento (OG).
+
+## Etapa 4 — painéis novos e planilhas Excel
+
+- **Página `/paineis`** (menu *Análise → Painéis*):
+  - **Curva ABC** de produtos e de clientes (Pareto 80/95), com resumo por
+    classe, barra de participação e tabela com acumulado;
+  - **Metas do mês**: realizado, progresso, projeção pela média diária e
+    “faltam X” por vendedor — sem meta, mostra “—” e o atalho para cadastrar;
+  - **Comparativo de lojas** (só para administrador da plataforma): totais por
+    loja, ticket médio, estoque a custo e variação contra o período anterior.
+    Com uma loja só, explica em vez de inventar comparação.
+- **Exportação `.xlsx`** em clientes, produtos, vendas (vendas/itens/pagamentos)
+  e em todos os relatórios (`format=xlsx`). ZIP + XML escritos no projeto, sem
+  dependência nova; cabeçalho congelado, autofiltro e números somáveis. Os
+  botões **Excel** aparecem ao lado dos de CSV em `/clientes` e `/relatorios`.
+- **Importação de clientes por CSV** (`/api/customers/import`) com diálogo em
+  `/clientes`: arrastar arquivo ou colar, modelo pronto para baixar, resumo de
+  importados/ignorados/avisos por linha e lembrete de consentimento LGPD.
+  Documento, UF e e-mail inválidos são descartados com aviso em vez de virar
+  dado errado no cadastro.
+- Correção no CSV de clientes: voltou a usar vírgula decimal (`1.500,00`) — a
+  versão em Excel é que leva número puro.
+- Testes: `export-xlsx` (6, inclui leitor de ZIP próprio) e `curva-abc` (6).
+  Suíte: **125 testes em 14 arquivos**.

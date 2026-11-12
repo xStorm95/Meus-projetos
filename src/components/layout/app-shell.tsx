@@ -8,6 +8,7 @@ import {
   FileText, RotateCcw, Wallet, Landmark, CreditCard, BarChart3, FileCheck2, ShieldCheck,
   Settings, ScrollText, ChevronLeft, ChevronRight, Search, Bell, Sun, Moon, LogOut, Menu,
   X, UserCircle2, Keyboard, CheckCheck, AlertTriangle, CircleAlert, Info, CircleCheck, Sparkles,
+  Target,
 } from "lucide-react";
 import { cn, initials, dateTimeBR } from "@/lib/utils";
 import { NAVIGATION, type NavItem } from "@/lib/navigation";
@@ -36,6 +37,7 @@ const ICONS: Record<NavItem["icon"], React.ComponentType<{ className?: string }>
   finance: Landmark,
   credit: CreditCard,
   reports: BarChart3,
+  insights: Target,
   fiscal: FileCheck2,
   users: ShieldCheck,
   settings: Settings,
