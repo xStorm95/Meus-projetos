@@ -136,5 +136,6 @@ Formato: um bloco por etapa do rebrand. Cada etapa é um commit.
   do relógio e colidia em criações na mesma janela de 10 s (teste instável).
   Agora, quando a referência é automática, o sistema tenta outros sufixos;
   referência digitada pelo usuário continua dando erro de duplicidade.
-- Testes: `qr-code` (7), `pix-brcode` (9), `danfe` (9). Suíte:
-  **150 testes em 17 arquivos**.
+- Testes: `qr-code` (7), `pix-brcode` (9), `danfe` (9), `pdv-offline` (9,
+  fila em ordem, falha que não descarta a venda, crediário/dividido bloqueados).
+  Suíte: **159 testes em 18 arquivos**.
