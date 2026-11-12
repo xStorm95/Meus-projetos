@@ -111,20 +111,34 @@ function normalizeReference(name: string, provided?: string): string {
   return `${base}${String(Date.now()).slice(-4)}`;
 }
 
+/** Sobrescreve a parte aleatória da referência automática, sem tocar na base do nome. */
+function referenceComSufixo(reference: string, suffix: string): string {
+  return `${reference.slice(0, -4)}${suffix}`;
+}
+
 export async function createProduct(input: ProductInput, actor: { id: string; name: string }) {
   if (!input.name?.trim()) throw new BusinessRuleError("Informe o nome do produto.");
   if (d(input.salePrice).lt(0) || d(input.costPrice).lt(0)) {
     throw new BusinessRuleError("Custo e preço de venda não podem ser negativos.");
   }
 
-  const reference = normalizeReference(input.name, input.reference);
-  const duplicated = await db
-    .select({ id: products.id })
-    .from(products)
-    .where(eq(products.reference, reference))
-    .limit(1);
-  if (duplicated[0]) {
-    throw new ConflictError(`Já existe um produto com a referência "${reference}".`);
+  // A referência automática usa os últimos 4 dígitos do relógio, então duas criações na mesma
+  // janela de 10 s colidem. Quando ela é automática, tenta alguns sufixos antes de desistir;
+  // referência informada pelo usuário continua sendo erro imediato (é escolha dele).
+  const automaticReference = !input.reference?.trim();
+  let reference = normalizeReference(input.name, input.reference);
+  for (let attempt = 0; ; attempt++) {
+    const duplicated = await db
+      .select({ id: products.id })
+      .from(products)
+      .where(eq(products.reference, reference))
+      .limit(1);
+    if (!duplicated[0]) break;
+    if (!automaticReference || attempt >= 20) {
+      throw new ConflictError(`Já existe um produto com a referência "${reference}".`);
+    }
+    const seed = `${Date.now()}${attempt}${Math.floor(Math.random() * 1000)}`;
+    reference = referenceComSufixo(reference, seed.slice(-4).padStart(4, "0"));
   }
   if (input.barcode) {
     const dupBar = await db

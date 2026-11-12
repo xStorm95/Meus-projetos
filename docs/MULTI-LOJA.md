@@ -9,7 +9,7 @@ e `src/server/db/client.ts`). Sem loja no contexto, nada é lido nem gravado.
 
 | Verificação | Resultado |
 |---|---|
-| Cadastro de duas lojas | `Passarela da Moda` e `Bella Boutique` — HTTP 200 |
+| Cadastro de duas lojas | `Ateliê Aurora` e `Bella Boutique` — HTTP 200 |
 | Login das duas contas | HTTP 200, cada uma na sua loja |
 | Produto criado em cada loja | 201 (o bug do `99,90` foi corrigido) |
 | Maria vê | `Vestido da Maria R$199.90` |

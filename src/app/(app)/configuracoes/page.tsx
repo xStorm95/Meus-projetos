@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/server/auth/session";
-import { demoAutoLoginEnabled } from "@/server/auth/session";
+import { demoAutoLoginPermitido } from "@/server/auth/session";
 import { getSettings } from "@/server/services/settings";
 import { SettingsView } from "./settings-view";
 
@@ -25,7 +25,7 @@ export default async function SettingsPage() {
       permissions={{
         canManage: user.permissions.includes("settings.manage"),
         canBackup: user.permissions.includes("backup.run"),
-        isDemo: demoAutoLoginEnabled(),
+        isDemo: await demoAutoLoginPermitido(),
       }}
     />
   );

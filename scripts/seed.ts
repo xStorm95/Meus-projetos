@@ -62,7 +62,7 @@ async function main() {
     process.exit(0);
   }
 
-  console.log("\n=== PASSARELA ERP — dados de DEMONSTRAÇÃO ===\n");
+  console.log("\n=== ORION — dados de DEMONSTRAÇÃO ===\n");
 
   const existing = await db.select({ count: sql<number>`count(*)::int` }).from(products);
   if (Number(existing[0]?.count ?? 0) > 0) {
@@ -137,7 +137,7 @@ async function main() {
 
   const brandIds: string[] = [];
   const { brands } = await import("../src/server/db/schema");
-  for (const brandName of ["Passarela Store [DEMO]", "Bella Vita [DEMO]"]) {
+  for (const brandName of ["Ateliê Aurora [DEMO]", "Bella Vita [DEMO]"]) {
     const found = await db.select().from(brands).where(sql`name = ${brandName}`).limit(1);
     if (found[0]) {
       brandIds.push(found[0].id);

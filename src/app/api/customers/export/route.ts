@@ -11,10 +11,10 @@
 import { z } from "zod";
 import { apiHandler } from "@/server/lib/api";
 import { listCustomers } from "@/server/services/customers";
-import { csvDate, csvNumber, csvResponse, jsonResponse } from "@/server/lib/export";
+import { csvDate, csvNumber, csvResponse, jsonResponse, xlsxResponse } from "@/server/lib/export";
 
 const querySchema = z.object({
-  format: z.enum(["csv", "json"]).default("csv"),
+  format: z.enum(["csv", "json", "xlsx"]).default("csv"),
   search: z.string().optional(),
   classification: z.string().optional(),
 });
@@ -31,16 +31,41 @@ export const GET = apiHandler(
     });
 
     const stamp = new Date().toISOString().slice(0, 10);
+    const headers = [
+      "Nome", "Documento", "Telefone", "WhatsApp", "E-mail", "Cidade", "UF",
+      "Compras", "Total gasto", "Dívida", "Em atraso", "Crédito na loja",
+      "Limite de crédito", "Última compra", "Classificações", "Cadastro",
+    ];
+    // Linha "crua": números como número (Excel) e datas já em DD/MM/AAAA.
+    const linhas = data.items.map((c) => [
+      c.name,
+      c.document,
+      c.phone,
+      c.whatsapp,
+      c.email,
+      c.city,
+      c.state,
+      Number(c.purchases ?? 0),
+      Number(c.totalSpent ?? 0),
+      Number(c.debt ?? 0),
+      Number(c.overdueDebt ?? 0),
+      Number(c.credits ?? 0),
+      Number(c.creditLimit ?? 0),
+      csvDate(c.lastPurchase),
+      (c.classifications ?? []).join(", "),
+      csvDate(c.createdAt),
+    ]);
 
     if (query.format === "json") return jsonResponse(`clientes_${stamp}.json`, data.items);
 
+    // Excel: números vão como número (dá para somar/filtrar na planilha).
+    if (query.format === "xlsx")
+      return xlsxResponse(`clientes_${stamp}.xlsx`, headers, linhas, { sheetName: "Clientes" });
+
+    // CSV: mesmas colunas, com dinheiro no padrão pt-BR (vírgula decimal).
     return csvResponse(
       `clientes_${stamp}.csv`,
-      [
-        "Nome", "Documento", "Telefone", "WhatsApp", "E-mail", "Cidade", "UF",
-        "Compras", "Total gasto", "Dívida", "Em atraso", "Crédito na loja",
-        "Limite de crédito", "Última compra", "Classificações", "Cadastro",
-      ],
+      headers,
       data.items.map((c) => [
         c.name,
         c.document,
@@ -49,7 +74,7 @@ export const GET = apiHandler(
         c.email,
         c.city,
         c.state,
-        String(c.purchases ?? 0),
+        c.purchases,
         csvNumber(c.totalSpent),
         csvNumber(c.debt),
         csvNumber(c.overdueDebt),

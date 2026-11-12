@@ -79,7 +79,7 @@ async function main() {
     });
 
   await write(
-    `-- PASSARELA ERP — backup lógico\n-- gerado em ${new Date().toISOString()}\n-- restore: npm run restore -- ${path.basename(file)}\n\nSET client_encoding = 'UTF8';\nSET standard_conforming_strings = on;\nBEGIN;\n\n`,
+    `-- ORION — backup lógico\n-- gerado em ${new Date().toISOString()}\n-- restore: npm run restore -- ${path.basename(file)}\n\nSET client_encoding = 'UTF8';\nSET standard_conforming_strings = on;\nBEGIN;\n\n`,
   );
 
   // 1) Enums

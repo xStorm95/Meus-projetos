@@ -12,6 +12,7 @@ import {
   suppliers,
 } from "@/server/db/schema";
 import { dre, cashFlow } from "@/server/services/finance";
+import { addDaysKey, inicioDoDia } from "@/server/lib/dates";
 
 const querySchema = z.object({
   format: z.enum(["csv", "json"]).default("csv"),
@@ -122,8 +123,8 @@ export const GET = apiHandler(
         .from(financeEntries)
         .where(
           and(
-            gte(financeEntries.paidAt, new Date(`${query.from}T00:00:00Z`)),
-            lte(financeEntries.paidAt, new Date(`${query.to}T23:59:59Z`)),
+            gte(financeEntries.paidAt, inicioDoDia(query.from)),
+            lte(financeEntries.paidAt, inicioDoDia(addDaysKey(query.to, 1))),
           ),
         )
         .orderBy(desc(financeEntries.paidAt));

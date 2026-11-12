@@ -6,7 +6,7 @@ import { customers, sales, users } from "@/server/db/schema";
 import { createSale, previewSale } from "@/server/services/sales";
 import { discountLimitFor } from "@/server/auth/permissions";
 import { getSettingsCached } from "@/server/services/settings";
-import { addDaysKey } from "@/server/lib/dates";
+import { addDaysKey, inicioDoDia } from "@/server/lib/dates";
 
 const paymentSchema = z.object({
   method: z.enum(["CASH", "PIX", "DEBIT", "CREDIT", "STORE_CREDIT", "TRANSFER", "OTHER"]),
@@ -101,8 +101,8 @@ export const GET = apiHandler(
   },
   async ({ query, user }) => {
     const conds = [];
-    if (query.from) conds.push(gte(sales.createdAt, new Date(`${query.from}T00:00:00Z`)));
-    if (query.to) conds.push(lt(sales.createdAt, new Date(`${addDaysKey(query.to, 1)}T00:00:00Z`)));
+    if (query.from) conds.push(gte(sales.createdAt, inicioDoDia(query.from)));
+    if (query.to) conds.push(lt(sales.createdAt, inicioDoDia(addDaysKey(query.to, 1))));
     if (query.status && query.status !== "ALL") conds.push(eq(sales.status, query.status as never));
     if (query.search) {
       const term = `%${query.search}%`;

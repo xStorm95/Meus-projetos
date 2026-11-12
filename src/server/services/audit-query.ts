@@ -5,6 +5,7 @@
 import { and, desc, eq, gte, lt, or, sql } from "drizzle-orm";
 import { db } from "../db/client";
 import { auditLogs, users } from "../db/schema";
+import { addDaysKey, inicioDoDia } from "../lib/dates";
 
 export async function queryAudit(params: {
   search?: string;
@@ -33,8 +34,8 @@ export async function queryAudit(params: {
   if (params.action && params.action !== "ALL") conds.push(eq(auditLogs.action, params.action));
   if (params.entity && params.entity !== "ALL") conds.push(eq(auditLogs.entity, params.entity));
   if (params.userId) conds.push(eq(auditLogs.userId, params.userId));
-  if (params.from) conds.push(gte(auditLogs.createdAt, new Date(`${params.from}T00:00:00Z`)));
-  if (params.to) conds.push(lt(auditLogs.createdAt, new Date(`${params.to}T23:59:59Z`)));
+  if (params.from) conds.push(gte(auditLogs.createdAt, inicioDoDia(params.from)));
+  if (params.to) conds.push(lt(auditLogs.createdAt, inicioDoDia(addDaysKey(params.to, 1))));
   const where = conds.length ? and(...conds) : undefined;
 
   const [items, totals] = await Promise.all([

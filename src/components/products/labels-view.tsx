@@ -26,20 +26,38 @@ type Label = {
  * (Code128 simplificado) sem dependências externas — o mesmo código pode ser
  * lido por leitores de PDV quando impresso em boa qualidade.
  */
+/** Tamanho do papel configurado → chave do Segmented + texto na tela. */
+const TAMANHOS: Record<string, { size: "P" | "M" | "G"; label: string }> = {
+  "40x25": { size: "P", label: "40×25" },
+  "33x22": { size: "P", label: "33×22" },
+  "50x30": { size: "M", label: "50×30" },
+  "60x40": { size: "G", label: "60×40" },
+  "100x50": { size: "G", label: "100×50" },
+};
+
 export function LabelsView({
   product,
   labels,
   companyName,
+  preferencias,
 }: {
   product: { id: string; name: string; reference: string };
   labels: Label[];
   companyName: string;
+  /** Preferências salvas em Configurações → Pagamentos e etiquetas. */
+  preferencias?: { size: string; showPrice: boolean; showBarcode: boolean; extraText: string | null };
 }) {
   const [copies, setCopies] = React.useState<Record<string, number>>(
     Object.fromEntries(labels.map((l) => [l.variantId, 1])),
   );
-  const [mode, setMode] = React.useState<"PRICE" | "BARCODE" | "BOTH">("BOTH");
-  const [size, setSize] = React.useState<"P" | "M" | "G">("M");
+  // A tela já abre com o que a loja configurou; o operador ainda pode trocar.
+  const [mode, setMode] = React.useState<"PRICE" | "BARCODE" | "BOTH">(
+    preferencias ? (preferencias.showPrice && preferencias.showBarcode ? "BOTH" : preferencias.showBarcode ? "BARCODE" : "PRICE") : "BOTH",
+  );
+  const [size, setSize] = React.useState<"P" | "M" | "G">(
+    preferencias ? (TAMANHOS[preferencias.size]?.size ?? "M") : "M",
+  );
+  const extraText = preferencias?.extraText?.trim() || null;
 
   const total = labels.reduce((acc, l) => acc + (copies[l.variantId] ?? 0), 0);
   const preview = labels.flatMap((l) => Array.from({ length: Math.min(copies[l.variantId] ?? 0, 12) }, () => l));
@@ -76,7 +94,14 @@ export function LabelsView({
             />
           </div>
           <div>
-            <p className="label">Tamanho</p>
+            <p className="label">
+              Tamanho
+              {preferencias && (
+                <span className="ml-1 font-normal normal-case tracking-normal text-[var(--text-muted)]">
+                  (padrão da loja: {TAMANHOS[preferencias.size]?.label ?? preferencias.size})
+                </span>
+              )}
+            </p>
             <Segmented
               value={size}
               onChange={setSize}
@@ -166,6 +191,9 @@ export function LabelsView({
               <p className="w-full truncate text-center text-[0.75em] text-neutral-600">
                 {label.colorName ?? ""} {label.sizeName ? `· ${label.sizeName}` : ""}
               </p>
+              {extraText && (
+                <p className="w-full truncate text-center text-[0.65em] text-neutral-600">{extraText}</p>
+              )}
               {mode !== "PRICE" && <Barcode value={label.barcode} className="my-0.5 h-6 w-full" />}
               {mode !== "PRICE" && <p className="font-mono text-[0.75em] tracking-wider">{label.barcode}</p>}
               {mode !== "BARCODE" && <p className="text-[1.25em] font-bold">{label.price}</p>}

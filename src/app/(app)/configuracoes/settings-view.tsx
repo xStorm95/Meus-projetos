@@ -4,6 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import {
   Store, Sliders, Palette, FileCheck2, ShieldCheck, Save, Upload, Trash2, Info, Database, Pipette, Loader2,
+  QrCode, Tag, WifiOff,
 } from "lucide-react";
 import { toast } from "sonner";
 import { api, errorMessage } from "@/lib/api-client";
@@ -56,9 +57,17 @@ type Settings = {
   fiscalDefaultCfop: string;
   fiscalDefaultNcm: string | null;
   fiscalDefaultCsosn: string;
+  pixKey: string | null;
+  pixReceiverName: string | null;
+  pixCity: string | null;
+  labelSize: string;
+  labelShowPrice: boolean;
+  labelShowBarcode: boolean;
+  labelExtraText: string | null;
+  offlineSalesEnabled: boolean;
 };
 
-type Tab = "COMPANY" | "RULES" | "BRANDING" | "FISCAL" | "SECURITY";
+type Tab = "COMPANY" | "RULES" | "BRANDING" | "PAYMENTS" | "FISCAL" | "SECURITY";
 
 const ACCENTS: Array<{ value: string; label: string; swatch: string }> = [
   { value: "gold", label: "Dourado", swatch: "#c9a227" },
@@ -136,6 +145,18 @@ export function SettingsView({
   const [security, setSecurity] = React.useState({
     lgpdPrivacyContact: settings.lgpdPrivacyContact ?? "",
     lgpdRetentionMonths: settings.lgpdRetentionMonths,
+  });
+  const [pagamentos, setPagamentos] = React.useState({
+    pixKey: settings.pixKey ?? "",
+    pixReceiverName: settings.pixReceiverName ?? "",
+    pixCity: settings.pixCity ?? settings.companyCity ?? "",
+  });
+  const [etiquetas, setEtiquetas] = React.useState({
+    labelSize: settings.labelSize,
+    labelShowPrice: settings.labelShowPrice,
+    labelShowBarcode: settings.labelShowBarcode,
+    labelExtraText: settings.labelExtraText ?? "",
+    offlineSalesEnabled: settings.offlineSalesEnabled,
   });
   const [backupOpen, setBackupOpen] = React.useState(false);
 
@@ -254,6 +275,32 @@ export function SettingsView({
     }
   }
 
+  async function savePagamentos() {
+    setSaving(true);
+    try {
+      await api.patch("/api/settings", { section: "payments", payments: pagamentos });
+      toast.success("Pix salvo.");
+      router.refresh();
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveEtiquetas() {
+    setSaving(true);
+    try {
+      await api.patch("/api/settings", { section: "labels", labels: etiquetas });
+      toast.success("Preferências de etiqueta e offline salvas.");
+      router.refresh();
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function saveSecurity() {
     setSaving(true);
     try {
@@ -300,6 +347,7 @@ export function SettingsView({
           { value: "COMPANY", label: "Empresa" },
           { value: "RULES", label: "Operação" },
           { value: "BRANDING", label: "Aparência" },
+          { value: "PAYMENTS", label: "Pagamentos e etiquetas" },
           { value: "FISCAL", label: "Fiscal" },
           { value: "SECURITY", label: "LGPD e segurança" },
         ]}
@@ -463,7 +511,7 @@ export function SettingsView({
                 disabled={readOnly}
                 onChange={(e) => setBranding({ ...branding, appName: e.target.value })}
                 className="h-8 w-44"
-                placeholder="Passarela da Moda"
+                placeholder="Ateliê Aurora"
               />
             </label>
           </div>
@@ -483,7 +531,7 @@ export function SettingsView({
                 )}
               </span>
               <span className="leading-tight">
-                <span className="block text-[13px] font-semibold">{branding.appName || "Passarela da Moda"}</span>
+                <span className="block text-[13px] font-semibold">{branding.appName || "ORION"}</span>
                 <span className="block text-[10.5px] text-[var(--text-muted)]">
                   {settings.companyName} · menu e cupons
                 </span>
@@ -673,6 +721,144 @@ export function SettingsView({
         </Card>
       )}
 
+      {tab === "PAYMENTS" && (
+        <div className="space-y-3">
+          <Card className="space-y-3 p-4">
+            <div className="flex items-center gap-2">
+              <QrCode className="h-4 w-4 text-[var(--accent-strong)]" />
+              <div>
+                <h2 className="text-sm font-semibold">Pix</h2>
+                <p className="text-[11px] text-[var(--text-muted)]">
+                  O PDV gera o QR e o copia e cola com o valor da venda. A confirmação do
+                  recebimento continua sendo feita no app do banco.
+                </p>
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field
+                label="Chave Pix"
+                hint="CPF/CNPJ (só números), e-mail, telefone +5533... ou chave aleatória"
+              >
+                <Input
+                  value={pagamentos.pixKey}
+                  disabled={readOnly}
+                  placeholder="ex.: contato@sualoja.com.br"
+                  onChange={(e) => setPagamentos({ ...pagamentos, pixKey: e.target.value })}
+                />
+              </Field>
+              <Field label="Nome do recebedor" hint="Aparece no app do banco (até 25 letras, sem acento)">
+                <Input
+                  value={pagamentos.pixReceiverName}
+                  disabled={readOnly}
+                  placeholder={settings.companyName}
+                  onChange={(e) => setPagamentos({ ...pagamentos, pixReceiverName: e.target.value })}
+                />
+              </Field>
+              <Field label="Cidade do recebedor" hint="O banco exige a cidade no código Pix">
+                <Input
+                  value={pagamentos.pixCity}
+                  disabled={readOnly}
+                  placeholder={settings.companyCity ?? "Ipatinga"}
+                  onChange={(e) => setPagamentos({ ...pagamentos, pixCity: e.target.value })}
+                />
+              </Field>
+              <div className="rounded-xl border border-[var(--border-default)] bg-[var(--bg-muted)]/40 px-3 py-2.5">
+                <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Como funciona</p>
+                <ul className="mt-1 space-y-0.5 text-[10.5px] text-[var(--text-secondary)]">
+                  <li>· O valor já vai embutido no QR (o cliente não digita).</li>
+                  <li>· O código identifica a venda no extrato (VENDA + número).</li>
+                  <li>· Sem chave, o caixa não mostra QR — mostra o aviso.</li>
+                </ul>
+              </div>
+            </div>
+            {permissions.canManage && (
+              <div className="flex justify-end">
+                <Button size="sm" loading={saving} leftIcon={<Save className="h-4 w-4" />} onClick={() => void savePagamentos()}>
+                  Salvar Pix
+                </Button>
+              </div>
+            )}
+          </Card>
+
+          <Card className="space-y-3 p-4">
+            <div className="flex items-center gap-2">
+              <Tag className="h-4 w-4 text-[var(--accent-strong)]" />
+              <div>
+                <h2 className="text-sm font-semibold">Etiquetas de produto</h2>
+                <p className="text-[11px] text-[var(--text-muted)]">
+                  Usadas na impressão de etiquetas em lote (Produtos → Etiquetas).
+                </p>
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Tamanho do papel">
+                <Select
+                  value={etiquetas.labelSize}
+                  disabled={readOnly}
+                  onChange={(e) => setEtiquetas({ ...etiquetas, labelSize: e.target.value })}
+                >
+                  <option value="60x40">60 × 40 mm (padrão)</option>
+                  <option value="50x30">50 × 30 mm</option>
+                  <option value="100x50">100 × 50 mm</option>
+                  <option value="40x25">40 × 25 mm</option>
+                </Select>
+              </Field>
+              <Field label="Texto extra (opcional)" hint="Ex.: “Troca em até 30 dias com a etiqueta”">
+                <Input
+                  value={etiquetas.labelExtraText}
+                  disabled={readOnly}
+                  maxLength={80}
+                  onChange={(e) => setEtiquetas({ ...etiquetas, labelExtraText: e.target.value })}
+                />
+              </Field>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Switch
+                checked={etiquetas.labelShowPrice}
+                disabled={readOnly}
+                onChange={(v) => setEtiquetas({ ...etiquetas, labelShowPrice: v })}
+                label="Imprimir preço"
+                description="Mostra o preço de venda na etiqueta."
+              />
+              <Switch
+                checked={etiquetas.labelShowBarcode}
+                disabled={readOnly}
+                onChange={(v) => setEtiquetas({ ...etiquetas, labelShowBarcode: v })}
+                label="Imprimir código de barras"
+                description="Usa o SKU da variação como código."
+              />
+            </div>
+            <div className="rounded-xl border border-[var(--border-default)] bg-[var(--bg-muted)]/40 p-3">
+              <div className="flex items-center gap-1.5">
+                <WifiOff className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+                <p className="text-[11px] font-semibold">Vendas sem internet</p>
+              </div>
+              <p className="mt-1 text-[10.5px] text-[var(--text-muted)]">
+                Com o modo offline ligado, o PDV guarda a venda no aparelho quando a conexão cai e
+                envia sozinho quando volta. O estoque é conferido na hora do envio — por isso a venda
+                pode ser recusada se outra pessoa vendeu a última peça nesse meio-tempo.
+              </p>
+              <div className="mt-2">
+                <Switch
+                  checked={etiquetas.offlineSalesEnabled}
+                  disabled={readOnly}
+                  onChange={(v) => setEtiquetas({ ...etiquetas, offlineSalesEnabled: v })}
+                  label="Permitir venda offline no PDV"
+                  description="Desligue se várias pessoas vendem as mesmas peças ao mesmo tempo."
+                />
+              </div>
+            </div>
+            {permissions.canManage && (
+              <div className="flex justify-end">
+                <Button size="sm" loading={saving} leftIcon={<Save className="h-4 w-4" />} onClick={() => void saveEtiquetas()}>
+                  Salvar etiquetas
+                </Button>
+              </div>
+            )}
+          </Card>
+        </div>
+      )}
+
       {tab === "FISCAL" && (
         <div className="space-y-3">
           <Card className="space-y-3 p-4">
@@ -686,7 +872,7 @@ export function SettingsView({
               </Badge>
             </div>
             <div className="rounded-xl border border-[var(--warning)]/30 bg-[var(--warning-soft)] p-3 text-[11px] text-[var(--text-secondary)]">
-              <strong className="text-[var(--warning)]">Importante:</strong> o PASSARELA ERP não emite documentos fiscais
+              <strong className="text-[var(--warning)]">Importante:</strong> o ORION não emite documentos fiscais
               por conta própria. Estes campos preparam a integração com um provedor (Focus NFe, eNotas, Tecnospeed
               etc.). Enquanto não houver provedor configurado e certificado válido, nenhum documento é transmitido à
               SEFAZ — o sistema nunca simula autorização.
@@ -810,7 +996,7 @@ export function SettingsView({
         <div className="space-y-3 text-[12px] text-[var(--text-secondary)]">
           <p className="font-semibold text-[var(--text-primary)]">Gerar backup agora</p>
           <pre className="overflow-x-auto rounded-lg bg-[var(--bg-muted)] p-2.5 text-[10.5px]">npm run backup</pre>
-          <p>O arquivo é salvo em <code>backups/passarela-AAAA-MM-DDTHH-mm.sql.gz</code>, com verificação de integridade.</p>
+          <p>O arquivo é salvo em <code>backups/orion-AAAA-MM-DDTHH-mm.sql.gz</code>, com verificação de integridade.</p>
           <p className="font-semibold text-[var(--text-primary)]">Restaurar</p>
           <pre className="overflow-x-auto rounded-lg bg-[var(--bg-muted)] p-2.5 text-[10.5px]">npm run restore -- backups/arquivo.sql.gz</pre>
           <p>

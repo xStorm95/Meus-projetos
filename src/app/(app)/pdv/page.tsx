@@ -53,6 +53,7 @@ export default async function PdvPage({
       settings={{
         requireDiscountReason: settings.requireDiscountReason,
         creditInterestRate: settings.creditInterestRate,
+        offlineEnabled: settings.offlineSalesEnabled,
       }}
       openSales={openSalesRows.map((s) => ({
         id: s.id,

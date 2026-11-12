@@ -40,6 +40,22 @@ const rulesSchema = z.object({
   whatsappEnabled: z.boolean().optional(),
 });
 
+const paymentsSchema = z.object({
+  /** Chave Pix: CPF/CNPJ (só dígitos), e-mail, telefone +55... ou aleatória. */
+  pixKey: z.string().trim().max(77, "Chave Pix muito longa.").nullable().optional(),
+  /** Nome que aparece no app do banco (máx. 25, normalizado no BR Code). */
+  pixReceiverName: z.string().trim().max(60).nullable().optional(),
+  pixCity: z.string().trim().max(60).nullable().optional(),
+});
+
+const labelsSchema = z.object({
+  labelSize: z.enum(["60x40", "50x30", "100x50", "40x25"]).optional(),
+  labelShowPrice: z.boolean().optional(),
+  labelShowBarcode: z.boolean().optional(),
+  labelExtraText: z.string().trim().max(80).nullable().optional(),
+  offlineSalesEnabled: z.boolean().optional(),
+});
+
 const fiscalSchema = z.object({
   fiscalProvider: z.string().max(60).nullable().optional(),
   fiscalEnvironment: z.enum(["HOMOLOGATION", "PRODUCTION"]).optional(),
@@ -56,10 +72,12 @@ const fiscalSchema = z.object({
 });
 
 const bodySchema = z.object({
-  section: z.enum(["company", "rules", "fiscal"]),
+  section: z.enum(["company", "rules", "fiscal", "payments", "labels"]),
   company: companySchema.optional(),
   rules: rulesSchema.optional(),
   fiscal: fiscalSchema.optional(),
+  payments: paymentsSchema.optional(),
+  labels: labelsSchema.optional(),
 });
 
 export const GET = apiHandler({ permission: "settings.view" }, async () => {
@@ -85,6 +103,26 @@ export const PATCH = apiHandler({ permission: "settings.manage", body: bodySchem
         typeof value === "number" && ["defaultMaxDiscount", "sellerMaxDiscount", "creditDefaultLimit", "creditInterestRate", "creditPenaltyRate", "creditDailyInterest"].includes(key)
           ? String(value)
           : value;
+    }
+  }
+  if (body.section === "payments" && body.payments) {
+    for (const [key, value] of Object.entries(body.payments)) {
+      if (value === undefined) continue;
+      // Chave Pix de CPF/CNPJ e telefone ficam só com dígitos/+; e-mail e
+      // chave aleatória são preservados como texto.
+      if (key === "pixKey" && typeof value === "string") {
+        const limpa = value.trim();
+        const soDigitos = /^[\d.\-/\s]+$/.test(limpa) ? limpa.replace(/\D/g, "") : limpa;
+        patch[key] = soDigitos || null;
+        continue;
+      }
+      patch[key] = typeof value === "string" ? value || null : value;
+    }
+  }
+  if (body.section === "labels" && body.labels) {
+    for (const [key, value] of Object.entries(body.labels)) {
+      if (value === undefined) continue;
+      patch[key] = typeof value === "string" ? value || null : value;
     }
   }
   if (body.section === "fiscal" && body.fiscal) {

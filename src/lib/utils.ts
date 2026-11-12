@@ -5,20 +5,42 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/** Converte string/DB value em número seguro (string vazia virava 0 silencioso). */
+export function toNumber(value: string | number | null | undefined): number {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  if (typeof value !== "string" || value.trim() === "") return 0;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+/*
+ * Formatadores instanciados uma única vez: `new Intl.NumberFormat` é caro e o
+ * dashboard formata centenas de valores por render. O locale é fixo em pt-BR
+ * para não depender do idioma do navegador (no servidor não existe navigator).
+ */
+const BRL_FMT = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+const NUM_FMT = new Map<number, Intl.NumberFormat>();
+
+function numFmt(decimals: number): Intl.NumberFormat {
+  let fmt = NUM_FMT.get(decimals);
+  if (!fmt) {
+    fmt = new Intl.NumberFormat("pt-BR", {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    });
+    NUM_FMT.set(decimals, fmt);
+  }
+  return fmt;
+}
+
 /** Formata valor em R$ (client-safe, sem importar decimal.js). */
 export function brl(value: string | number | null | undefined): string {
-  const n = typeof value === "string" ? Number(value) : (value ?? 0);
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(
-    Number.isFinite(n) ? n : 0,
-  );
+  // Números vindos do Postgres como string ("600.00") precisam de Number().
+  return BRL_FMT.format(toNumber(value));
 }
 
 export function num(value: string | number | null | undefined, decimals = 0): string {
-  const n = typeof value === "string" ? Number(value) : (value ?? 0);
-  return new Intl.NumberFormat("pt-BR", {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  }).format(Number.isFinite(n) ? n : 0);
+  return numFmt(decimals).format(toNumber(value));
 }
 
 export function pct(value: number | null | undefined, decimals = 1): string {
@@ -61,10 +83,19 @@ export function timeBR(value: string | Date | null | undefined): string {
   }).format(date);
 }
 
-/** Data de hoje no formato YYYY-MM-DD. */
-export function todayISO(): string {
-  const now = new Date();
-  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}-${String(now.getUTCDate()).padStart(2, "0")}`;
+/**
+ * Data de hoje (YYYY-MM-DD) no fuso da loja, não em UTC.
+ * Em UTC, das 21h à meia-noite o "hoje" do usuário já era o dia seguinte —
+ * o que fazia o filtro "Hoje" e o `max` do calendário apontarem para o dia errado.
+ */
+export function todayISO(now: Date = new Date()): string {
+  // en-CA com timeZone fixo devolve exatamente YYYY-MM-DD.
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
 }
 
 export function initials(name: string): string {

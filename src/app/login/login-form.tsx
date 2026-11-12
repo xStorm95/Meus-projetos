@@ -7,6 +7,8 @@ import { api, errorMessage } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Input, Field } from "@/components/ui/form";
 import { Alert } from "@/components/ui/primitives";
+import { OrionMark, OrionWordmark } from "@/components/brand/orion-mark";
+import { BRAND } from "@/config/brand";
 
 export function LoginForm() {
   const router = useRouter();
@@ -52,7 +54,7 @@ export function LoginForm() {
         password,
         accentHex: signup.accentHex,
       });
-      router.replace("/");
+      router.replace("/dashboard");
       router.refresh();
     } catch (err) {
       setError(errorMessage(err));
@@ -84,29 +86,28 @@ export function LoginForm() {
           className="pointer-events-none absolute inset-0 opacity-40"
           style={{
             background:
-              "radial-gradient(circle at 20% 20%, rgba(201,162,39,0.35), transparent 45%), radial-gradient(circle at 80% 70%, rgba(216,160,166,0.30), transparent 50%)",
+              "radial-gradient(circle at 18% 18%, rgba(125,179,255,0.30), transparent 45%), radial-gradient(circle at 82% 72%, rgba(125,179,255,0.14), transparent 52%)",
           }}
         />
         <div className="relative">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-[var(--gold-500)]/40 bg-[var(--gold-500)]/10">
-              <span className="font-[family-name:var(--font-display)] text-xl font-semibold text-[var(--gold-300)]">
-                P
-              </span>
-            </div>
+            <OrionMark size={40} color="#7DB3FF" withGlow />
             <div>
-              <p className="font-[family-name:var(--font-display)] text-2xl font-semibold tracking-wide text-white">
-                PASSARELA
+              <p
+                className="font-[family-name:var(--font-display)] text-2xl font-semibold uppercase text-white"
+                style={{ letterSpacing: "0.3em" }}
+              >
+                {BRAND.name}
               </p>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--gold-400)]">
-                ERP para moda
+              <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[#7DB3FF]">
+                {BRAND.tagline}
               </p>
             </div>
           </div>
         </div>
 
         <div className="relative max-w-md">
-          <h1 className="font-[family-name:var(--font-display)] text-4xl font-medium leading-tight text-white">
+          <h1 className="font-[family-name:var(--font-display)] text-4xl font-semibold leading-tight text-white">
             Gestão completa da sua loja, do caixa ao guarda-roupa.
           </h1>
           <p className="mt-4 text-sm leading-relaxed text-[var(--ink-300)]">
@@ -121,7 +122,7 @@ export function LoginForm() {
               "Dashboard com faturamento, lucro e recompra",
             ].map((item) => (
               <li key={item} className="flex items-start gap-2.5">
-                <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--gold-400)]" />
+                <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[#7DB3FF]" />
                 {item}
               </li>
             ))}
@@ -129,25 +130,15 @@ export function LoginForm() {
         </div>
 
         <p className="relative text-[11px] text-[var(--ink-500)]">
-          © {new Date().getFullYear()} PASSARELA ERP · Dados protegidos conforme a LGPD
+          © {new Date().getFullYear()} {BRAND.fullName} · {BRAND.legal}
         </p>
       </div>
 
       {/* Formulário */}
       <div className="flex flex-1 items-center justify-center px-5 py-10 sm:px-10">
         <div className="w-full max-w-sm">
-          <div className="mb-8 flex items-center gap-3 lg:hidden">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--accent)]">
-              <span className="font-[family-name:var(--font-display)] text-lg font-semibold text-[var(--accent-contrast)]">
-                P
-              </span>
-            </div>
-            <div>
-              <p className="font-[family-name:var(--font-display)] text-xl font-semibold">PASSARELA</p>
-              <p className="text-[9px] font-semibold uppercase tracking-[0.28em] text-[var(--accent)]">
-                ERP para moda
-              </p>
-            </div>
+          <div className="mb-8 lg:hidden">
+            <OrionWordmark size="md" />
           </div>
 
           <h2 className="text-xl font-semibold tracking-tight text-[var(--text-primary)]">
@@ -181,7 +172,7 @@ export function LoginForm() {
                   autoFocus
                   required
                   leftIcon={<Store className="h-4 w-4" />}
-                  placeholder="Passarela da Moda"
+                  placeholder="Ateliê Aurora"
                   value={signup.storeName}
                   onChange={(e) => setSignup({ ...signup, storeName: e.target.value })}
                 />

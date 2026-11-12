@@ -8,11 +8,13 @@ import {
   FileText, RotateCcw, Wallet, Landmark, CreditCard, BarChart3, FileCheck2, ShieldCheck,
   Settings, ScrollText, ChevronLeft, ChevronRight, Search, Bell, Sun, Moon, LogOut, Menu,
   X, UserCircle2, Keyboard, CheckCheck, AlertTriangle, CircleAlert, Info, CircleCheck, Sparkles,
+  Target,
 } from "lucide-react";
 import { cn, initials, dateTimeBR } from "@/lib/utils";
 import { NAVIGATION, type NavItem } from "@/lib/navigation";
 import type { SessionUser } from "@/server/auth/session";
 import { useTheme } from "./theme-provider";
+import { OrionMark } from "@/components/brand/orion-mark";
 import { api } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Modal, Badge } from "@/components/ui/primitives";
@@ -35,6 +37,7 @@ const ICONS: Record<NavItem["icon"], React.ComponentType<{ className?: string }>
   finance: Landmark,
   credit: CreditCard,
   reports: BarChart3,
+  insights: Target,
   fiscal: FileCheck2,
   users: ShieldCheck,
   settings: Settings,
@@ -68,7 +71,7 @@ export function AppShell({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { theme, toggleTheme } = useTheme();
+  const { resolved, toggleTheme } = useTheme();
   const [collapsed, setCollapsed] = React.useState(false);
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [searchOpen, setSearchOpen] = React.useState(false);
@@ -364,9 +367,9 @@ export function AppShell({
               onClick={toggleTheme}
               className="rounded-lg p-2 text-[var(--text-secondary)] hover:bg-[var(--bg-muted)]"
               aria-label="Alternar tema"
-              title={theme === "dark" ? "Tema claro" : "Tema escuro"}
+              title={resolved === "dark" ? "Tema claro" : "Tema escuro"}
             >
-              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              {resolved === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </button>
 
             <div className="relative">
@@ -496,10 +499,10 @@ function SidebarContent({
           // eslint-disable-next-line @next/next/no-img-element
           <img src={logoUrl} alt={companyName} className="h-8 w-8 rounded-lg object-cover" />
         ) : (
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--accent)]">
-            <span className="font-[family-name:var(--font-display)] text-sm font-bold text-[var(--accent-contrast)]">
-              {appName.charAt(0)}
-            </span>
+          // Sem logo própria da loja: usa o símbolo da marca (três estrelas),
+          // que já é a identidade padrão de todo cadastro novo.
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-soft)]">
+            <OrionMark size={20} color="var(--accent)" />
           </div>
         )}
         {!collapsed && (

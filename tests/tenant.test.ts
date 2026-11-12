@@ -239,6 +239,25 @@ describe("guardião: alias não pode ser capturado fora do FROM/JOIN", () => {
     expect(ondeSubconsultaFecha).toBeGreaterThan(0);
   });
 
+  /**
+   * Regressão: filtro de loja não pode cair DEPOIS do GROUP BY.
+   *
+   * A subconsulta de novos/recorrentes do dashboard tem `GROUP BY c.id`; a
+   * condição era colada no fim do parêntese e o Postgres respondia
+   * "argument of AND must be type boolean, not type uuid" (500 no dashboard).
+   */
+  it("não injeta filtro depois do GROUP BY", () => {
+    const sql = guardado(
+      `SELECT COUNT(*)::int FROM (SELECT c.id, COUNT(s.id)::int AS compras ` +
+        `FROM customers c LEFT JOIN sales s ON s.customer_id = c.id ` +
+        `WHERE c.deleted_at IS NULL GROUP BY c.id) t`,
+    );
+    expect(sql).toMatch(/deleted_at is null and c\."company_id"/i);
+    expect(sql).toMatch(/GROUP BY c\.id/i);
+    // Nada de "GROUP BY ... and" — a condição vem antes do GROUP BY
+    expect(sql).not.toMatch(/group by[^)]*and [a-z0-9_."]+company_id/i);
+  });
+
   it("subconsulta correlacionada mantém o próprio alias", () => {
     const sql = guardado(
       `select (select count(*) from sale_items si where si.sale_id = "sales"."id") from "sales"`,

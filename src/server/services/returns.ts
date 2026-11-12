@@ -23,6 +23,7 @@ import { d, money } from "../lib/money";
 import { nextSequence, formatCode } from "../lib/sequences";
 import { getDefaultWarehouse, moveStock } from "./stock";
 import { writeAudit } from "../lib/audit";
+import { addDaysKey, inicioDoDia } from "../lib/dates";
 
 export type CreateReturnInput = {
   saleId: string;
@@ -453,8 +454,8 @@ export async function listReturns(params: {
   const pageSize = Math.min(100, params.pageSize ?? 25);
   const conds = [sql`1 = 1`];
   if (params.type && params.type !== "ALL") conds.push(sql`r.type = ${params.type}`);
-  if (params.from) conds.push(sql`r.created_at >= ${`${params.from}T00:00:00Z`}::timestamptz`);
-  if (params.to) conds.push(sql`r.created_at <= ${`${params.to}T23:59:59Z`}::timestamptz`);
+  if (params.from) conds.push(sql`r.created_at >= ${inicioDoDia(params.from).toISOString()}::timestamptz`);
+  if (params.to) conds.push(sql`r.created_at <= ${inicioDoDia(addDaysKey(params.to, 1)).toISOString()}::timestamptz`);
   if (params.search) {
     const term = `%${params.search.toLowerCase()}%`;
     conds.push(sql`(lower(r.code) LIKE ${term} OR lower(c.name) LIKE ${term} OR CAST(s.number AS TEXT) LIKE ${term})`);

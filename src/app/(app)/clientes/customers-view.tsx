@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Plus, Users, Phone, MessageCircle, AlertTriangle, Crown, UserX, Cake, UserCheck,
-  Download, Star, Ban, TrendingUp,
+  Download, Star, Ban, TrendingUp, FileUp, FileSpreadsheet,
 } from "lucide-react";
 import { toast } from "sonner";
 import { api, errorMessage, downloadFile } from "@/lib/api-client";
@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Card, Badge, EmptyState } from "@/components/ui/primitives";
 import { Field, SearchInput, Select } from "@/components/ui/form";
 import { DataTable, type Column } from "@/components/ui/data-table";
+import { ImportCustomersDialog } from "@/components/customers/import-customers-dialog";
 
 type CustomerRow = {
   id: string;
@@ -61,6 +62,7 @@ export function CustomersView({
   const router = useRouter();
   const params = useSearchParams();
   const [search, setSearch] = React.useState(filters.search);
+  const [importOpen, setImportOpen] = React.useState(false);
 
   function applyFilters(patch: Record<string, string | number | undefined>) {
     const next = new URLSearchParams(params.toString());
@@ -80,14 +82,14 @@ export function CustomersView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
 
-  async function exportCsv() {
+  async function exportar(formato: "csv" | "xlsx") {
     try {
       await downloadFile("/api/customers/export", {
-        format: "csv",
+        format: formato,
         search: filters.search,
         classification: filters.classification,
       });
-      toast.success("Arquivo gerado.");
+      toast.success(formato === "xlsx" ? "Planilha Excel gerada." : "Arquivo CSV gerado.");
     } catch (err) {
       toast.error(errorMessage(err));
     }
@@ -204,6 +206,7 @@ export function CustomersView({
 
   return (
     <div className="mx-auto max-w-[1500px] space-y-4">
+      <ImportCustomersDialog open={importOpen} onClose={() => setImportOpen(false)} />
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-[family-name:var(--font-display)] text-2xl font-semibold tracking-tight">
@@ -215,8 +218,35 @@ export function CustomersView({
         </div>
         <div className="flex gap-2">
           {canExport && (
-            <Button variant="outline" size="sm" leftIcon={<Download className="h-3.5 w-3.5" />} onClick={() => void exportCsv()}>
-              Exportar
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                leftIcon={<Download className="h-3.5 w-3.5" />}
+                onClick={() => void exportar("csv")}
+                title="Baixar CSV (abre no Excel e em qualquer planilha)"
+              >
+                CSV
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                leftIcon={<FileSpreadsheet className="h-3.5 w-3.5" />}
+                onClick={() => void exportar("xlsx")}
+                title="Baixar planilha Excel com números somáveis"
+              >
+                Excel
+              </Button>
+            </>
+          )}
+          {canCreate && (
+            <Button
+              variant="outline"
+              size="sm"
+              leftIcon={<FileUp className="h-3.5 w-3.5" />}
+              onClick={() => setImportOpen(true)}
+            >
+              Importar
             </Button>
           )}
           <Link href="/clientes/relatorios">

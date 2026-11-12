@@ -1,11 +1,11 @@
 import { z } from "zod";
 import { sql } from "drizzle-orm";
 import { apiHandler } from "@/server/lib/api";
-import { csvResponse, csvNumber, jsonResponse } from "@/server/lib/export";
+import { csvResponse, csvNumber, jsonResponse, xlsxResponse } from "@/server/lib/export";
 import { db } from "@/server/db/client";
 
 const querySchema = z.object({
-  format: z.enum(["csv", "json"]).default("csv"),
+  format: z.enum(["csv", "json", "xlsx"]).default("csv"),
   search: z.string().optional(),
   categoryId: z.string().uuid().optional(),
   status: z.string().optional(),
@@ -42,32 +42,46 @@ export const GET = apiHandler(
     const list = rows.rows as Array<Record<string, string | number>>;
     const stamp = new Date().toISOString().slice(0, 10);
 
+    const headers = [
+      "nome", "referencia", "categoria", "marca", "fornecedor", "colecao", "material", "composicao", "ncm",
+      "cor", "tamanho", "codigo_barras", "custo", "preco", "estoque", "sku", "situacao",
+    ];
+    // Números viram número no Excel: custo, preço e estoque dão para somar.
+    const linhas = list.map((r) => [
+      String(r.name),
+      String(r.reference),
+      String(r.category ?? ""),
+      String(r.brand ?? ""),
+      String(r.supplier ?? ""),
+      String(r.collection ?? ""),
+      String(r.material ?? ""),
+      String(r.composition ?? ""),
+      String(r.ncm ?? ""),
+      String(r.color_name ?? ""),
+      String(r.size_name ?? ""),
+      String(r.variant_barcode ?? r.barcode ?? ""),
+      Number(r.variant_cost ?? r.cost_price ?? 0),
+      Number(r.variant_price ?? r.sale_price ?? 0),
+      Number(r.stock_qty ?? 0),
+      String(r.sku ?? ""),
+      String(r.status),
+    ]);
+
     if (query.format === "json") return jsonResponse(`produtos_${stamp}.json`, list);
+    if (query.format === "xlsx")
+      return xlsxResponse(`produtos_${stamp}.xlsx`, headers, linhas, { sheetName: "Produtos" });
 
     return csvResponse(
       `produtos_${stamp}.csv`,
-      [
-        "nome", "referencia", "categoria", "marca", "fornecedor", "colecao", "material", "composicao", "ncm",
-        "cor", "tamanho", "codigo_barras", "custo", "preco", "estoque", "sku", "situacao",
-      ],
-      list.map((r) => [
-        String(r.name),
-        String(r.reference),
-        String(r.category ?? ""),
-        String(r.brand ?? ""),
-        String(r.supplier ?? ""),
-        String(r.collection ?? ""),
-        String(r.material ?? ""),
-        String(r.composition ?? ""),
-        String(r.ncm ?? ""),
-        String(r.color_name ?? ""),
-        String(r.size_name ?? ""),
-        String(r.variant_barcode ?? r.barcode ?? ""),
-        csvNumber(String(r.variant_cost ?? r.cost_price ?? 0)),
-        csvNumber(String(r.variant_price ?? r.sale_price ?? 0)),
-        csvNumber(String(r.stock_qty ?? 0)),
-        String(r.sku ?? ""),
-        String(r.status),
+      headers,
+      // CSV mantém o padrão pt-BR (vírgula decimal) para abrir certo no Excel local.
+      linhas.map((l, i) => [
+        ...l.slice(0, 12),
+        csvNumber(String(list[i].variant_cost ?? list[i].cost_price ?? 0)),
+        csvNumber(String(list[i].variant_price ?? list[i].sale_price ?? 0)),
+        csvNumber(String(list[i].stock_qty ?? 0)),
+        l[15],
+        l[16],
       ]),
     );
   },

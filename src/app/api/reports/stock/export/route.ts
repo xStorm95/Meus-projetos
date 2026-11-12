@@ -3,6 +3,7 @@ import { sql } from "drizzle-orm";
 import { apiHandler } from "@/server/lib/api";
 import { csvResponse, csvDateTime, csvNumber, jsonResponse } from "@/server/lib/export";
 import { db } from "@/server/db/client";
+import { addDaysKey, inicioDoDia } from "@/server/lib/dates";
 
 const querySchema = z.object({
   format: z.enum(["csv", "json"]).default("csv"),
@@ -20,8 +21,8 @@ export const GET = apiHandler(
 
     if (query.kind === "movements") {
       const conds = [sql`1 = 1`];
-      if (query.from) conds.push(sql`sm.created_at >= ${`${query.from}T00:00:00Z`}::timestamptz`);
-      if (query.to) conds.push(sql`sm.created_at <= ${`${query.to}T23:59:59Z`}::timestamptz`);
+      if (query.from) conds.push(sql`sm.created_at >= ${inicioDoDia(query.from).toISOString()}::timestamptz`);
+      if (query.to) conds.push(sql`sm.created_at <= ${inicioDoDia(addDaysKey(query.to, 1)).toISOString()}::timestamptz`);
       const rows = await db.execute(sql`
         SELECT sm.created_at, sm.type, p.name AS product_name, pv.sku, pv.color_name, pv.size_name,
                sm.quantity::text, sm.balance_after::text, sm.unit_cost::text, sm.reason,

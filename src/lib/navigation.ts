@@ -18,6 +18,7 @@ export type NavItem = {
     | "finance"
     | "credit"
     | "reports"
+    | "insights"
     | "fiscal"
     | "users"
     | "settings"
@@ -36,7 +37,7 @@ export const NAVIGATION: NavGroup[] = [
   {
     title: "Operação",
     items: [
-      { label: "Dashboard", href: "/", icon: "dashboard", permission: "sales.view", shortcut: "D" },
+      { label: "Dashboard", href: "/dashboard", icon: "dashboard", permission: "sales.view", shortcut: "D" },
       { label: "Nova Venda (PDV)", href: "/pdv", icon: "pos", permission: "sales.create", shortcut: "F2" },
       { label: "Vendas", href: "/vendas", icon: "sales", permission: "sales.view" },
       { label: "Orçamentos", href: "/orcamentos", icon: "quotes", permission: "quotes.view" },
@@ -67,6 +68,7 @@ export const NAVIGATION: NavGroup[] = [
   {
     title: "Análise",
     items: [
+      { label: "Painéis", href: "/paineis", icon: "insights", permission: "reports.view" },
       { label: "Relatórios", href: "/relatorios", icon: "reports", permission: "reports.view" },
       { label: "Fiscal", href: "/fiscal", icon: "fiscal", permission: "fiscal.view" },
     ],

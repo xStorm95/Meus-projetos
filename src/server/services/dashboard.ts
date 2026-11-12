@@ -5,18 +5,24 @@
 import { and, eq, gte, lt, sql, type SQL } from "drizzle-orm";
 import { db } from "../db/client";
 import { customers, productVariants, products, sales } from "../db/schema";
-import { addDaysKey, daysBetween, previousPeriod, todayKey } from "../lib/dates";
+import { addDaysKey, daysBetween, inicioDoDia, previousPeriod, rangeToTimestamps, todayKey } from "../lib/dates";
 import { d, money, pct } from "../lib/money";
 import { cashBalanceToday } from "./cash";
 import { overdueSummary } from "./finance";
 
 export type DashboardResult = Awaited<ReturnType<typeof getDashboard>>;
 
+/**
+ * Janela única de todo indicador do dashboard.
+ *
+ * ANTES existiam duas: `periodTs` (aqui) e outra montada dentro de
+ * `getDashboard` com `todayKey().slice(0,7)`. Como `todayKey()` usava UTC, o
+ * card do período e o card do mês podiam apontar para meses diferentes — o
+ * caso do "R$ 600,00 / 1 venda" ao lado de "R$ 0,00 / 0 vendas".
+ * Agora as duas usam `rangeToTimestamps` (fuso America/Sao_Paulo).
+ */
 function periodTs(from: string, to: string) {
-  return {
-    gte: new Date(`${from}T00:00:00Z`),
-    lt: new Date(`${addDaysKey(to, 1)}T00:00:00Z`),
-  };
+  return rangeToTimestamps(from, to);
 }
 
 export async function salesSummary(from: string, to: string) {
@@ -66,6 +72,7 @@ export async function getDashboard(params: { from: string; to: string }) {
     payableTotals,
     customerStats,
     paymentMix,
+    custoAusente,
     cashBalance,
     overdue,
     topCustomers,
@@ -74,15 +81,19 @@ export async function getDashboard(params: { from: string; to: string }) {
     salesSummary(from, to),
     salesSummary(prev.from, prev.to),
     salesSummary(today, today),
+    // "Faturamento do mês": primeiro dia do mês corrente até hoje — mesmas
+    // datas e mesmo critério (só COMPLETED) do card do período.
     salesSummary(`${today.slice(0, 7)}-01`, today),
 
+    // O dia do gráfico é o dia da LOJA: `AT TIME ZONE` antes do date_trunc,
+    // senão a venda das 22h cai no dia seguinte (UTC).
     db.execute(sql`
       SELECT to_char(day, 'DD/MM') AS label,
              to_char(day, 'YYYY-MM-DD') AS day,
              COALESCE(SUM(total), 0)::text AS receita,
              COUNT(*)::int AS vendas
         FROM (
-          SELECT date_trunc('day', completed_at) AS day, total
+          SELECT date_trunc('day', completed_at AT TIME ZONE 'America/Sao_Paulo') AS day, total
             FROM sales
            WHERE status = 'COMPLETED'
              AND completed_at >= ${ts.gte} AND completed_at < ${ts.lt}
@@ -180,6 +191,31 @@ export async function getDashboard(params: { from: string; to: string }) {
        GROUP BY method ORDER BY SUM(amount) DESC
     `),
 
+    /*
+     * Itens vendidos no período SEM custo cadastrado.
+     *
+     * `sale_items.unit_cost` é NOT NULL com default 0: produto sem custo entra
+     * como custo zero, o lucro vira "venda cheia" e a margem mentirosa. Em vez
+     * de mostrar 0,00 como se fosse lucro real, o dashboard avisa quantos itens
+     * estão nessa situação e aponta para a correção.
+     */
+    db.execute(sql`
+      SELECT COUNT(*) FILTER (WHERE si.unit_cost IS NULL OR si.unit_cost = 0)::int AS itens,
+             COUNT(*)::int AS itens_total,
+             COUNT(DISTINCT si.product_id)
+               FILTER (WHERE si.unit_cost IS NULL OR si.unit_cost = 0)::int AS produtos,
+             COALESCE(SUM(
+               CASE WHEN si.unit_cost IS NULL OR si.unit_cost = 0
+                    THEN si.quantity * si.unit_price - si.discount_amount
+                    ELSE 0 END
+             ), 0)::text AS receita
+        FROM sale_items si
+        JOIN sales s ON s.id = si.sale_id
+       WHERE s.status = 'COMPLETED'
+         AND s.completed_at >= ${ts.gte} AND s.completed_at < ${ts.lt}
+         AND si.quantity > 0
+    `),
+
     cashBalanceToday(),
     overdueSummary(),
 
@@ -209,10 +245,17 @@ export async function getDashboard(params: { from: string; to: string }) {
     `),
   ]);
 
-  const variation = (curr: string, prevValue: string) => {
+  /**
+   * Variação percentual em relação ao período anterior.
+   *
+   * Devolve `null` quando não há base de comparação (período anterior zero).
+   * Antes retornava 100, e a tela pintava "↗ 100,0%" em verde como se fosse
+   * crescimento — número inventado. Com `null` a tela mostra "Novo" ou "—".
+   */
+  const variation = (curr: string, prevValue: string): number | null => {
     const c = d(curr);
     const p = d(prevValue);
-    if (p.isZero()) return c.isZero() ? 0 : 100;
+    if (p.isZero()) return null;
     return Number(c.minus(p).dividedBy(p).times(100).toFixed(2));
   };
 
@@ -244,6 +287,19 @@ export async function getDashboard(params: { from: string; to: string }) {
     },
     expenses: expenseTotal,
     estimatedResult: money(profitCurrent),
+    /*
+     * Custo ausente: o lucro exibido só é confiável se `semCusto.itens` for 0.
+     * A tela usa isso para trocar o valor por "—" e mostrar o aviso.
+     */
+    semCusto: {
+      // `itensTotal` é a base da comparação: contar linhas de venda contra
+      // `current.itemCount` (peças) daria proporção errada quando há
+      // quantidade > 1 na mesma linha.
+      itens: Number((custoAusente.rows as Array<{ itens: number }>)[0]?.itens ?? 0),
+      itensTotal: Number((custoAusente.rows as Array<{ itens_total: number }>)[0]?.itens_total ?? 0),
+      produtos: Number((custoAusente.rows as Array<{ produtos: number }>)[0]?.produtos ?? 0),
+      receita: money((custoAusente.rows as Array<{ receita: string }>)[0]?.receita ?? 0),
+    },
     receivables: {
       open: money((receivableTotals.rows as Array<{ aberto: string }>)[0]?.aberto ?? 0),
       overdue: money((receivableTotals.rows as Array<{ vencido: string }>)[0]?.vencido ?? 0),
@@ -341,4 +397,263 @@ export async function monthlyEvolution(months = 6) {
 }
 
 export const dashboardPeriodWhere = (from: string, to: string): SQL =>
-  sql`completed_at >= ${`${from}T00:00:00Z`}::timestamptz AND completed_at < ${`${addDaysKey(to, 1)}T00:00:00Z`}::timestamptz`;
+  sql`completed_at >= ${inicioDoDia(from).toISOString()}::timestamptz AND completed_at < ${inicioDoDia(addDaysKey(to, 1)).toISOString()}::timestamptz`;
+
+/* ============================================================
+ * PAINÉIS NOVOS (etapa 4)
+ *  - curva ABC de produtos e de clientes (Pareto por receita);
+ *  - metas por vendedor (usuário tem `monthlyGoal`) e projeção do mês;
+ *  - comparativo entre lojas (visão de plataforma, dono do produto).
+ *
+ * Todos herdam o isolamento do driver: sem loja no contexto, nada é lido.
+ * Só a comparação entre lojas usa `runWithCompany(null)` explicitamente —
+ * e ela é restrita a quem administra a plataforma (ver `isPlatformAdmin`).
+ * ============================================================ */
+
+export type CurvaAbcItem = {
+  /** A, B ou C */
+  classe: "A" | "B" | "C";
+  nome: string;
+  detalhe: string;
+  quantidade: number;
+  receita: number;
+  share: number;
+  acumulado: number;
+  lucro: number;
+};
+
+export type CurvaAbc = {
+  itens: CurvaAbcItem[];
+  /** Quantos % do faturamento vêm dos itens A (80%) — a leitura executiva. */
+  classeA: { itens: number; receita: number; share: number };
+  classeB: { itens: number; receita: number; share: number };
+  classeC: { itens: number; receita: number; share: number };
+  receitaTotal: number;
+};
+
+/**
+ * Curva ABC por receita (Pareto):
+ *   A = itens que somam os primeiros 80% da receita,
+ *   B = até 95%,
+ *   C = o restante.
+ * A classificação é sempre relativa ao período — não existe curva "de sempre".
+ */
+export async function curvaAbcProdutos(from: string, to: string): Promise<CurvaAbc> {
+  const ts = periodTs(from, to);
+  const result = await db.execute(sql`
+    SELECT p.name,
+           COALESCE(NULLIF(CONCAT_WS(' / ', pv.color_name, pv.size_name), ''), pv.sku, p.reference) AS detalhe,
+           SUM(si.quantity)::int AS quantidade,
+           SUM(si.quantity * si.unit_price - si.discount_amount)::text AS receita,
+           SUM(si.total - si.unit_cost * si.quantity)::text AS lucro
+      FROM sale_items si
+      JOIN sales s ON s.id = si.sale_id
+      JOIN products p ON p.id = si.product_id
+      LEFT JOIN product_variants pv ON pv.id = si.variant_id
+     WHERE s.status = 'COMPLETED'
+       AND s.completed_at >= ${ts.gte} AND s.completed_at < ${ts.lt}
+       AND si.quantity > 0
+     GROUP BY p.name, pv.color_name, pv.size_name, pv.sku, p.reference
+     ORDER BY SUM(si.quantity * si.unit_price - si.discount_amount) DESC
+  `);
+
+  return montarCurva(
+    (result.rows as Array<{
+      name: string;
+      detalhe: string | null;
+      quantidade: number;
+      receita: string;
+      lucro: string;
+    }>).map((r) => ({
+      nome: r.name,
+      detalhe: r.detalhe ?? "—",
+      quantidade: Number(r.quantidade),
+      receita: Number(r.receita),
+      lucro: Number(r.lucro),
+    })),
+  );
+}
+
+export async function curvaAbcClientes(from: string, to: string): Promise<CurvaAbc> {
+  const ts = periodTs(from, to);
+  const result = await db.execute(sql`
+    SELECT c.name,
+           COUNT(s.id)::int AS compras,
+           COALESCE(SUM(s.total), 0)::text AS receita,
+           COALESCE(SUM(s.profit), 0)::text AS lucro
+      FROM sales s
+      JOIN customers c ON c.id = s.customer_id
+     WHERE s.status = 'COMPLETED'
+       AND s.completed_at >= ${ts.gte} AND s.completed_at < ${ts.lt}
+     GROUP BY c.id, c.name
+     ORDER BY SUM(s.total) DESC
+  `);
+
+  return montarCurva(
+    (result.rows as Array<{ name: string; compras: number; receita: string; lucro: string }>).map(
+      (r) => ({
+        nome: r.name,
+        detalhe: `${Number(r.compras)} compra(s)`,
+        quantidade: Number(r.compras),
+        receita: Number(r.receita),
+        lucro: Number(r.lucro),
+      }),
+    ),
+  );
+}
+
+/**
+ * Regra da curva: 80% → A, 95% → B, resto → C. Receita <= 0 fica fora.
+ * Exportada para teste — é a única regra de negócio do painel que não depende
+ * do banco.
+ */
+export function montarCurva(
+  brutos: Array<{ nome: string; detalhe: string; quantidade: number; receita: number; lucro: number }>,
+): CurvaAbc {
+  const validos = brutos.filter((b) => b.receita > 0);
+  const receitaTotal = validos.reduce((acc, b) => acc + b.receita, 0);
+
+  let acumuladoValor = 0;
+  const itens: CurvaAbcItem[] = validos.map((b) => {
+    /*
+     * A classe olha o acumulado ANTES deste item: o item que cruza os 80%
+     * ainda é A (é ele que sustenta o faturamento). Olhando o acumulado depois,
+     * uma loja com um campeão isolado o classificaria como "B" e a classe A
+     * ficaria vazia — leitura errada da curva.
+     *
+     * Comparação com tolerância: 8 itens de 10% somam 80% exatos, e o ponto
+     * flutuante (0,8 acumulado) pode cair em 79,99999 ou 80,00001. O `epsilon`
+     * garante que o limite pertença sempre à classe de baixo (A), independente
+     * da ordem de soma.
+     */
+    const anterior = receitaTotal > 0 ? (acumuladoValor / receitaTotal) * 100 : 0;
+    acumuladoValor += b.receita;
+    const acumulado = receitaTotal > 0 ? (acumuladoValor / receitaTotal) * 100 : 0;
+    const limiteA = anterior < 80 || Math.abs(anterior - 80) < 1e-9;
+    const limiteB = anterior < 95 || Math.abs(anterior - 95) < 1e-9;
+    return {
+      classe: limiteA ? "A" : limiteB ? "B" : "C",
+      nome: b.nome,
+      detalhe: b.detalhe,
+      quantidade: b.quantidade,
+      receita: b.receita,
+      share: receitaTotal > 0 ? (b.receita / receitaTotal) * 100 : 0,
+      acumulado,
+      lucro: b.lucro,
+    };
+  });
+
+  const resumo = (classe: "A" | "B" | "C") => {
+    const daClasse = itens.filter((i) => i.classe === classe);
+    const receita = daClasse.reduce((acc, i) => acc + i.receita, 0);
+    return {
+      itens: daClasse.length,
+      receita,
+      share: receitaTotal > 0 ? (receita / receitaTotal) * 100 : 0,
+    };
+  };
+
+  return {
+    itens,
+    classeA: resumo("A"),
+    classeB: resumo("B"),
+    classeC: resumo("C"),
+    receitaTotal,
+  };
+}
+
+/* ---------------- Metas ---------------- */
+
+export type MetaVendedor = {
+  id: string;
+  nome: string;
+  meta: number;
+  realizado: number;
+  /** null quando não há meta cadastrada — nunca "0%" nem "100%". */
+  progresso: number | null;
+  projecao: number | null;
+  faltam: number | null;
+};
+
+export type MetasResumo = {
+  mes: string;
+  /** Dias corridos e dias úteis já passados no mês (projeção honesta). */
+  hoje: { realizado: number; meta: number; progresso: number | null; projecaoMes: number | null };
+  vendedores: MetaVendedor[];
+  /** Quantos vendedores estão sem meta — a tela pede para cadastrar. */
+  semMeta: number;
+};
+
+/**
+ * Metas do mês corrente.
+ *
+ * `realizado` é somado por vendedor a partir das vendas concluídas; a projeção
+ * usa a média diária do mês até hoje, não uma regra de três sobre o período
+ * escolhido no dashboard (que pode ser de 1 dia e produzir metas irreais).
+ */
+export async function metasDoMes(): Promise<MetasResumo> {
+  const hoje = todayKey();
+  const inicioMes = `${hoje.slice(0, 7)}-01`;
+  const ts = periodTs(inicioMes, hoje);
+
+  const [vendasPorVendedor, vendedores] = await Promise.all([
+    db.execute(sql`
+      SELECT s.seller_id AS id, COALESCE(SUM(s.total), 0)::text AS total
+        FROM sales s
+       WHERE s.status = 'COMPLETED'
+         AND s.completed_at >= ${ts.gte} AND s.completed_at < ${ts.lt}
+       GROUP BY s.seller_id
+    `),
+    db.execute(sql`
+      SELECT id, name, COALESCE(monthly_goal, 0)::text AS meta
+        FROM users
+       WHERE is_active = true
+       ORDER BY name
+    `),
+  ]);
+
+  const realizadoPorId = new Map<string, number>();
+  for (const r of vendasPorVendedor.rows as Array<{ id: string; total: string }>) {
+    realizadoPorId.set(r.id, Number(r.total));
+  }
+
+  const diasNoMes = new Date(Number(hoje.slice(0, 4)), Number(hoje.slice(5, 7)), 0).getDate();
+  const diaAtual = Number(hoje.slice(8, 10));
+
+  const lista: MetaVendedor[] = (vendedores.rows as Array<{ id: string; name: string; meta: string }>)
+    .map((v) => {
+      const meta = Number(v.meta);
+      const realizado = realizadoPorId.get(v.id) ?? 0;
+      const progresso = meta > 0 ? Math.round((realizado / meta) * 1000) / 10 : null;
+      const projecao =
+        meta > 0 && diaAtual > 0 ? Math.round((realizado / diaAtual) * diasNoMes * 100) / 100 : null;
+      return {
+        id: v.id,
+        nome: v.name,
+        meta,
+        realizado,
+        progresso,
+        projecao,
+        faltam: meta > 0 ? Math.max(0, Math.round((meta - realizado) * 100) / 100) : null,
+      };
+    })
+    .filter((v) => v.meta > 0 || v.realizado > 0);
+
+  const metaTotal = lista.reduce((acc, v) => acc + v.meta, 0);
+  const realizadoTotal = lista.reduce((acc, v) => acc + v.realizado, 0);
+
+  return {
+    mes: hoje.slice(0, 7),
+    hoje: {
+      realizado: realizadoTotal,
+      meta: metaTotal,
+      progresso: metaTotal > 0 ? Math.round((realizadoTotal / metaTotal) * 1000) / 10 : null,
+      projecaoMes:
+        metaTotal > 0 && diaAtual > 0
+          ? Math.round((realizadoTotal / diaAtual) * diasNoMes * 100) / 100
+          : null,
+    },
+    vendedores: lista.sort((a, b) => b.realizado - a.realizado),
+    semMeta: lista.filter((v) => v.meta === 0).length,
+  };
+}

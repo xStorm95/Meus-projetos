@@ -7,6 +7,30 @@
  */
 export const TZ = "America/Sao_Paulo";
 
+/**
+ * FUSO — a regra do sistema.
+ *
+ * O banco guarda timestamptz em UTC, mas o "dia comercial" é o de São Paulo.
+ * Antes, `todayKey()` e `rangeToTimestamps()` montavam as datas em UTC:
+ *   - às 21h de Brasília o servidor (UTC) já estava no dia seguinte, então
+ *     "hoje" e "este mês" apontavam para o dia errado;
+ *   - uma venda feita às 22h de 31/01 caía em 01/02.
+ * Era isso que fazia o card do período mostrar R$ 600,00 e o card do mês
+ * mostrar R$ 0,00 no dashboard.
+ */
+
+/** Partes de data (ano, mês, dia) no fuso da loja, para um instante qualquer. */
+function partesEmSaoPaulo(date: Date = new Date()): { y: number; m: number; d: number } {
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const [y, m, d] = fmt.format(date).split("-").map(Number);
+  return { y, m, d };
+}
+
 /** Retorna a data no formato YYYY-MM-DD (horário local do servidor/loja). */
 export function toDateOnly(value: Date | string): string {
   if (typeof value === "string") {
@@ -26,9 +50,15 @@ function formatDateKey(date: Date): string {
   return `${y}-${m}-${dd}`;
 }
 
-/** Data de hoje como YYYY-MM-DD (em UTC, alinhado ao banco). */
-export function todayKey(): string {
-  return formatDateKey(new Date());
+/**
+ * Data de HOJE como YYYY-MM-DD **no fuso da loja** (America/Sao_Paulo).
+ *
+ * Não use `new Date()` direto: em produção o processo roda em UTC e, à noite,
+ * o dia já virou. Toda a regra de período do sistema parte daqui.
+ */
+export function todayKey(now: Date = new Date()): string {
+  const { y, m, d } = partesEmSaoPaulo(now);
+  return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 }
 
 export function addDaysKey(base: string | Date, days: number): string {
@@ -67,11 +97,29 @@ export function startOfWeekKey(reference: string | Date = new Date()): string {
   return addDaysKey(formatDateKey(date), diff);
 }
 
-/** Intervalo de datas para uso em timestamptz: início inclusivo, fim exclusivo. */
+/**
+ * Deslocamento do fuso da loja em relação a UTC, em horas (Brasil: -3, sem
+ * horário de verão desde 2019). É o que converte "dia da loja" em instante.
+ */
+const OFFSET_HORAS = -3;
+
+/**
+ * Instante em que o dia começa no fuso da loja.
+ * `2026-11-07` → `2026-11-07T03:00:00.000Z`.
+ */
+export function inicioDoDia(fromKey: string): Date {
+  return new Date(`${fromKey}T${String(-OFFSET_HORAS).padStart(2, "0")}:00:00.000Z`);
+}
+
+/**
+ * Intervalo de datas para uso em timestamptz: início inclusivo, fim exclusivo,
+ * **no fuso da loja**. `from=2026-11-01, to=2026-11-07` pega de
+ * 01/11 00:00 (03:00Z) até 07/11 23:59:59.999 (08/11 03:00Z).
+ */
 export function rangeToTimestamps(fromKey: string, toKey: string): { gte: Date; lt: Date } {
   return {
-    gte: new Date(`${fromKey}T00:00:00.000Z`),
-    lt: new Date(`${addDaysKey(toKey, 1)}T00:00:00.000Z`),
+    gte: inicioDoDia(fromKey),
+    lt: inicioDoDia(addDaysKey(toKey, 1)),
   };
 }
 

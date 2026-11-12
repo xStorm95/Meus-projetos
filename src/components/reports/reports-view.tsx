@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import {
-  BarChart3, Download, Printer, Table2, TrendingUp, Users, Wallet, Package,
+  BarChart3, Download, FileSpreadsheet, Printer, Table2, TrendingUp, Users, Wallet, Package,
   FileText, Search, Calendar, Percent, Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -169,7 +169,7 @@ export function ReportsView({
     return [...map.entries()];
   }, [filteredCatalog]);
 
-  async function exportFile(format: "csv" | "json") {
+  async function exportFile(format: "csv" | "json" | "xlsx") {
     try {
       await downloadFile(`/api/reports/${report.kind}/export`, {
         format,
@@ -308,6 +308,15 @@ export function ReportsView({
               <div className="ml-auto flex gap-2">
                 <Button variant="outline" size="sm" leftIcon={<Printer className="h-3.5 w-3.5" />} onClick={() => window.print()}>
                   Imprimir
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  leftIcon={<FileSpreadsheet className="h-3.5 w-3.5" />}
+                  onClick={() => void exportFile("xlsx")}
+                  title="Planilha Excel com números somáveis"
+                >
+                  Excel
                 </Button>
                 <Button variant="outline" size="sm" leftIcon={<Download className="h-3.5 w-3.5" />} onClick={() => void exportFile("csv")}>
                   CSV

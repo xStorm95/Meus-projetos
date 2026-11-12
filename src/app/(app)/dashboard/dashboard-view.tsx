@@ -31,6 +31,23 @@ const METHOD_COLORS: Record<string, string> = {
 const CHART_GOLD = "#c9a227";
 const CHART_ROSE = "#d8a0a6";
 
+/**
+ * Saudação pelo horário de Brasília (o do servidor pode ser UTC).
+ * Capitalização natural: "Bom dia", "Boa tarde", "Boa noite".
+ */
+function saudacaoDoDia(agora: Date = new Date()): string {
+  const hora = Number(
+    new Intl.DateTimeFormat("pt-BR", {
+      timeZone: "America/Sao_Paulo",
+      hour: "2-digit",
+      hour12: false,
+    }).format(agora),
+  );
+  if (hora >= 5 && hora < 12) return "Bom dia";
+  if (hora >= 12 && hora < 18) return "Boa tarde";
+  return "Boa noite";
+}
+
 export function DashboardView({
   data,
   evolution,
@@ -66,8 +83,28 @@ export function DashboardView({
       next.delete("from");
       next.delete("to");
     }
-    router.push(`/?${next.toString()}`);
+    router.push(`/dashboard?${next.toString()}`);
   }
+
+  /*
+   * A saudação é calculada no cliente: no servidor o horário é UTC e a
+   * hidratação reclamaria da diferença. O primeiro render usa "Olá" e o
+   * efeito troca pelo horário da loja.
+   */
+  const [saudacao, setSaudacao] = React.useState("Olá");
+  React.useEffect(() => {
+    setSaudacao(saudacaoDoDia());
+  }, []);
+
+  /*
+   * Aviso de custo ausente (consulta `custoAusente` do dashboard).
+   * `itens`      = linhas de venda sem custo · `itensTotal` = todas as linhas.
+   * `semCustoTotal` significa que nada no período tem custo, logo não há lucro
+   * para mostrar; caso contrário o lucro vale, mas sai subestimado no custo.
+   */
+  const semCusto = data.semCusto ?? { itens: 0, itensTotal: 0, produtos: 0, receita: "0.00" };
+  // Comparação na mesma unidade: linhas de venda contra linhas de venda.
+  const semCustoTotal = semCusto.itens > 0 && semCusto.itens >= semCusto.itensTotal;
 
   const goalNumber = Number(monthlyGoal) > 0 ? Number(monthlyGoal) : 0;
   const monthRevenue = Number(data.month.revenue);
@@ -82,7 +119,8 @@ export function DashboardView({
             {companyName}
           </p>
           <h1 className="mt-0.5 font-[family-name:var(--font-display)] text-2xl font-semibold tracking-tight sm:text-3xl">
-            Bom dia, {userName}
+            {/* Saudação pelo horário da loja (Brasília), não pelo do servidor. */}
+            {saudacao}, {userName}
           </h1>
           <p className="mt-0.5 text-xs text-[var(--text-muted)]">
             Visão de <strong className="font-semibold text-[var(--text-secondary)]">{periodLabel}</strong>{" "}
@@ -174,6 +212,7 @@ export function DashboardView({
           hint={`Hoje: ${brl(data.today.revenue)}`}
           icon={<Banknote className="h-4 w-4" />}
           variation={data.variations.revenue}
+          atual={Number(data.current.revenue)}
           tone="gold"
         />
         <KpiCard
@@ -182,6 +221,7 @@ export function DashboardView({
           hint={`${num(data.current.itemCount)} peças vendidas`}
           icon={<ShoppingBag className="h-4 w-4" />}
           variation={data.variations.salesCount}
+          atual={data.current.salesCount}
         />
         <KpiCard
           label="Ticket médio"
@@ -189,16 +229,35 @@ export function DashboardView({
           hint={`${num(data.current.itemCount)} itens no período`}
           icon={<Receipt className="h-4 w-4" />}
           variation={data.variations.ticketAverage}
+          atual={Number(data.current.ticketAverage)}
         />
         {canSeeFinance ? (
-          <KpiCard
-            label="Lucro estimado"
-            value={brl(data.current.profit)}
-            hint={`Margem ${pct(data.marginPercent)} · descontos ${brl(data.current.discounts)}`}
-            icon={<TrendingUp className="h-4 w-4" />}
-            variation={data.variations.profit}
-            tone="success"
-          />
+          /*
+           * Custo ausente distorce o lucro: `sale_items.unit_cost` é NOT NULL
+           * com default 0, então produto sem custo entra como lucro cheio.
+           * Quando TODOS os itens do período estão sem custo, mostramos "—"
+           * em vez de um número inventado. Quando é só parte, mantemos o valor
+           * válido e avisamos quantos itens estão fora do cálculo.
+           */
+          semCustoTotal ? (
+            <KpiCard
+              label="Lucro estimado"
+              value="—"
+              hint={`${num(data.semCusto.itens)} itens sem custo cadastrado`}
+              icon={<TrendingUp className="h-4 w-4" />}
+              tone="success"
+            />
+          ) : (
+            <KpiCard
+              label="Lucro estimado"
+              value={brl(data.current.profit)}
+              hint={`Margem ${pct(data.marginPercent)} · descontos ${brl(data.current.discounts)}`}
+              icon={<TrendingUp className="h-4 w-4" />}
+              variation={data.variations.profit}
+              atual={Number(data.current.profit)}
+              tone="success"
+            />
+          )
         ) : (
           <KpiCard
             label="Peças vendidas"
@@ -206,9 +265,38 @@ export function DashboardView({
             hint="Quantidade de itens no período"
             icon={<Package className="h-4 w-4" />}
             variation={data.variations.itemCount}
+            atual={data.current.itemCount}
           />
         )}
       </div>
+
+      {/* Custo ausente: avisa sem esconder o resto do painel */}
+      {canSeeFinance && semCusto.itens > 0 && (
+        <Card className="border-[var(--warning)]/40 bg-[var(--warning-soft)]">
+          <CardContent className="flex flex-wrap items-start gap-3 pt-4">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--warning)]" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium">
+                {semCustoTotal
+                  ? "O lucro não pode ser calculado neste período"
+                  : `Lucro parcial: ${num(semCusto.itens)} de ${num(semCusto.itensTotal)} itens sem custo`}
+              </p>
+              <p className="mt-0.5 text-xs text-[var(--text-muted)]">
+                {num(semCusto.produtos)} {semCusto.produtos === 1 ? "produto está" : "produtos estão"} sem
+                custo de compra cadastrado
+                {Number(semCusto.receita) > 0 && ` (${brl(semCusto.receita)} em vendas)`}. Sem o custo, a
+                venda entra como lucro cheio e o resultado fica maior do que o real.
+              </p>
+            </div>
+            <Link
+              href="/produtos"
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border-strong)] bg-[var(--bg-surface)] px-3 text-xs font-medium transition-colors hover:bg-[var(--bg-muted)]"
+            >
+              Cadastrar custos <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Financeiro */}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -225,7 +313,9 @@ export function DashboardView({
               value={brl(data.expenses)}
               icon={<Wallet className="h-3.5 w-3.5" />}
               tone="danger"
-              subtitle={`Resultado estimado ${brl(data.estimatedResult)}`}
+              subtitle={
+                semCustoTotal ? "Resultado estimado — (sem custos)" : `Resultado estimado ${brl(data.estimatedResult)}`
+              }
             />
             <MiniStat
               label="Saldo em caixa"
@@ -658,15 +748,39 @@ function KpiCard({
   icon,
   variation,
   tone,
+  variationInvertida,
+  atual,
 }: {
   label: string;
   value: string;
   hint?: string;
   icon: React.ReactNode;
-  variation?: number;
+  /** null = sem base de comparação (período anterior zerado) → "Novo". */
+  variation?: number | null;
   tone?: "gold" | "success" | "danger";
+  /** Despesa/custo: cair é bom, então a cor se inverte. */
+  variationInvertida?: boolean;
+  /** Valor atual do indicador — define se "Novo" faz sentido. */
+  atual?: number;
 }) {
-  const positive = (variation ?? 0) >= 0;
+  /*
+   * Semântica do badge:
+   *  - null          → "Novo" (não existia base antes). NUNCA "100%".
+   *  - 0             → neutro (cinza): não mudou.
+   *  - positivo      → verde (ou vermelho, se for despesa).
+   *  - negativo      → vermelho (ou verde, se for despesa).
+   */
+  /*
+   * "Novo" só é honesto quando o indicador realmente saiu de zero. Um ticket
+   * médio ou um lucro que existe nos dois períodos mas estava zerado antes
+   * (sem custo cadastrado, por exemplo) não é "novidade" — é "—".
+   */
+  const temAtual = atual === undefined || atual > 0;
+  const semBase = (variation === null || variation === undefined) && temAtual;
+  const semComparacao = (variation === null || variation === undefined) && !temAtual;
+  const neutro = !semBase && !semComparacao && variation === 0;
+  const subiu = !semBase && !semComparacao && (variation as number) > 0;
+  const bom = variationInvertida ? !subiu : subiu;
   return (
     <Card className="group relative overflow-hidden transition-shadow hover:shadow-[var(--shadow-card)]">
       <div
@@ -695,21 +809,43 @@ function KpiCard({
             {icon}
           </span>
         </div>
-        <p className="mt-2 font-[family-name:var(--font-display)] text-2xl font-semibold tabular-nums tracking-tight">
+        {/* Valor principal: display + tabular-nums para não "pular" ao atualizar. */}
+        <p
+          className="mt-2 font-[family-name:var(--font-display)] text-2xl font-semibold tabular-nums tracking-tight"
+          title={value}
+        >
           {value}
         </p>
         <div className="mt-1.5 flex flex-wrap items-center gap-2">
-          {variation !== undefined && (
+          {semBase ? (
+            <span
+              className="inline-flex items-center gap-0.5 rounded-full bg-[var(--bg-muted)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--text-muted)]"
+              title="Sem vendas no período anterior para comparar"
+            >
+              Novo
+            </span>
+          ) : semComparacao ? (
+            <span
+              className="inline-flex items-center gap-0.5 rounded-full bg-[var(--bg-muted)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--text-muted)]"
+              title="Sem base de comparação no período anterior"
+            >
+              —
+            </span>
+          ) : neutro ? (
+            <span className="inline-flex items-center gap-0.5 rounded-full bg-[var(--bg-muted)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--text-muted)]">
+              {pct(0)}
+            </span>
+          ) : (
             <span
               className={cn(
                 "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold",
-                positive
+                bom
                   ? "bg-[var(--success-soft)] text-[var(--success)]"
                   : "bg-[var(--danger-soft)] text-[var(--danger)]",
               )}
             >
-              {positive ? <ArrowUpRight className="h-2.5 w-2.5" /> : <ArrowDownRight className="h-2.5 w-2.5" />}
-              {pct(Math.abs(variation))}
+              {subiu ? <ArrowUpRight className="h-2.5 w-2.5" /> : <ArrowDownRight className="h-2.5 w-2.5" />}
+              {pct(Math.abs(variation as number))}
             </span>
           )}
           {hint && <span className="truncate text-[10px] text-[var(--text-muted)]">{hint}</span>}

@@ -1,5 +1,6 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { demoAutoLoginEnabled, getCurrentUser } from "@/server/auth/session";
+import { demoAutoLoginPermitido, getCurrentUser } from "@/server/auth/session";
 import { getSettingsCached } from "@/server/services/settings";
 import {
   isCustomAccent,
@@ -8,8 +9,36 @@ import {
   accentCssVars,
 } from "@/server/lib/color";
 import { AppShell } from "@/components/layout/app-shell";
+import { BRAND } from "@/config/brand";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * Metadados da ÁREA LOGADA: título com o nome da loja e `noindex`.
+ *
+ * A landing é indexável; o app não. Antes esse `noindex` (e o nome antigo da
+ * marca) vinha do layout raiz e contaminava até a página pública.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  let appName: string = BRAND.name;
+  let companyName = "";
+  try {
+    const settings = await getSettingsCached();
+    appName = settings.appName || BRAND.name;
+    companyName = settings.companyName;
+  } catch {
+    /* banco indisponível: usa padrão da marca */
+  }
+  return {
+    title: {
+      default: `${appName} — ${BRAND.tagline}`,
+      template: `%s · ${appName}`,
+    },
+    description: `Gestão da loja${companyName ? ` ${companyName}` : ""}: vendas, estoque com grade, caixa, crediário e financeiro.`,
+    applicationName: appName,
+    robots: { index: false, follow: false },
+  };
+}
 
 export default async function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
@@ -24,7 +53,7 @@ async function renderShell(
   user: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>,
   children: React.ReactNode,
 ) {
-  let appName = "PASSARELA ERP";
+  let appName: string = BRAND.name;
   let companyName = "Minha Loja";
   let logoUrl: string | null = null;
   let accentColor = "gold";
@@ -58,12 +87,12 @@ async function renderShell(
         dangerouslySetInnerHTML={{ __html: accentBoot }}
       />
       <AppShell
-      user={user}
-      appName={appName}
-      companyName={companyName}
-      logoUrl={logoUrl}
-      demoMode={demoAutoLoginEnabled()}
-    >
+        user={user}
+        appName={appName}
+        companyName={companyName}
+        logoUrl={logoUrl}
+        demoMode={await demoAutoLoginPermitido()}
+      >
         {children}
       </AppShell>
     </>

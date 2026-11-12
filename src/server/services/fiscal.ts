@@ -15,6 +15,7 @@ import { BusinessRuleError, NotFoundError } from "../lib/errors";
 import { money } from "../lib/money";
 import { writeAudit } from "../lib/audit";
 import { getSettingsCached } from "./settings";
+import { addDaysKey, inicioDoDia } from "../lib/dates";
 
 type Actor = { id: string; name: string };
 
@@ -88,8 +89,8 @@ export async function listFiscalDocuments(params: {
   const conds = [];
   if (params.status && params.status !== "ALL") conds.push(eq(fiscalDocuments.status, params.status as never));
   if (params.model && params.model !== "ALL") conds.push(eq(fiscalDocuments.model, params.model));
-  if (params.from) conds.push(gte(fiscalDocuments.createdAt, new Date(`${params.from}T00:00:00Z`)));
-  if (params.to) conds.push(lt(fiscalDocuments.createdAt, new Date(`${params.to}T23:59:59Z`)));
+  if (params.from) conds.push(gte(fiscalDocuments.createdAt, inicioDoDia(params.from)));
+  if (params.to) conds.push(lt(fiscalDocuments.createdAt, inicioDoDia(addDaysKey(params.to, 1))));
   const where = conds.length ? and(...conds) : undefined;
 
   const [items, totals] = await Promise.all([
@@ -147,6 +148,77 @@ export async function listFiscalDocuments(params: {
  * Não transmite nada: exige provedor e ambiente configurados; caso contrário
  * apenas registra o documento como PENDING (fila) para integração posterior.
  */
+/**
+ * Insere o documento com um número livre para modelo+série.
+ *
+ * Estratégia: maior número existente (na loja, via guardião) + 1 e, se o banco
+ * recusar por duplicidade, tenta de novo com o próximo. O retry é limitado —
+ * em caso de disputa persistente, o erro sobe com mensagem clara em vez de
+ * gravar documento com número repetido (o que seria pior: dois cupons iguais).
+ */
+async function inserirComNumeroLivre(params: {
+  saleId: string;
+  saleNumber: number;
+  saleTotal: string;
+  model: "65" | "55";
+  series: number;
+  numeroInicial: number;
+  environment: "HOMOLOGATION" | "PRODUCTION";
+  provider: string | null;
+  actor: Actor;
+  customerName: string | null;
+  customerDocument: string | null;
+}) {
+  const base = Math.max(0, params.numeroInicial - 1);
+
+  for (let tentativa = 0; tentativa < 5; tentativa++) {
+    const maior = await db
+      .select({ numero: sql<number>`COALESCE(MAX(${fiscalDocuments.number}), 0)::int` })
+      .from(fiscalDocuments)
+      .where(
+        and(
+          eq(fiscalDocuments.model, params.model),
+          eq(fiscalDocuments.series, params.series),
+        ),
+      );
+    const proximo = Math.max(Number(maior[0]?.numero ?? 0), base) + 1;
+
+    try {
+      const [doc] = await db
+        .insert(fiscalDocuments)
+        .values({
+          saleId: params.saleId,
+          model: params.model,
+          series: params.series,
+          number: proximo,
+          environment: params.environment,
+          status: "PENDING",
+          total: params.saleTotal,
+          provider: params.provider,
+          requestPayload: {
+            preparedAt: new Date().toISOString(),
+            preparedBy: params.actor.name,
+            saleNumber: params.saleNumber,
+            customer: params.customerName,
+            customerDocument: params.customerDocument,
+            itemsPending: true,
+            note: "Documento preparado no ERP. Transmissão depende do provedor configurado.",
+          },
+        })
+        .returning();
+      return doc;
+    } catch (err) {
+      // 23505 = unique_violation: outra requisição usou este número. Recomeça.
+      const codigo = (err as { code?: string; cause?: { code?: string } }).code
+        ?? (err as { cause?: { code?: string } }).cause?.code;
+      if (codigo !== "23505" || tentativa === 4) throw err;
+    }
+  }
+  throw new BusinessRuleError(
+    "Não foi possível reservar o número do documento fiscal. Tente novamente em alguns segundos.",
+  );
+}
+
 export async function prepareFiscalDocument(
   params: { saleId: string; model?: "65" | "55"; force?: boolean },
   actor: Actor,
@@ -195,30 +267,36 @@ export async function prepareFiscalDocument(
 
   const settings = await getSettingsCached();
   const series = model === "65" ? settings.fiscalSeriesNfce : settings.fiscalSeriesNfe;
-  const next = model === "65" ? settings.fiscalNextNumberNfce : settings.fiscalNextNumberNfe;
 
-  const [doc] = await db
-    .insert(fiscalDocuments)
-    .values({
-      saleId: row.sale.id,
-      model,
-      series,
-      number: next,
-      environment: settings.fiscalEnvironment,
-      status: "PENDING",
-      total: row.sale.total,
-      provider: settings.fiscalProvider,
-      requestPayload: {
-        preparedAt: new Date().toISOString(),
-        preparedBy: actor.name,
-        saleNumber: row.sale.number,
-        customer: row.customerName,
-        customerDocument: row.customerDocument,
-        itemsPending: true,
-        note: "Documento preparado no ERP. Transmissão depende do provedor configurado.",
-      },
-    })
-    .returning();
+  /*
+   * NÚMERO DO DOCUMENTO — como antes estava errado:
+   *
+   * vinha de `settings.fiscalNextNumberNfce`, que nunca era incrementado (nem
+   * aqui, nem em lugar nenhum). A primeira nota saía "1"; a partir da segunda,
+   * o INSERT batia na unicidade (modelo+série+número) e a loja recebia 500 em
+   * TODA tentativa de emitir de novo. O campo de configuração servia de
+   * "número inicial", não de contador.
+   *
+   * Agora o número é derivado do maior número já registrado naquela
+   * modelo+série (+ o número inicial configurado), e o INSERT é repetido se
+   * outra requisição pegar o mesmo número no meio do caminho (duas abas, dois
+   * operadores). `sequences` não serve: é global, e numeração fiscal precisa
+   * ser por loja.
+   */
+  const doc = await inserirComNumeroLivre({
+    saleId: row.sale.id,
+    saleNumber: row.sale.number,
+    saleTotal: row.sale.total,
+    model,
+    series,
+    numeroInicial: model === "65" ? settings.fiscalNextNumberNfce : settings.fiscalNextNumberNfe,
+    environment: settings.fiscalEnvironment,
+    provider: settings.fiscalProvider,
+    actor,
+    customerName: row.customerName,
+    customerDocument: row.customerDocument,
+  });
+  const next = doc.number;
 
   await writeAudit({
     userId: actor.id,
