@@ -19,3 +19,6 @@ web/dist/
 /backups/*.sql.gz
 /public/uploads/*
 !/public/uploads/.gitkeep
+
+# rascunhos locais de depuração
+.tmp/
