@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { demoAutoLoginEnabled, getCurrentUser } from "@/server/auth/session";
+import { demoAutoLoginPermitido, getCurrentUser } from "@/server/auth/session";
 import { LoginForm } from "./login-form";
 
 export const dynamic = "force-dynamic";
@@ -8,7 +8,7 @@ export const metadata = { title: "Entrar — PASSARELA ERP" };
 
 export default async function LoginPage() {
   // Em modo demonstração o acesso é automático — a tela de login é ignorada.
-  if (demoAutoLoginEnabled()) redirect("/");
+  if (await demoAutoLoginPermitido()) redirect("/");
 
   const user = await getCurrentUser();
   if (user) redirect("/");

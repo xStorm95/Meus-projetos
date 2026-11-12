@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/server/auth/session";
 import { getSettingsCached } from "@/server/services/settings";
+import { withCompany } from "@/server/db/tenant";
 import { resolvePeriod, type PeriodPreset } from "@/server/lib/dates";
 import { getDashboard, monthlyEvolution } from "@/server/services/dashboard";
 import { DashboardView } from "./dashboard-view";
@@ -23,11 +24,19 @@ export default async function DashboardPage({
   const preset = (params.period as PeriodPreset) || "thisMonth";
   const period = resolvePeriod(preset, params.from, params.to);
 
-  const [data, evolution, settings] = await Promise.all([
-    getDashboard({ from: period.from, to: period.to }),
-    monthlyEvolution(6),
-    getSettingsCached(),
-  ]);
+  /*
+   * A loja entra EXPLICITAMENTE no contexto: no App Router o layout e a página
+   * são renderizados em contextos assíncronos separados, então o `enterWith`
+   * feito na sessão não alcança estas consultas. Sem isso, o guardião
+   * multi-loja executava tudo "sem loja" e o painel aparecia zerado.
+   */
+  const [data, evolution, settings] = await withCompany(user.companyId, () =>
+    Promise.all([
+      getDashboard({ from: period.from, to: period.to }),
+      monthlyEvolution(6),
+      getSettingsCached(),
+    ]),
+  );
 
   return (
     <DashboardView

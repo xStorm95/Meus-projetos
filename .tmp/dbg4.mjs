@@ -1,0 +1,16 @@
+const base="http://localhost:3000";
+const email=`dbg${Date.now()}@exemplo.com`;
+let r=await fetch(base+"/api/auth/signup",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({storeName:"Loja Dbg",ownerName:"Ana",email,password:"MinhaLoja2026!"})});
+const cookie=r.headers.getSetCookie().map(c=>c.split(";")[0]).join("; ");
+const H={cookie,"content-type":"application/json"};
+const get=p=>fetch(base+p,{headers:{cookie}});
+const post=(p,b)=>fetch(base+p,{method:"POST",headers:H,body:JSON.stringify(b)});
+await post("/api/products",{name:"Peça Y",salePrice:300,costPrice:0,variants:[{colorId:null,sizeId:null,costPrice:0,salePrice:300,stockQty:5}]});
+await post("/api/cash/sessions",{openingAmount:0});
+const prod=await (await get("/api/products?search=Peça Y")).json();
+const id=(prod.products??prod.items??prod)[0]?.id;
+const pd=await (await get(`/api/products/${id}`)).json();
+await post("/api/sales",{items:[{variantId:pd.variants[0].id,quantity:1,unitPrice:300}],payments:[{method:"CASH",amount:300}]});
+const html=await (await get("/?period=thisMonth")).text();
+const m=html.match(/\\"current\\":\{[^}]*\}/)?.[0];
+console.log("current:", m);

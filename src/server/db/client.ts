@@ -153,34 +153,76 @@ function stampClient(client: any, companyId: string | null, release?: any) {
  * Aceita as duas formas usadas pelo driver:
  *   query(texto, valores)  |  query({ text, values })
  */
-/** Marca em andamento para não empilhar resoluções de sessão. */
-declare global {
-  // eslint-disable-next-line no-var
-  var __passarelaResolvingCompany: boolean | undefined;
-}
-
 /**
  * Último recurso para descobrir a loja: a sessão do usuário.
  *
- * Algumas leituras acontecem fora de qualquer contexto aberto (páginas que o
- * React renderiza em paralelo ao layout). Em vez de devolver vazio — o que
- * apareceria como "não encontrado" para o próprio dono —, a loja é
- * descoberta pela sessão. Se não houver sessão, aí sim nada é devolvido.
+ * Algumas leituras acontecem fora de qualquer contexto aberto: o React
+ * Server Components renderiza `layout` e `page` em contextos assíncronos
+ * distintos, então o `enterWith` feito na resolução da sessão NÃO alcança as
+ * consultas da página. Sem esta busca, o guardião considerava "sem loja" e
+ * devolvia conjunto vazio — o dashboard aparecia com R$ 0,00 mesmo havendo
+ * vendas.
+ *
+ * A busca é feita direto na tabela `sessions` (leitura de cookie + consulta
+ * indexada), e NÃO via `getCurrentUser()`: aquela função faz consultas que
+ * voltariam aqui, criando recursão. Antes havia um flag global para conter a
+ * recursão e ele era compartilhado por TODAS as requisições do processo —
+ * duas requisições simultâneas faziam uma anular a outra e o resultado era
+ * dado vazio na tela. Aqui não existe estado global: cada requisição resolve
+ * a própria loja.
+ *
+ * O resultado é memoizado por token por alguns instantes apenas para as
+ * consultas paralelas da mesma página não repetirem a busca; sessão revogada
+ * deixa de valer no instante seguinte (a página recarrega e cai no login).
  */
-async function resolveCompanyFromSession(): Promise<string | null> {
-  if (global.__passarelaResolvingCompany) return null;
-  global.__passarelaResolvingCompany = true;
+const SESSION_LOOKUP_TTL_MS = 5_000;
+const sessionLookupCache = new Map<string, { companyId: string; at: number }>();
+
+async function companyFromSessionCookie(): Promise<string | null> {
+  let token: string | undefined;
   try {
-    const { enterCompany } = await import("./tenant");
-    const { getCurrentUser } = await import("../auth/session");
-    const user = await getCurrentUser();
-    if (!user) return null;
-    enterCompany(user.companyId);
-    return user.companyId;
+    const { cookies } = await import("next/headers");
+    token = (await cookies()).get("passarela_session")?.value;
+  } catch {
+    // Fora de uma requisição (scripts, testes) não há cookie para ler.
+    return null;
+  }
+  if (!token) return null;
+
+  const cached = sessionLookupCache.get(token);
+  if (cached && Date.now() - cached.at < SESSION_LOOKUP_TTL_MS) return cached.companyId;
+  sessionLookupCache.delete(token);
+
+  try {
+    const { createHash } = await import("node:crypto");
+    const { runAsSystem } = await import("./tenant");
+    const { sessions, users } = await import("./schema");
+    const { and, eq, gt, isNull } = await import("drizzle-orm");
+    const hash = createHash("sha256").update(token).digest("hex");
+
+    const rows = await runAsSystem(async () =>
+      db
+        .select({ companyId: users.companyId })
+        .from(sessions)
+        .innerJoin(users, eq(users.id, sessions.userId))
+        .where(
+          and(
+            eq(sessions.tokenHash, hash),
+            isNull(sessions.revokedAt),
+            gt(sessions.expiresAt, new Date()),
+            eq(users.isActive, true),
+          ),
+        )
+        .limit(1),
+    );
+
+    const companyId = rows[0]?.companyId ?? null;
+    if (!companyId) return null;
+    if (sessionLookupCache.size > 500) sessionLookupCache.clear();
+    sessionLookupCache.set(token, { companyId, at: Date.now() });
+    return companyId;
   } catch {
     return null;
-  } finally {
-    global.__passarelaResolvingCompany = false;
   }
 }
 
@@ -188,7 +230,7 @@ async function guardQueryArgs(
   args: unknown[],
   companyId?: string | null,
 ): Promise<unknown[] | null> {
-  const resolvida = companyId ?? currentCompanyIdSync() ?? (await resolveCompanyFromSession());
+  const resolvida = companyId ?? currentCompanyIdSync() ?? (await companyFromSessionCookie());
   const first = args[0];
 
   // Formato 1: query("select ...", [valores])

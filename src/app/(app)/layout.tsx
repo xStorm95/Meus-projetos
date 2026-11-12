@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { demoAutoLoginEnabled, getCurrentUser } from "@/server/auth/session";
+import { demoAutoLoginPermitido, getCurrentUser } from "@/server/auth/session";
 import { getSettingsCached } from "@/server/services/settings";
 import {
   isCustomAccent,
@@ -58,12 +58,12 @@ async function renderShell(
         dangerouslySetInnerHTML={{ __html: accentBoot }}
       />
       <AppShell
-      user={user}
-      appName={appName}
-      companyName={companyName}
-      logoUrl={logoUrl}
-      demoMode={demoAutoLoginEnabled()}
-    >
+        user={user}
+        appName={appName}
+        companyName={companyName}
+        logoUrl={logoUrl}
+        demoMode={await demoAutoLoginPermitido()}
+      >
         {children}
       </AppShell>
     </>

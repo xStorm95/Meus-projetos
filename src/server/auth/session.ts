@@ -26,10 +26,40 @@ export const SESSION_COOKIE = "passarela_session";
  * Quando DEMO_AUTO_LOGIN=true, o sistema entra automaticamente com o usuário
  * administrador ativo mais antigo. Serve para avaliar o ERP sem cadastro.
  * Em produção, mantenha DEMO_AUTO_LOGIN="false" e use a tela de login normal.
+ *
+ * ATENÇÃO: o acesso automático só vale quando o banco tem UMA loja. Com
+ * multi-loja ligado, entrar como "o admin mais antigo" fazia um dono novo cair
+ * na loja de outra pessoa (dados de outra empresa na tela). Nesse caso o modo
+ * demo é ignorado e a sessão/cadastro valem normalmente.
  */
 export function demoAutoLoginEnabled(): boolean {
   return String(process.env.DEMO_AUTO_LOGIN ?? "false") === "true";
 }
+
+/**
+ * O modo demo só pode ser usado quando existe UMA loja no banco.
+ *
+ * É uma checagem em runtime (e não uma variável de ambiente) porque o
+ * isolamento por loja está sempre ligado: a primeira conta criada é a "dona"
+ * do ambiente, então faz sentido continuar entrando nela sem login enquanto
+ * não houver mais ninguém. No instante em que a segunda loja é criada, o
+ * acesso automático morre e vale o login normal — ninguém cai na loja de
+ * outra pessoa.
+ */
+export async function demoAutoLoginPermitido(): Promise<boolean> {
+  if (!demoAutoLoginEnabled()) return false;
+  try {
+    const { runAsSystem } = await import("../db/tenant");
+    const { companies } = await import("../db/schema");
+    const rows = await runAsSystem(async () =>
+      db.select({ id: companies.id }).from(companies).limit(2),
+    );
+    return rows.length <= 1;
+  } catch {
+    return false;
+  }
+}
+
 
 async function findDemoUser() {
   const { runAsSystem } = await import("../db/tenant");
@@ -195,7 +225,7 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
   const token = store.get(SESSION_COOKIE)?.value;
 
   if (!token) {
-    if (!demoAutoLoginEnabled()) return null;
+    if (!(await demoAutoLoginPermitido())) return null;
     // Modo demonstração: entrada automática
     try {
       const demo = await findDemoUser();
@@ -241,8 +271,9 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
   if (!row || !row.isActive) return null;
 
   // A partir daqui, tudo o que esta requisição fizer no banco roda na loja do
-  // usuário — inclusive as consultas das páginas, que o React renderiza em
-  // paralelo ao layout (ver enterCompany em ../db/tenant).
+  // usuário. ATENÇÃO: isso vale para o que é executado DENTRO deste escopo
+  // assíncrono — no App Router a página é renderizada em outro contexto, por
+  // isso as páginas envolvem as consultas em `withCompany(user.companyId)`.
   const { enterCompany } = await import("../db/tenant");
   enterCompany(row.companyId);
 

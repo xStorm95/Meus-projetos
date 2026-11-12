@@ -72,6 +72,7 @@ export async function getDashboard(params: { from: string; to: string }) {
     payableTotals,
     customerStats,
     paymentMix,
+    custoAusente,
     cashBalance,
     overdue,
     topCustomers,
@@ -190,6 +191,31 @@ export async function getDashboard(params: { from: string; to: string }) {
        GROUP BY method ORDER BY SUM(amount) DESC
     `),
 
+    /*
+     * Itens vendidos no período SEM custo cadastrado.
+     *
+     * `sale_items.unit_cost` é NOT NULL com default 0: produto sem custo entra
+     * como custo zero, o lucro vira "venda cheia" e a margem mentirosa. Em vez
+     * de mostrar 0,00 como se fosse lucro real, o dashboard avisa quantos itens
+     * estão nessa situação e aponta para a correção.
+     */
+    db.execute(sql`
+      SELECT COUNT(*) FILTER (WHERE si.unit_cost IS NULL OR si.unit_cost = 0)::int AS itens,
+             COUNT(*)::int AS itens_total,
+             COUNT(DISTINCT si.product_id)
+               FILTER (WHERE si.unit_cost IS NULL OR si.unit_cost = 0)::int AS produtos,
+             COALESCE(SUM(
+               CASE WHEN si.unit_cost IS NULL OR si.unit_cost = 0
+                    THEN si.quantity * si.unit_price - si.discount_amount
+                    ELSE 0 END
+             ), 0)::text AS receita
+        FROM sale_items si
+        JOIN sales s ON s.id = si.sale_id
+       WHERE s.status = 'COMPLETED'
+         AND s.completed_at >= ${ts.gte} AND s.completed_at < ${ts.lt}
+         AND si.quantity > 0
+    `),
+
     cashBalanceToday(),
     overdueSummary(),
 
@@ -219,10 +245,17 @@ export async function getDashboard(params: { from: string; to: string }) {
     `),
   ]);
 
-  const variation = (curr: string, prevValue: string) => {
+  /**
+   * Variação percentual em relação ao período anterior.
+   *
+   * Devolve `null` quando não há base de comparação (período anterior zero).
+   * Antes retornava 100, e a tela pintava "↗ 100,0%" em verde como se fosse
+   * crescimento — número inventado. Com `null` a tela mostra "Novo" ou "—".
+   */
+  const variation = (curr: string, prevValue: string): number | null => {
     const c = d(curr);
     const p = d(prevValue);
-    if (p.isZero()) return c.isZero() ? 0 : 100;
+    if (p.isZero()) return null;
     return Number(c.minus(p).dividedBy(p).times(100).toFixed(2));
   };
 
@@ -254,6 +287,19 @@ export async function getDashboard(params: { from: string; to: string }) {
     },
     expenses: expenseTotal,
     estimatedResult: money(profitCurrent),
+    /*
+     * Custo ausente: o lucro exibido só é confiável se `semCusto.itens` for 0.
+     * A tela usa isso para trocar o valor por "—" e mostrar o aviso.
+     */
+    semCusto: {
+      // `itensTotal` é a base da comparação: contar linhas de venda contra
+      // `current.itemCount` (peças) daria proporção errada quando há
+      // quantidade > 1 na mesma linha.
+      itens: Number((custoAusente.rows as Array<{ itens: number }>)[0]?.itens ?? 0),
+      itensTotal: Number((custoAusente.rows as Array<{ itens_total: number }>)[0]?.itens_total ?? 0),
+      produtos: Number((custoAusente.rows as Array<{ produtos: number }>)[0]?.produtos ?? 0),
+      receita: money((custoAusente.rows as Array<{ receita: string }>)[0]?.receita ?? 0),
+    },
     receivables: {
       open: money((receivableTotals.rows as Array<{ aberto: string }>)[0]?.aberto ?? 0),
       overdue: money((receivableTotals.rows as Array<{ vencido: string }>)[0]?.vencido ?? 0),
