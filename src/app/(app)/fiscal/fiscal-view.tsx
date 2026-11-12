@@ -232,7 +232,7 @@ export function FiscalView({
       </div>
 
       <Alert tone="warning" title="Nenhuma emissão fiscal simulada">
-        O PASSARELA ERP <strong>não transmite documentos à SEFAZ</strong> por conta própria. Esta tela registra a
+        O ORION <strong>não transmite documentos à SEFAZ</strong> por conta própria. Esta tela registra a
         intenção de emissão, valida os requisitos e mantém a fila para um provedor externo homologado. Um documento só
         muda para <em>Autorizado</em> quando o provedor retorna autorização real — jamais por simulação.
       </Alert>

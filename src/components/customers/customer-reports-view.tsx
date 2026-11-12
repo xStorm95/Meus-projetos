@@ -240,7 +240,7 @@ export function CustomerReportsView({
                       {(row.whatsapp || row.phone) && row.acceptsWhatsapp && (
                         <a
                           href={`https://wa.me/55${(row.whatsapp ?? row.phone ?? "").replace(/\D/g, "")}?text=${encodeURIComponent(
-                            `Olá ${row.name.split(" ")[0]}! A Passarela deseja um feliz aniversário 🎉 Venha nos visitar, preparamos uma surpresa para você.`,
+                            `Olá ${row.name.split(" ")[0]}! A loja deseja um feliz aniversário 🎉 Venha nos visitar, preparamos uma surpresa para você.`,
                           )}`}
                           target="_blank"
                           rel="noreferrer"
@@ -289,7 +289,7 @@ export function CustomerReportsView({
                     {(row.whatsapp || row.phone) && row.accepts_whatsapp ? (
                       <a
                         href={`https://wa.me/55${(row.whatsapp ?? row.phone ?? "").replace(/\D/g, "")}?text=${encodeURIComponent(
-                          `Olá ${row.name.split(" ")[0]}! Sentimos sua falta na Passarela 💛 Temos novidades que combinam com você.`,
+                          `Olá ${row.name.split(" ")[0]}! Sentimos sua falta 💛 Temos novidades que combinam com você.`,
                         )}`}
                         target="_blank"
                         rel="noreferrer"

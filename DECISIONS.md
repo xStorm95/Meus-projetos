@@ -74,6 +74,46 @@ correções necessárias:
 Desabilitados (decisão do produto). Nenhuma tela de checkout na landing: o CTA
 é “Testar grátis” (cadastro) + WhatsApp.
 
+## Rotas: landing em `/` e app em `/dashboard`
+
+O dashboard morava em `/`; para a landing ser pública e indexável, o painel
+passou para `/dashboard` (o menu, o login, o 404 e os erros apontam para lá).
+`/` é a landing, sempre acessível sem login. Quem já tinha o link antigo na
+raiz passa a ver a landing e entra pelo botão “Entrar”.
+
+## Tema: escuro por identidade, claro por escolha
+
+- A landing é **sempre escura** (escopo `.theme-dark`, independente do aparelho).
+- O app interno tem três estados: **automático** (segue o aparelho, padrão),
+  claro e escuro. A preferência fica no navegador (`orion:theme`), com leitura da
+  chave antiga (`passarela:theme`) para não perder a escolha de quem já usava.
+- As duas seleções (`html.dark` e `.theme-dark`) compartilham o mesmo bloco de
+  variáveis, então não há tema “meio escuro”.
+
+## SEO
+
+- `robots.txt` e `sitemap.xml` gerados pelo Next (`src/app/robots.ts`,
+  `src/app/sitemap.ts`): só as páginas públicas são indexáveis.
+- O layout raiz deixou de injetar `noindex` (era aplicado em TODAS as páginas,
+  inclusive na landing); o `noindex` agora mora na área logada e no login.
+- Dados estruturados `SoftwareApplication` na landing, com `canonical` e Open
+  Graph. A imagem OG depende de uma URL pública — pendente do deploy.
+
+## Identificadores internos com o nome antigo
+
+`passarela_session` (cookie), `__passarela*` (globais do driver) e
+`passarela-tenant` (marca interna do SQL) **continuam** nesta etapa: renomear o
+cookie derrubaria todas as sessões ativas e os globais não aparecem para o
+usuário. A limpeza é a etapa 7 (rename final), feita com cuidado e com o
+cookie antigo aceito por um período de transição.
+
+## Dados reais pendentes (não inventados)
+
+WhatsApp, telefone, e-mail e cidade em `src/config/brand.ts` estão vazios ou
+com valor provisório. Enquanto não forem informados, o botão “Falar no
+WhatsApp” da landing aponta para a seção de planos, em vez de abrir um link
+quebrado. CNPJ/razão social não aparecem em nenhuma página pública.
+
 ## Deploy
 
 O domínio é mantido (`meus-projetos-qzoj.vercel.app`). Não há renomeação de

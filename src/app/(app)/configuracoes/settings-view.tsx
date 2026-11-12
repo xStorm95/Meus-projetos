@@ -463,7 +463,7 @@ export function SettingsView({
                 disabled={readOnly}
                 onChange={(e) => setBranding({ ...branding, appName: e.target.value })}
                 className="h-8 w-44"
-                placeholder="Passarela da Moda"
+                placeholder="Ateliê Aurora"
               />
             </label>
           </div>
@@ -483,7 +483,7 @@ export function SettingsView({
                 )}
               </span>
               <span className="leading-tight">
-                <span className="block text-[13px] font-semibold">{branding.appName || "Passarela da Moda"}</span>
+                <span className="block text-[13px] font-semibold">{branding.appName || "ORION"}</span>
                 <span className="block text-[10.5px] text-[var(--text-muted)]">
                   {settings.companyName} · menu e cupons
                 </span>
@@ -686,7 +686,7 @@ export function SettingsView({
               </Badge>
             </div>
             <div className="rounded-xl border border-[var(--warning)]/30 bg-[var(--warning-soft)] p-3 text-[11px] text-[var(--text-secondary)]">
-              <strong className="text-[var(--warning)]">Importante:</strong> o PASSARELA ERP não emite documentos fiscais
+              <strong className="text-[var(--warning)]">Importante:</strong> o ORION não emite documentos fiscais
               por conta própria. Estes campos preparam a integração com um provedor (Focus NFe, eNotas, Tecnospeed
               etc.). Enquanto não houver provedor configurado e certificado válido, nenhum documento é transmitido à
               SEFAZ — o sistema nunca simula autorização.
@@ -810,7 +810,7 @@ export function SettingsView({
         <div className="space-y-3 text-[12px] text-[var(--text-secondary)]">
           <p className="font-semibold text-[var(--text-primary)]">Gerar backup agora</p>
           <pre className="overflow-x-auto rounded-lg bg-[var(--bg-muted)] p-2.5 text-[10.5px]">npm run backup</pre>
-          <p>O arquivo é salvo em <code>backups/passarela-AAAA-MM-DDTHH-mm.sql.gz</code>, com verificação de integridade.</p>
+          <p>O arquivo é salvo em <code>backups/orion-AAAA-MM-DDTHH-mm.sql.gz</code>, com verificação de integridade.</p>
           <p className="font-semibold text-[var(--text-primary)]">Restaurar</p>
           <pre className="overflow-x-auto rounded-lg bg-[var(--bg-muted)] p-2.5 text-[10.5px]">npm run restore -- backups/arquivo.sql.gz</pre>
           <p>

@@ -53,7 +53,7 @@ async function ask(question: string, hidden = false): Promise<string> {
 }
 
 async function main() {
-  console.log("\n\x1b[36mPASSARELA ERP\x1b[0m — criação do administrador inicial\n");
+  console.log("\n\x1b[36mORION\x1b[0m — criação do administrador inicial\n");
 
   const email = process.env.ADMIN_EMAIL ?? (await ask("E-mail do administrador: ")).toLowerCase();
   const name = process.env.ADMIN_NAME ?? (await ask("Nome completo: "));

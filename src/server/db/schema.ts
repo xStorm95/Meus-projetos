@@ -1,5 +1,5 @@
 /**
- * PASSARELA ERP — Esquema completo do banco de dados (PostgreSQL)
+ * ORION — Esquema completo do banco de dados (PostgreSQL)
  * ---------------------------------------------------------------
  * Convenções:
  *  - Nomes de tabelas e colunas em snake_case no banco, camelCase no TypeScript.
@@ -350,7 +350,7 @@ export const settings = pgTable("settings", {
   companyId: uuid("company_id")
     .notNull()
     .references(() => companies.id, { onDelete: "cascade" }),
-  appName: text("app_name").notNull().default("PASSARELA ERP"),
+  appName: text("app_name").notNull().default("ORION"),
   companyName: text("company_name").notNull().default("Minha Loja"),
   companyLegalName: text("company_legal_name"),
   companyDocument: text("company_document"),

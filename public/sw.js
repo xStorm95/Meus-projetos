@@ -1,8 +1,8 @@
-/* PASSARELA ERP — Service Worker (PWA)
+/* ORION — Service Worker (PWA)
  * Estratégia conservadora: o ERP nunca serve dados de negócio do cache.
  * Somente assets estáticos são cacheados. Requisições /api sempre vão à rede.
  */
-const CACHE = "passarela-static-v1";
+const CACHE = "orion-static-v1";
 const STATIC_ASSETS = ["/icon.svg", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
@@ -12,6 +12,7 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
+      // Remove qualquer cache que não seja o atual (inclui os da marca anterior).
       Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))),
     ).then(() => self.clients.claim()),
   );

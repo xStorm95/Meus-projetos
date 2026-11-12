@@ -83,7 +83,7 @@ export function DashboardView({
       next.delete("from");
       next.delete("to");
     }
-    router.push(`/?${next.toString()}`);
+    router.push(`/dashboard?${next.toString()}`);
   }
 
   /*

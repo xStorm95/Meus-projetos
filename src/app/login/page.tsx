@@ -4,7 +4,7 @@ import { LoginForm } from "./login-form";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "Entrar — PASSARELA ERP" };
+export const metadata = { title: "Entrar", robots: { index: false, follow: false } };
 
 export default async function LoginPage() {
   // Em modo demonstração o acesso é automático — a tela de login é ignorada.

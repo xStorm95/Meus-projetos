@@ -3,23 +3,33 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Sem conexão — PASSARELA ERP</title>
+  <title>Sem conexão — ORION</title>
   <style>
     body{margin:0;display:flex;min-height:100vh;align-items:center;justify-content:center;
-      background:#faf8f5;font-family:system-ui,-apple-system,sans-serif;color:#1a1a1f;text-align:center;padding:24px}
-    .badge{width:56px;height:56px;border-radius:16px;background:#c9a227;color:#fff;font-family:Georgia,serif;
-      font-size:30px;font-weight:700;display:flex;align-items:center;justify-content:center;margin:0 auto 20px}
-    h1{font-size:18px;margin:0 0 8px}p{font-size:13px;color:#6a6a74;max-width:340px;line-height:1.6;margin:0 auto}
-    button{margin-top:20px;background:#c9a227;color:#fff;border:0;border-radius:12px;padding:10px 20px;
+      background:#0B0B0F;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#F4F6FA;text-align:center;padding:24px}
+    .badge{width:64px;height:64px;border-radius:18px;background:#121218;border:1px solid rgba(125,179,255,.25);
+      display:flex;align-items:center;justify-content:center;margin:0 auto 20px}
+    h1{font-size:18px;margin:0 0 8px;letter-spacing:.02em}
+    p{font-size:13px;color:#B9BFCC;max-width:340px;line-height:1.6;margin:0 auto}
+    button{margin-top:20px;background:#7DB3FF;color:#07101F;border:0;border-radius:12px;padding:10px 20px;
       font-size:14px;font-weight:600;cursor:pointer}
+    .brand{margin-top:28px;font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:#8B92A2}
   </style>
 </head>
 <body>
   <div>
-    <div class="badge">P</div>
+    <div class="badge" aria-hidden="true">
+      <!-- Três estrelas do Cinturão de Órion (mesma marca do app) -->
+      <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+        <circle cx="10.5" cy="21" r="2.6" fill="#7DB3FF"/>
+        <circle cx="16" cy="16" r="3.4" fill="#A6CBFF"/>
+        <circle cx="21.5" cy="11" r="2.6" fill="#7DB3FF"/>
+      </svg>
+    </div>
     <h1>Você está sem conexão</h1>
-    <p>O ERP precisa de conexão com a internet para consultar e gravar dados no servidor, garantindo que todas as informações fiquem centralizadas e seguras.</p>
+    <p>O sistema precisa de internet para consultar e gravar os dados no servidor, mantendo tudo centralizado e seguro. Assim que a conexão voltar, você continua de onde parou.</p>
     <button onclick="location.reload()">Tentar novamente</button>
+    <p class="brand">ORION</p>
   </div>
 </body>
 </html>

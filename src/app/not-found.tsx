@@ -9,7 +9,7 @@ export default function NotFound() {
         O endereço acessado não existe ou você não tem permissão para visualizá-lo.
       </p>
       <Link
-        href="/"
+        href="/dashboard"
         className="mt-6 rounded-xl bg-[var(--accent)] px-5 py-2.5 text-sm font-semibold text-[var(--accent-contrast)]"
       >
         Voltar ao dashboard

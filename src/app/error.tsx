@@ -29,7 +29,7 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
           <RefreshCw className="h-4 w-4" /> Tentar novamente
         </button>
         <a
-          href="/"
+          href="/dashboard"
           className="rounded-xl border border-[var(--border-strong)] px-4 py-2.5 text-sm font-medium"
         >
           Ir ao dashboard

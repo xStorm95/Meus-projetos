@@ -6,7 +6,7 @@ import { sql } from "drizzle-orm";
 import { db } from "../db/client";
 import { companies } from "../db/schema";
 
-/** "Passarela da Moda" -> "passarela-da-moda" */
+/** "Ateliê Aurora" -> "atelie-aurora" */
 export function slugifyStore(name: string): string {
   return (
     name

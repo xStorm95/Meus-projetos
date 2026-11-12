@@ -1,11 +1,11 @@
 {
-  "name": "PASSARELA ERP",
-  "short_name": "Passarela",
-  "description": "Sistema de gestão para varejo de moda: PDV, estoque, crediário e financeiro.",
+  "name": "ORION ERP",
+  "short_name": "ORION",
+  "description": "Gestão para o varejo de moda: PDV, estoque com grade, caixa, crediário e financeiro.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#faf8f5",
-  "theme_color": "#c9a227",
+  "background_color": "#0B0B0F",
+  "theme_color": "#0B0B0F",
   "orientation": "any",
   "lang": "pt-BR",
   "icons": [

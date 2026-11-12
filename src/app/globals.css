@@ -1,8 +1,12 @@
 @import "tailwindcss";
 
 /*
- * PASSARELA ERP — Design System
- * Branco predominante, dourado premium, rosé complementar, neutros quentes.
+ * ORION — Design System
+ *
+ * Tema claro neutro e tema escuro profundo (#0B0B0F) com acento azul (#7DB3FF).
+ * O acento pode ser sobrescrito pela cor da logo da loja (Configurações >
+ * Aparência), que continua funcionando: as regras de data-accent-hex vêm
+ * depois e têm precedência.
  */
 
 @theme {
@@ -67,8 +71,8 @@
   --text-muted: #85858f;
   --border-default: #e8e1d7;
   --border-strong: #d9cfc0;
-  --accent: #c9a227;
-  --accent-soft: #fbf7ec;
+  --accent: #1d68c9;
+  --accent-soft: #eaf2fd;
   --accent-contrast: #ffffff;
   --rose-accent: #d8a0a6;
   --success: #15803d;
@@ -81,20 +85,28 @@
   --info-soft: #eff6ff;
 }
 
-html.dark {
-  --bg-app: #0f0f13;
-  --bg-surface: #1a1a1f;
-  --bg-elevated: #232329;
-  --bg-muted: #2c2c33;
-  --bg-sidebar: #16161a;
-  --text-primary: #f6f6f7;
-  --text-secondary: #b0b0b9;
-  --text-muted: #85858f;
-  --border-default: #2c2c33;
-  --border-strong: #414149;
-  --accent: #d8ab4c;
-  --accent-soft: #2b2415;
-  --accent-contrast: #1a1a1f;
+/*
+ * Tema escuro.
+ * - `html.dark`: preferência salva do usuário (app interno, via ThemeProvider).
+ * - `.theme-dark`: escopo fixo — usado pela landing e por qualquer bloco que
+ *   precise ser escuro independentemente da preferência do visitante.
+ * Por isso as duas seleções compartilham o mesmo bloco de variáveis.
+ */
+html.dark,
+.theme-dark {
+  --bg-app: #0b0b0f;
+  --bg-surface: #121218;
+  --bg-elevated: #17171f;
+  --bg-muted: #1e1e27;
+  --bg-sidebar: #0e0e14;
+  --text-primary: #f4f6fa;
+  --text-secondary: #b9bfcc;
+  --text-muted: #8b92a2;
+  --border-default: #26262f;
+  --border-strong: #363642;
+  --accent: #7db3ff;
+  --accent-soft: #16233a;
+  --accent-contrast: #07101f;
   --rose-accent: #e4869a;
   --success: #4ade80;
   --success-soft: #12281c;

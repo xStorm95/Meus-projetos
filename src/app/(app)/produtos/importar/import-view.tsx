@@ -11,10 +11,10 @@ import { Card, Alert, Badge } from "@/components/ui/primitives";
 import { Textarea } from "@/components/ui/form";
 
 const TEMPLATE = `nome;referencia;categoria;marca;fornecedor;cor;tamanho;custo;preco;estoque;codigo_barras
-Vestido Midi Canelado;VESTMIDI;Vestidos;Passarela Store;Confecções Bella Moda;Preto;P;45,00;149,90;3;7891000000011
-Vestido Midi Canelado;VESTMIDI;Vestidos;Passarela Store;Confecções Bella Moda;Preto;M;45,00;149,90;4;7891000000012
-Vestido Midi Canelado;VESTMIDI;Vestidos;Passarela Store;Confecções Bella Moda;Vinho;M;45,00;149,90;2;7891000000013
-Blusa Cropped Tricot;BLUSCROP;Croppeds;Passarela Store;;Off-white;Único;22,00;79,90;6;7891000000021`;
+Vestido Midi Canelado;VESTMIDI;Vestidos;Ateliê Aurora;Confecções Bella Moda;Preto;P;45,00;149,90;3;7891000000011
+Vestido Midi Canelado;VESTMIDI;Vestidos;Ateliê Aurora;Confecções Bella Moda;Preto;M;45,00;149,90;4;7891000000012
+Vestido Midi Canelado;VESTMIDI;Vestidos;Ateliê Aurora;Confecções Bella Moda;Vinho;M;45,00;149,90;2;7891000000013
+Blusa Cropped Tricot;BLUSCROP;Croppeds;Ateliê Aurora;;Off-white;Único;22,00;79,90;6;7891000000021`;
 
 type Result = {
   createdProducts: number;

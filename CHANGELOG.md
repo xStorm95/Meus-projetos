@@ -43,6 +43,28 @@ Formato: um bloco por etapa do rebrand. Cada etapa é um commit.
 - Testes novos: `dashboard-sem-custo` (7), `dashboard-badges` (5),
   `tenant-context` (3). Suíte: 113 testes.
 
+## Etapa 3 — identidade ORION e landing pública
+
+- **Módulo de marca** (`src/config/brand.ts`): nome, slogan, paleta, símbolo das
+  três estrelas e contato em um só lugar. Componentes `OrionMark`/`OrionWordmark`.
+- **Tema**: tema escuro `#0B0B0F` com acento `#7DB3FF`; a landing é sempre
+  escura, o app interno ganhou o modo **automático** (segue o aparelho) e a
+  preferência mudou para `orion:*` lendo a chave antiga uma vez.
+- **Rotas**: painel movido para `/dashboard`; `/` virou a landing pública
+  (header, hero, recursos, como funciona, planos sem checkout, LGPD, CTA).
+- **Cadastro público** em `/cadastro` (cria loja + dono e já entra), com
+  validação de senha espelhando o servidor e aceite dos termos.
+- **Termos** (`/termos`) e **privacidade** (`/privacidade`) escritos a partir do
+  que o sistema faz de fato (LGPD, controlador/operador, cookies, direitos).
+- **SEO**: `robots.txt` e `sitemap.xml`; landing indexável com Open Graph e
+  JSON-LD; `noindex` só na área logada e no login. O layout raiz não injeta mais
+  o nome antigo da marca nem o `noindex` global.
+- **Marca antiga fora do produto**: login, app shell, ícone, manifest, offline,
+  service worker (com troca de cache), backups, textos de fiscal/configurações e
+  dados de demonstração. Identificadores internos (`passarela_session`,
+  `__passarela*`) ficam para a etapa 7 — renomear o cookie derrubaria sessões.
+- Verificação: 31 rotas em 200, landing com 0 erros de SEO/marca, suíte 113/113.
+
 ## Pendências conhecidas
 
 - Etapas 3 a 7 do rebrand (landing pública, painéis novos, Pix QR/NFC-e/
