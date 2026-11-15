@@ -4,7 +4,7 @@ import platform
 
 APP_NAME = "Nexus Booster"
 APP_ID = "nexusbooster"
-APP_VERSION = "1.0.1"
+APP_VERSION = "1.1.0"
 ORG_NAME = "Nexus Booster"
 
 # Cores base do tema (azul neon).

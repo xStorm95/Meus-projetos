@@ -39,7 +39,7 @@ echo Compilando instalador...
 
 echo.
 echo ============================================================
-echo  INSTALADOR GERADO: installer_output\NexusBooster-Setup-1.0.1.exe
+echo  INSTALADOR GERADO: installer_output\NexusBooster-Setup-1.1.0.exe
 echo ============================================================
 popd
 endlocal

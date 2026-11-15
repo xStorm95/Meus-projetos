@@ -8,7 +8,7 @@ from collections import deque
 from typing import Optional
 
 import psutil
-from PySide6.QtCore import QObject, QThread, Signal
+from PySide6.QtCore import QObject, QThread, QTimer, Signal
 
 from nexus.system import gpu_nvidia, windows_gpu
 from nexus.system.hardware import HardwareInfo, probe_hardware
@@ -20,8 +20,14 @@ HISTORY_POINTS = 120
 
 
 class _MonitorThread(QThread):
-    updated = Signal(object)
-    hardware_ready = Signal(object)
+    """Thread dedicada de coleta de métricas.
+
+    Não emite sinais Qt: apenas publica os resultados em atributos simples
+    (escrita/leitura protegidas pelo GIL). A thread principal faz o polling
+    desses atributos — isso elimina o marshalling cross-thread de objetos
+    Python via sinais, fonte conhecida de corridas no PySide6 quando a
+    interface pinta simultaneamente.
+    """
 
     def __init__(self, interval_ms: int):
         super().__init__()
@@ -32,6 +38,9 @@ class _MonitorThread(QThread):
         self._cpu_temp_unsupported = False
         self._last_hw_probe = 0.0
         self._gpu_name = ""
+        # resultados publicados para a thread principal
+        self.pending_hw: Optional[HardwareInfo] = None
+        self.latest_snap: Optional[SystemSnapshot] = None
         # Aquece o cpu_percent (primeira chamada sempre retorna 0)
         psutil.cpu_percent(percpu=True)
 
@@ -49,15 +58,20 @@ class _MonitorThread(QThread):
         except Exception as exc:  # noqa: BLE001
             log.exception("probe de hardware falhou: %s", exc)
             hw = HardwareInfo(ready=True)
-        self.hardware_ready.emit(hw)
+        self.pending_hw = hw
 
         while self._running:
             try:
-                snap = self._collect()
-                self.updated.emit(snap)
+                self.latest_snap = self._collect()
             except Exception as exc:  # noqa: BLE001
                 log.exception("ciclo de monitoramento falhou: %s", exc)
-            time.sleep(self._interval)
+            # dorme em fatias para reagir rápido ao stop()
+            deadline = time.time() + self._interval
+            while self._running:
+                remaining = deadline - time.time()
+                if remaining <= 0:
+                    break
+                time.sleep(min(0.1, remaining))
 
     def stop(self) -> None:
         self._running = False
@@ -198,7 +212,13 @@ class _MonitorThread(QThread):
 
 
 class MonitorService(QObject):
-    """API usada pela interface: start/stop, sinais e histórico p/ gráficos."""
+    """API usada pela interface: start/stop, sinais e histórico p/ gráficos.
+
+    Os sinais ``updated`` e ``hardware_ready`` são emitidos SEMPRE na thread
+    principal: um QTimer consome o que a thread de coleta publicou. Assim
+    nenhum slot da interface roda fora da thread correta — sem marshalling
+    cross-thread de objetos Python.
+    """
 
     updated = Signal(object)
     hardware_ready = Signal(object)
@@ -206,8 +226,10 @@ class MonitorService(QObject):
     def __init__(self, interval_ms: int = 1000):
         super().__init__()
         self._thread = _MonitorThread(interval_ms)
-        self._thread.updated.connect(self._on_update)
-        self._thread.hardware_ready.connect(self._on_hw)
+        self._poll = QTimer(self)
+        self._poll.setInterval(max(100, min(500, interval_ms // 2)))
+        self._poll.timeout.connect(self._poll_thread)
+        self._emitted: Optional[SystemSnapshot] = None
         self.latest: Optional[SystemSnapshot] = None
         self.hardware: HardwareInfo = HardwareInfo()
         self.history = {
@@ -226,13 +248,29 @@ class MonitorService(QObject):
     def start(self) -> None:
         if not self._thread.isRunning():
             self._thread.start()
+        if not self._poll.isActive():
+            self._poll.start()
 
     def stop(self) -> None:
+        self._poll.stop()
         self._thread.stop()
         self._thread.wait(3000)
 
     def set_interval(self, interval_ms: int) -> None:
         self._thread.set_interval(interval_ms)
+        self._poll.setInterval(max(100, min(500, interval_ms // 2)))
+
+    # ------------------------------------------------------------------
+    def _poll_thread(self) -> None:
+        """Roda na thread principal: consome o publicado pela thread de coleta."""
+        hw = self._thread.pending_hw
+        if hw is not None:
+            self._thread.pending_hw = None
+            self._on_hw(hw)
+        snap = self._thread.latest_snap
+        if snap is not None and snap is not self._emitted:
+            self._emitted = snap
+            self._on_update(snap)
 
     def _on_update(self, snap: SystemSnapshot) -> None:
         self.latest = snap

@@ -67,7 +67,7 @@ O Nexus Booster foi construído com três princípios:
 
 ### Modo 1 — Instalador pronto (recomendado)
 
-Baixe **`NexusBooster-Setup-1.0.1.exe`** nos [**Releases do GitHub**](https://github.com/xStorm95/Meus-projetos/releases),
+Baixe **`NexusBooster-Setup-1.1.0.exe`** nos [**Releases do GitHub**](https://github.com/xStorm95/Meus-projetos/releases),
 dê dois cliques e avance no assistente (atalho na área de trabalho é opcional).
 
 O instalador inclui **desinstalador completo** e prepara o terreno para **atualizações
@@ -208,7 +208,7 @@ NexusBooster/
 │   │   └── build.bat           # gera dist/NexusBooster.exe
 │   └── installer/
 │       ├── nexusbooster.iss    # script Inno Setup
-│       └── build_installer.bat # gera NexusBooster-Setup-1.0.1.exe
+│       └── build_installer.bat # gera NexusBooster-Setup-1.1.0.exe
 ├── tools/
 │   ├── make_icon.py            # logo.svg → icon.ico
 │   ├── dev_ui_check.py         # verificação headless da interface
@@ -241,7 +241,7 @@ Pré-requisito: [Inno Setup 6](https://jrsoftware.org/isdl.php) + `dist\NexusBoo
 packaging\installer\build_installer.bat
 ```
 
-Saída: `installer_output\NexusBooster-Setup-1.0.1.exe` — instalação simples, atalho
+Saída: `installer_output\NexusBooster-Setup-1.1.0.exe` — instalação simples, atalho
 opcional na área de trabalho, desinstalador, tarefas opcionais (iniciar com o Windows)
 e suporte a atualizações (versões futuras sobrescrevem mantendo dados).
 
@@ -359,4 +359,4 @@ inicialização em `startup_backup\`. Removê-los não afeta o Windows.
 
 ---
 
-**Nexus Booster v1.0.1** · Python 3.12 · PySide6 · psutil · SQLite
+**Nexus Booster v1.1.0** · Python 3.12 · PySide6 · psutil · SQLite

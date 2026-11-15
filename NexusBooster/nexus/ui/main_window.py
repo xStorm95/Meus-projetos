@@ -5,8 +5,17 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from PySide6.QtCore import Qt, QTimer, Signal
-from PySide6.QtGui import QCloseEvent, QColor, QFont, QMouseEvent
+from PySide6.QtCore import QRectF, Qt, QTimer, Signal
+from PySide6.QtGui import (
+    QCloseEvent,
+    QColor,
+    QFont,
+    QMouseEvent,
+    QPainter,
+    QPainterPath,
+    QPen,
+    QPixmap,
+)
 from PySide6.QtWidgets import (
     QApplication,
     QFrame,
@@ -45,6 +54,55 @@ NAV_ITEMS = [
 ]
 
 GROUP_LABELS = {1: "Geral", 2: "Ferramentas", 3: "Sistema"}
+
+
+def _rounded_pixmap(pm: QPixmap, size: int, radius: int = 10) -> QPixmap:
+    """Redimensiona a imagem com cantos arredondados."""
+    out = QPixmap(size, size)
+    out.fill(Qt.GlobalColor.transparent)
+    p = QPainter(out)
+    p.setRenderHint(QPainter.RenderHint.Antialiasing)
+    path = QPainterPath()
+    path.addRoundedRect(QRectF(0.5, 0.5, size - 1, size - 1), radius, radius)
+    p.setClipPath(path)
+    p.drawPixmap(0, 0, size, size, pm)
+    p.setClipping(False)
+    acc = QColor(theme.ACCENT)
+    p.setPen(QPen(QColor(acc.red(), acc.green(), acc.blue(), 170), 1))
+    p.drawPath(path)
+    p.end()
+    return out
+
+
+class NeonEdge(QFrame):
+    """Moldura neon nas bordas da janela (decorativa, não captura mouse)."""
+
+    def __init__(self, parent: QWidget):
+        super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_NoSystemBackground, True)
+        self.raise_()
+
+    def paintEvent(self, event) -> None:
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        acc = QColor(theme.ACCENT)
+        r, g, b = acc.red(), acc.green(), acc.blue()
+        rect = QRectF(self.rect()).adjusted(1.0, 1.0, -1.0, -1.0)
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.setPen(QPen(QColor(r, g, b, 120), 1))
+        p.drawRect(rect)
+        p.setPen(QPen(QColor(r, g, b, 35), 3))
+        p.drawRect(rect.adjusted(1.5, 1.5, -1.5, -1.5))
+        # destaques de canto
+        p.setPen(QPen(QColor(r, g, b, 220), 2))
+        for cx, cy, sx, sy in (
+            (2, 2, 1, 1), (self.width() - 2, 2, -1, 1),
+            (2, self.height() - 2, 1, -1), (self.width() - 2, self.height() - 2, -1, -1),
+        ):
+            p.drawLine(cx, cy, cx + 14 * sx, cy)
+            p.drawLine(cx, cy, cx, cy + 14 * sy)
+        p.end()
 
 
 class SidebarButton(QFrame):
@@ -126,6 +184,17 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(1180, 720)
         self.resize(1360, 820)
 
+        # Ícone da janela a partir da imagem da marca
+        from nexus.core.paths import asset_path
+
+        brand = QPixmap()
+        if asset_path("brand.jpg").is_file():
+            brand.load(str(asset_path("brand.jpg")))
+        if not brand.isNull():
+            from PySide6.QtGui import QIcon
+
+            self.setWindowIcon(QIcon(_rounded_pixmap(brand, 64, radius=14)))
+
         self._tabs: dict[str, QWidget] = {}
         self._nav_buttons: dict[str, SidebarButton] = {}
         self._current_tab: Optional[str] = None
@@ -152,6 +221,10 @@ class MainWindow(QMainWindow):
         # Toast host cobre a janela inteira
         self.toast_host = ToastHost(central)
         services.toast_host = self.toast_host
+
+        # Moldura neon nas bordas da janela
+        self.neon_edge = NeonEdge(central)
+        self.neon_edge.raise_()
 
         self._build_tabs()
         self.navigate("dashboard")
@@ -183,11 +256,19 @@ class MainWindow(QMainWindow):
         lay.setContentsMargins(0, 18, 0, 14)
         lay.setSpacing(2)
 
-        # logo
+        # logo (imagem da marca enviada pelo usuário; fallback: ícone raio)
         logo_row = QHBoxLayout()
         logo_row.setContentsMargins(16, 0, 16, 18)
         logo_icon = QLabel()
-        logo_icon.setPixmap(icons.pixmap("bolt_filled", "accent", 30))
+        from nexus.core.paths import asset_path
+
+        brand = QPixmap()
+        if asset_path("brand.jpg").is_file():
+            brand.load(str(asset_path("brand.jpg")))
+        if not brand.isNull():
+            logo_icon.setPixmap(_rounded_pixmap(brand, 40))
+        else:
+            logo_icon.setPixmap(icons.pixmap("bolt_filled", "accent", 30))
         logo_row.addWidget(logo_icon)
         name_col = QVBoxLayout()
         name_col.setSpacing(0)
@@ -383,6 +464,10 @@ class MainWindow(QMainWindow):
         }
         self.page_subtitle.setText(subtitles.get(tab_id, ""))
         self.stack.setCurrentWidget(self._tabs[tab_id])
+        # transição suave entre abas
+        from nexus.ui.components import fade_in
+
+        fade_in(self._tabs[tab_id], duration_ms=200)
 
     # -------------------------------------------------------- monitor route
     def _on_monitor_update(self, snap) -> None:
@@ -418,27 +503,50 @@ class MainWindow(QMainWindow):
         else:
             self.boost_label.setText("")
 
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        if hasattr(self, "neon_edge"):
+            self.neon_edge.setGeometry(self.centralWidget().rect())
+
     # ------------------------------------------------------------ autodetect
     def _auto_detect_game(self) -> None:
-        """Detecta jogo em execução e inicia boost automático (se ativado)."""
-        try:
-            from nexus.games.profiles import get_profile
+        """Detecta jogo em execução (em thread) sem travar a interface."""
+        if getattr(self, "_detect_running", False):
+            return
+        self._detect_running = True
 
+        def job():
             games = self.services.db.games_all()
-            game = self.services.booster.detect_running_game(games)
+            return self.services.booster.detect_running_game(games)
+
+        def done(game) -> None:
+            self._detect_running = False
             if game and not self.services.booster.state.active:
                 if self.services.settings.get_bool("auto_boost"):
-                    ok, msg = self.services.booster.start(game)
-                    if ok:
-                        toast_for(
-                            self,
-                            f"Jogo detectado: {game.name}. Boost automático iniciado.",
-                            "success",
-                        )
+                    from nexus.core.worker import run_task
+
+                    def start_job():
+                        return self.services.booster.start(game)
+
+                    def start_done(res) -> None:
+                        ok, msg = res
+                        if ok:
+                            toast_for(
+                                self,
+                                f"Jogo detectado: {game.name}. Boost automático iniciado.",
+                                "success",
+                            )
+
+                    run_task(start_job, on_done=start_done)
                 else:
                     toast_for(self, f"Jogo detectado em execução: {game.name}", "info")
-        except Exception:  # noqa: BLE001
-            log.exception("auto-detecção de jogos falhou")
+
+        def fail(_msg) -> None:
+            self._detect_running = False
+
+        from nexus.core.worker import run_task
+
+        run_task(job, on_done=done, on_error=fail)
 
     # ---------------------------------------------------------------- close
     def closeEvent(self, event: QCloseEvent) -> None:

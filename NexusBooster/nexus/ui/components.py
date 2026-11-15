@@ -30,6 +30,7 @@ from PySide6.QtGui import (
     QPainter,
     QPainterPath,
     QPen,
+    QPixmap,
 )
 from PySide6.QtWidgets import (
     QDialog,
@@ -43,6 +44,7 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QSizePolicy,
     QVBoxLayout,
     QWidget,
@@ -78,22 +80,21 @@ def scaled_font(base: QFont, mult: float, bold: bool = False, min_pt: float = 7.
 # ------------------------------------------------------------------ Card
 
 
-class Card(QFrame):
-    """Cartão com cabeçalho (ícone + título) e área de conteúdo."""
+def _neon_path(p: QPainter, rect: QRectF, radius: float, width: float, color: QColor) -> None:
+    pen = QPen(color, width, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
+    p.setPen(pen)
+    p.setBrush(Qt.BrushStyle.NoBrush)
+    p.drawRoundedRect(rect, radius, radius)
 
-    def __init__(self, title: str = "", icon_name: str = "", parent=None):
+
+class Card(QFrame):
+    """Cartão com borda neon e cabeçalho (ícone + título)."""
+
+    def __init__(self, title: str = "", icon_name: str = "", parent=None, neon: bool = True):
         super().__init__(parent)
-        self.setObjectName("card")
-        self.setStyleSheet(
-            f"""
-            QFrame#card {{
-                background: {theme.CARD};
-                border: 1px solid {theme.BORDER};
-                border-radius: 14px;
-            }}
-            QFrame#card:hover {{ border-color: {theme.BORDER}; }}
-            """
-        )
+        self._neon = neon
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
+        self.setStyleSheet("QFrame { background: transparent; border: none; }")
         self._layout = QVBoxLayout(self)
         self._layout.setContentsMargins(18, 14, 18, 16)
         self._layout.setSpacing(10)
@@ -119,6 +120,81 @@ class Card(QFrame):
 
     def body_layout(self) -> QVBoxLayout:
         return self._layout
+
+    def paintEvent(self, event) -> None:
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        rect = QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
+        radius = 13.0
+        path = QPainterPath()
+        path.addRoundedRect(rect, radius, radius)
+        # fundo
+        p.fillPath(path, QColor(theme.CARD))
+        # brilho interno sutil (topo)
+        grad = QLinearGradient(rect.topLeft(), rect.bottomLeft())
+        grad.setColorAt(0, QColor(255, 255, 255, 8))
+        grad.setColorAt(1, QColor(255, 255, 255, 0))
+        p.fillPath(path, QBrush(grad))
+        if self._neon:
+            acc = accent()
+            r, g, b = acc.red(), acc.green(), acc.blue()
+            # borda neon nítida
+            _neon_path(p, rect, radius, 1.0, QColor(r, g, b, 150))
+            # halo interno (2 anéis suaves)
+            _neon_path(p, rect.adjusted(1, 1, -1, -1), radius - 1, 2.0, QColor(r, g, b, 45))
+            _neon_path(p, rect.adjusted(3, 3, -3, -3), radius - 3, 4.0, QColor(r, g, b, 16))
+        p.end()
+
+
+class HeroCard(Card):
+    """Cartão hero com imagem de marca ao fundo + sobreposição escura."""
+
+    def __init__(self, image_name: str = "brand.jpg", title: str = "", icon_name: str = "", parent=None):
+        super().__init__(title, icon_name, parent)
+        self._pm = QPixmap()
+        from nexus.core.paths import asset_path
+
+        p = asset_path(image_name)
+        if p.is_file():
+            self._pm.load(str(p))
+
+    def paintEvent(self, event) -> None:
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        rect = QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
+        radius = 13.0
+        path = QPainterPath()
+        path.addRoundedRect(rect, radius, radius)
+        p.fillPath(path, QColor(theme.CARD))
+
+        if not self._pm.isNull():
+            w, h = self.width(), self.height()
+            # desenha a imagem 'cover' na metade direita, esmaecendo
+            iw, ih = self._pm.width(), self._pm.height()
+            target_h = h * 1.05
+            target_w = target_h * (iw / ih)
+            tx = w - target_w * 0.72
+            target = QRectF(tx, (h - target_h) / 2, target_w, target_h)
+            p.save()
+            p.setClipPath(path)
+            p.setOpacity(0.55)
+            p.drawPixmap(target.toRect(), self._pm)
+            p.setOpacity(1.0)
+            # esmaece a imagem em direção ao conteúdo (esquerda)
+            fade = QLinearGradient(QPointF(w * 0.35, 0), QPointF(w * 0.95, 0))
+            fade.setColorAt(0.0, QColor(theme.CARD))
+            fade.setColorAt(0.55, QColor(10, 14, 23, 190))
+            fade.setColorAt(1.0, QColor(10, 14, 23, 120))
+            p.fillRect(rect, QBrush(fade))
+            p.restore()
+
+        # borda neon (igual ao Card)
+        acc = accent()
+        r, g, b = acc.red(), acc.green(), acc.blue()
+        _neon_path(p, rect, radius, 1.0, QColor(r, g, b, 150))
+        _neon_path(p, rect.adjusted(1, 1, -1, -1), radius - 1, 2.0, QColor(r, g, b, 45))
+        _neon_path(p, rect.adjusted(3, 3, -3, -3), radius - 3, 4.0, QColor(r, g, b, 16))
+        p.end()
 
 
 class SectionTitle(QLabel):
@@ -219,8 +295,8 @@ class GaugeRing(QFrame):
         self._target: Optional[float] = None
         self.setFixedSize(size, size)
         self._anim = QVariantAnimation(self)
-        self._anim.setDuration(500)
-        self._anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self._anim.setDuration(650)
+        self._anim.setEasingCurve(QEasingCurve.Type.OutQuart)
         self._anim.valueChanged.connect(self._on_anim)
 
     def set_value(self, value: Optional[float], sub: str = "") -> None:
@@ -516,11 +592,13 @@ class ToggleSwitch(QFrame):
     def isChecked(self) -> bool:
         return self._checked
 
-    def setChecked(self, checked: bool) -> None:
+    def setChecked(self, checked: bool, emit: bool = False) -> None:
         if checked == self._checked:
             return
         self._checked = checked
         self._animate()
+        if emit:
+            self.toggled.emit(self._checked)
 
     def toggle(self) -> None:
         self._checked = not self._checked
@@ -555,6 +633,61 @@ class ToggleSwitch(QFrame):
         p.setBrush(QColor("#ffffff"))
         p.drawEllipse(QRectF(tx, 2.5, h - 5, h - 5))
         p.end()
+
+
+# ------------------------------------------------------- animações/scroll
+
+
+def fade_in(widget: QWidget, duration_ms: int = 220) -> None:
+    """Fade suave ao exibir um widget (removido ao fim para não pesar repaints)."""
+    effect = QGraphicsOpacityEffect(widget)
+    widget.setGraphicsEffect(effect)
+    anim = QVariantAnimation(widget)
+    anim.setDuration(duration_ms)
+    anim.setStartValue(0.0)
+    anim.setEndValue(1.0)
+    anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+    anim.valueChanged.connect(effect.setOpacity)
+
+    def _cleanup() -> None:
+        widget.setGraphicsEffect(None)
+
+    anim.finished.connect(_cleanup)
+    effect.setOpacity(0.0)
+    anim.start()
+    widget._fade_anim = anim  # keep-alive
+
+
+class SmoothScrollArea(QScrollArea):
+    """QScrollArea com rolagem animada suave (roda do mouse)."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._scroll_anim: Optional[QVariantAnimation] = None
+
+    def wheelEvent(self, event) -> None:
+        bar = self.verticalScrollBar()
+        if bar is None or not bar.isVisible():
+            super().wheelEvent(event)
+            return
+        delta = event.angleDelta().y()
+        if delta == 0:
+            super().wheelEvent(event)
+            return
+        target = max(bar.minimum(), min(bar.maximum(), bar.value() - int(delta * 1.6)))
+
+        if self._scroll_anim is not None:
+            self._scroll_anim.stop()
+
+        anim = QVariantAnimation(self)
+        anim.setDuration(280)
+        anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+        anim.setStartValue(bar.value())
+        anim.setEndValue(target)
+        anim.valueChanged.connect(lambda v, b=bar: b.setValue(int(v)))
+        anim.start()
+        self._scroll_anim = anim
+        event.accept()
 
 
 # ---------------------------------------------------------------- Toast

@@ -28,7 +28,7 @@ class _ProcessTable(QTableWidget):
     """Tabela de processos reutilizável (aba Processos + diálogo de seleção)."""
 
     def __init__(self, services, selectable_check: bool = False):
-        super().__init__(0, 7 if not selectable_check else 6)
+        super().__init__(0, 6 if not selectable_check else 6)
         self.services = services
         self.selectable = selectable_check
         self._data: list = []
@@ -64,6 +64,7 @@ class _ProcessTable(QTableWidget):
         return names
 
     def populate(self) -> None:
+        self.setUpdatesEnabled(False)
         self.setRowCount(0)
         for p in self._data[:400]:
             row = self.rowCount()
@@ -88,6 +89,7 @@ class _ProcessTable(QTableWidget):
             self.setItem(row, base + 4, QTableWidgetItem(status))
             self.setItem(row, base + 5, QTableWidgetItem(p.exe or "—"))
         self.resizeRowsToContents()
+        self.setUpdatesEnabled(True)
 
 
 def QColor_safe():

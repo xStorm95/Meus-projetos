@@ -55,3 +55,11 @@ def exe_path() -> str:
     if is_frozen():
         return sys.executable
     return str(Path(__file__).resolve().parent.parent.parent / "main.py")
+
+
+def asset_path(name: str) -> Path:
+    """Caminho de um asset (assets/) — funciona em dev e no build PyInstaller."""
+    if is_frozen():
+        base = Path(getattr(sys, "_MEIPASS", "")) if getattr(sys, "_MEIPASS", "") else Path(sys.executable).parent
+        return base / "assets" / name
+    return Path(__file__).resolve().parent.parent.parent / "assets" / name

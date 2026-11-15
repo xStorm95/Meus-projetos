@@ -115,6 +115,7 @@ QHeaderView::section {{
     padding: 8px 10px; font-weight: 600; font-size: 12px;
 }}
 QTableWidget::item {{ padding: 6px 8px; }}
+QTableWidget::item:hover {{ background: #14202f; }}
 QTableWidget::item:selected {{ background: #10344a; }}
 
 /* ---------- barras de progresso ---------- */

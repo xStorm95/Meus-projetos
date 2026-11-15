@@ -176,7 +176,6 @@ class InternetTab(BaseTab):
 
     def _render_ping(self, res) -> None:
         if res.error and not res.samples:
-            self.ping_avg.set_value("erro")
             self.ping_avg.set_value(res.error[:40], "falha")
             return
         for s in res.samples:
@@ -209,13 +208,13 @@ class InternetTab(BaseTab):
     # ---------------------------------------------------------- velocidade
     def _speed_test(self) -> None:
         self.speed_btn.setEnabled(False)
-        self.down_tile.set_value("testando…", "")
-        self.up_tile.set_value("testando…", "")
+        self.down_tile.set_value("testando…", "aguarde")
+        self.up_tile.set_value("…", "aguarde")
 
+        # Nota: nenhuma atualização de widget acontece na thread de fundo —
+        # o resultado chega aqui via sinal (thread-safe).
         def job():
-            return diagnostics.speed_test(
-                progress=lambda msg: self.down_tile.set_value("…", msg)
-            )
+            return diagnostics.speed_test(progress=None)
 
         def done(res) -> None:
             self.speed_btn.setEnabled(True)

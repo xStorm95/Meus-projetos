@@ -55,7 +55,11 @@ class GameTile(QFrame):
         self.setFixedSize(190 if not small else 160, 258 if not small else 220)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setStyleSheet(
-            f"background: {theme.CARD}; border: 1px solid {theme.BORDER}; border-radius: 14px;"
+            f"""
+            background: {theme.CARD}; border: 1px solid {theme.BORDER};
+            border-radius: 14px;
+            """
+            f"QFrame:hover {{ border-color: {theme.ACCENT}; }}"
         )
 
         lay = QVBoxLayout(self)
@@ -198,8 +202,10 @@ class LibraryTab(BaseTab):
         self.add(bar)
 
         # ---------------------------------------------------------- grade
+        from nexus.ui.components import SmoothScrollArea
+
         self.grid_card = Card("", "")
-        self.scroll = QScrollArea()
+        self.scroll = SmoothScrollArea()
         self.scroll.setWidgetResizable(True)
         self.scroll.setFrameShape(QFrame.Shape.NoFrame)
         self.scroll.setStyleSheet("QScrollArea { background: transparent; border: none; }")

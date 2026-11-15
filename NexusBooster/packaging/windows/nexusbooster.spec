@@ -12,7 +12,9 @@ a = Analysis(
     pathex=[str(ROOT)],
     binaries=[],
     datas=[
-        (str(ROOT / "assets" / "logo.svg"), "assets"),
+        (str(p), "assets")
+        for p in (ROOT / "assets").glob("*")
+        if p.is_file()
     ],
     hiddenimports=[
         "PySide6.QtSvg",

@@ -138,7 +138,7 @@ class CleanupTab(BaseTab):
 
     def _toggle_all(self, on: bool) -> None:
         for cid, row in self.rows.items():
-            row.toggle.setChecked(on)
+            row.toggle.setChecked(on, emit=True)
         self.clean_btn.setEnabled(bool(self._selected))
 
     # ------------------------------------------------------------ análise

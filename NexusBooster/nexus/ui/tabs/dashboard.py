@@ -80,7 +80,9 @@ class DashboardTab(BaseTab):
         self.services.monitor.hardware_ready.connect(self._on_hardware_ready)
 
         # ---------------------------------------------------------- hero
-        hero = Card("", "")
+        from nexus.ui.components import HeroCard
+
+        hero = HeroCard("brand.jpg", "", "")
         hero_h = QHBoxLayout()
         hero_h.setSpacing(24)
 

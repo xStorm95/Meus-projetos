@@ -143,14 +143,27 @@ class OptimizerWizard(QDialog):
         engine = self.services.engine
         create_rp = self.rp_check.isChecked()
 
-        def on_start(name: str) -> None:
-            dialog.begin_step(name)
+        # Ponte thread-safe: sinais Qt garantem que o diálogo só seja
+        # tocado pela thread principal (callbacks rodam na worker).
+        from PySide6.QtCore import QObject, Signal
 
-        def on_done(result) -> None:
-            dialog.step_done(result.title, result.ok, result.message)
+        class _Bridge(QObject):
+            step_started = Signal(str)
+            step_done = Signal(object)
+
+        bridge = _Bridge(dialog)
+        bridge.step_started.connect(dialog.begin_step)
+        bridge.step_done.connect(
+            lambda result: dialog.step_done(result.title, result.ok, result.message)
+        )
 
         def job():
-            return engine.run(selected, on_start, on_done, create_rp=create_rp)
+            return engine.run(
+                selected,
+                on_start=lambda name: bridge.step_started.emit(name),
+                on_done=lambda result: bridge.step_done.emit(result),
+                create_rp=create_rp,
+            )
 
         def done(results) -> None:
             ok_count = sum(1 for r in results if r.ok)

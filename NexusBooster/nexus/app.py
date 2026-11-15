@@ -137,6 +137,14 @@ def run() -> int:
 
     apply_theme(app, services.settings.get_str("accent") or "neon")
 
+    # Splash de abertura com a imagem da marca
+    from nexus.ui.splash import NexusSplash
+
+    splash = NexusSplash()
+    splash.show()
+    splash.message("Carregando interface…")
+    app.processEvents()
+
     from nexus.ui.main_window import MainWindow
     from nexus.ui.optimizer_wizard import OptimizerWizard
 
@@ -144,8 +152,14 @@ def run() -> int:
     win.optimize_requested.connect(
         lambda: (OptimizerWizard(services, win).exec())
     )
+    splash.message("Preparando monitoramento…")
+    app.processEvents()
     win.show()
     services.start()
+    splash.message("Pronto — bom jogo! ⚡")
+    from PySide6.QtCore import QTimer
+
+    QTimer.singleShot(650, splash.close)
 
     code = app.exec()
     log.info("Nexus Booster encerrado (código %s).", code)

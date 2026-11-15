@@ -1,7 +1,14 @@
 # Nexus Booster — dependências
 # Python 3.12+ recomendado (funciona em 3.10+)
+#
+# PySide6 limitado a <6.12: a versão 6.12.0 tem uma regressão de binding que
+# perde uma referência de None a cada chamada de método Qt que retorna nada
+# (QPainter.setPen, save/restore, drawLine, ...). Em Python < 3.12, None é um
+# objeto com refcount normal, e a pintura da interface derruba o app com
+# "Fatal Python error: none_dealloc". Remova o teto quando uma 6.12.x
+# corrigida for lançada e testada.
 
-PySide6>=6.6,<7
+PySide6>=6.6,<6.12
 psutil>=5.9
 
 # Opcionais/somente Windows — melhoram a detecção de hardware

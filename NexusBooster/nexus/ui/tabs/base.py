@@ -1,11 +1,13 @@
-"""Classe base das abas: área rolável com layout vertical padrão."""
+"""Classe base das abas: área rolável (suave) com layout vertical padrão."""
 
 from __future__ import annotations
 
-from PySide6.QtWidgets import QFrame, QScrollArea, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QFrame, QVBoxLayout, QWidget
+
+from nexus.ui.components import SmoothScrollArea
 
 
-class BaseTab(QScrollArea):
+class BaseTab(SmoothScrollArea):
     def __init__(self, services, main_window=None):
         super().__init__()
         self.services = services
