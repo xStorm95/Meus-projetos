@@ -31,3 +31,5 @@ __pycache__/
 NexusBooster/dist/
 NexusBooster/output/
 *.egg-info/
+# artefatos de download gerados localmente
+NexusBooster-v*.zip
