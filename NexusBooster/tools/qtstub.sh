@@ -11,7 +11,7 @@
 # ============================================================
 set -euo pipefail
 QTSTUB=/tmp/qtstub
-VENV=${VENV:-$(dirname "$0")/../../.venv/bin/python}
+VENV=${VENV:-$(cd "$(dirname "$0")/../.." && pwd)/.venv/bin/python}
 PY=$("$VENV" --version >/dev/null 2>&1 && echo "$VENV" || echo python3)
 
 mkdir -p "$QTSTUB"
@@ -28,7 +28,7 @@ done
 # stubs com símbolos coletados das libs+plugins do PySide6
 "$PY" <<'EOF'
 import subprocess, re, os, sys
-BASE = os.path.abspath(os.path.join(os.path.dirname(sys.executable), "..", "..",
+BASE = os.path.abspath(os.path.join(os.path.dirname(sys.executable), "..",
                                     "lib", "python3.11", "site-packages",
                                     "PySide6", "Qt"))
 DIRS = [os.path.join(BASE, "lib"), os.path.join(BASE, "plugins")]
