@@ -88,14 +88,25 @@ class SettingsTab(BaseTab):
         self.interval = Slider(Qt.Orientation.Horizontal)
         self.interval.setRange(500, 3000)
         self.interval.setSingleStep(250)
+        self.interval.setPageStep(500)
         self.interval.setValue(s.get_int("monitor_interval"))
-        self.interval.setFixedWidth(220)
-        self.interval_label = ThemeLabel(f"{self.interval.value()} ms", "body_sm")
+        self.interval.setFixedWidth(240)
         self.interval.valueChanged.connect(self._change_interval)
-        row_m.addWidget(self.interval)
+        row_m.addWidget(self.interval, 1)
+        self.interval_label = ThemeLabel(f"{self.interval.value()} ms", "value")
+        self.interval_label.setMinimumWidth(64)
+        self.interval_label.setAlignment(Qt.AlignmentFlag.AlignRight |
+                                         Qt.AlignmentFlag.AlignVCenter)
         row_m.addWidget(self.interval_label)
-        row_m.addStretch(1)
         mon.body_layout().addLayout(row_m)
+
+        # limites do intervalo sob o controle
+        limits = QHBoxLayout()
+        limits.addWidget(ThemeLabel("0,5 s (mais fluido)", "caption"))
+        limits.addStretch(1)
+        limits.addWidget(ThemeLabel("3 s (mais econômico)", "caption"))
+        mon.body_layout().addLayout(limits)
+
         mon.body_layout().addWidget(
             ThemeLabel("Define o equilíbrio entre fluidez dos gráficos e uso de CPU "
                        "do monitoramento.", "caption", wrap=True)

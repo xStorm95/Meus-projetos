@@ -806,7 +806,12 @@ class ProportionBar(QFrame):
 
 
 class GaugeRing(QFrame):
-    """Anel de progresso animado (0–100) com texto central."""
+    """Anel de progresso (0–100) com texto central.
+
+    Atualizações de monitoramento (mesmo alvo ou variação pequena) aplicam
+    ajuste rápido de 120ms; a animação completa só ocorre na primeira leitura
+    ou em saltos grandes — o número sempre assenta num valor estável.
+    """
 
     def __init__(self, label: str = "", suffix: str = "%", parent=None,
                  size: int = 150, warn_at: float = 85.0):
@@ -820,7 +825,6 @@ class GaugeRing(QFrame):
         self._target: Optional[float] = None
         self.setFixedSize(size, size)
         self._anim = QVariantAnimation(self)
-        self._anim.setDuration(max(200, theme.dur("slow") * 3))
         self._anim.setEasingCurve(QEasingCurve.Type.OutCubic)
         self._anim.valueChanged.connect(self._on_anim)
         bind_retheme(self, self.update)
@@ -831,22 +835,46 @@ class GaugeRing(QFrame):
             self._target = None
             self.update()
             return
-        self._target = float(value)
-        duration = theme.dur("slow")
-        if duration <= 0:
-            self._display = float(value)
+        new = float(value)
+        first = self._target is None
+        prev = self._target if self._target is not None else self._display
+        self._target = new
+        self._sub = sub or self._sub
+
+        # mesmo valor (±0.5): apenas garante o estado final, sem animar
+        if abs(new - self._display) <= 0.5 and not first:
+            self._anim.stop()
+            self._display = new
             self.update()
             return
+
+        d = theme.dur("fast")
+        if d <= 0:
+            self._display = new
+            self.update()
+            return
+        # primeira leitura ou salto grande → animação completa;
+        # fluxo contínuo do monitor → ajuste rápido e discreto
+        big_jump = first or abs(new - prev) > 25.0
         self._anim.stop()
-        self._anim.setDuration(420)
+        self._anim.setDuration(420 if big_jump else max(90, int(d * 0.75)))
         self._anim.setStartValue(self._display)
-        self._anim.setEndValue(float(value))
+        self._anim.setEndValue(new)
         self._anim.start()
         self.update()
 
     def _on_anim(self, v: float) -> None:
         self._display = v
         self.update()
+
+    def _value_color(self) -> str:
+        if self._target is None:
+            return theme.TEXT
+        if self._target >= 95:
+            return theme.DANGER
+        if self._target >= self._warn_at:
+            return theme.WARNING
+        return theme.TEXT
 
     def paintEvent(self, event) -> None:
         p = QPainter(self)
@@ -875,7 +903,7 @@ class GaugeRing(QFrame):
             p.drawArc(rect, start, int(span * ratio))
 
         # textos — value centrado acima do centro; label e sub bem separados
-        p.setPen(QColor(theme.TEXT))
+        p.setPen(QColor(self._value_color()))
         p.setFont(px_font(max(14, int(w * 0.16)), QFont.Weight.DemiBold))
         if self._target is None:
             p.drawText(QRectF(0, h * 0.28, w, h * 0.30),

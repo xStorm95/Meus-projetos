@@ -83,15 +83,38 @@ class DashboardTab(BaseTab):
 
         # ------------------------------------------------- faixa de saúde
         health = Card("Saúde do sistema", "activity")
+
+        # veredito (atualizado a cada ciclo do monitor)
+        verdict_row = QHBoxLayout()
+        verdict_row.setSpacing(theme.pad("sm"))
+        self._verdict_icon = QLabel()
+        self._verdict_icon.setPixmap(icons.pixmap("check_circle", "success", 20))
+        verdict_row.addWidget(self._verdict_icon)
+        verdict_col = QVBoxLayout()
+        verdict_col.setSpacing(0)
+        self.verdict_label = ThemeLabel("Monitorando…", "label")
+        verdict_col.addWidget(self.verdict_label)
+        self.verdict_sub = ThemeLabel(
+            "O índice considera CPU, RAM, espaço em disco, temperatura e inicialização.",
+            "caption", wrap=True,
+        )
+        verdict_col.addWidget(self.verdict_sub)
+        verdict_row.addLayout(verdict_col, 1)
+        health.body_layout().addLayout(verdict_row)
+
+        # anéis — uma coluna de largura igual para cada
         rings = QHBoxLayout()
-        rings.setSpacing(theme.pad("xl"))
+        rings.setSpacing(theme.pad("lg"))
         self.cpu_ring = GaugeRing("CPU", size=136)
         self.gpu_ring = GaugeRing("GPU", size=136)
         self.ram_ring = GaugeRing("RAM", size=136)
         self.disk_ring = GaugeRing("Disco (C:)", size=136)
         for ring in (self.cpu_ring, self.gpu_ring, self.ram_ring, self.disk_ring):
-            rings.addWidget(ring, 0, Qt.AlignmentFlag.AlignHCenter)
-        rings.addStretch(1)
+            col = QVBoxLayout()
+            col.addWidget(ring, 0, Qt.AlignmentFlag.AlignHCenter)
+            rings.addLayout(col, 1)
+
+        # temperaturas ao lado, em coluna compacta
         temps = QVBoxLayout()
         temps.setSpacing(theme.pad("sm"))
         self.cpu_temp_tile = StatTile("thermometer", "Temp. CPU", "N/D", color="muted")
@@ -384,6 +407,19 @@ class DashboardTab(BaseTab):
     def _update_score(self) -> None:
         score, issues = self._score()
         self._last_score = score
+
+        # veredito do painel de saúde
+        if getattr(self, "_last_snap", None) is None:
+            self.verdict_label.setText("Monitorando…")
+            self._verdict_icon.setPixmap(icons.pixmap("info", "muted", 20))
+        elif not issues:
+            self.verdict_label.setText("Tudo operando normalmente")
+            self._verdict_icon.setPixmap(icons.pixmap("check_circle", "success", 20))
+        else:
+            worst = "danger" if any(c == "danger" for _i, c, _t in issues) else "warning"
+            self.verdict_label.setText(f"{len(issues)} atenção(ões) — veja as recomendações")
+            self._verdict_icon.setPixmap(icons.pixmap("alert", worst, 20))
+
         # limpa issues antigas
         while self.issues_box.count():
             item = self.issues_box.takeAt(0)

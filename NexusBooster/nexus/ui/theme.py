@@ -522,11 +522,12 @@ QCheckBox::indicator:checked, QRadioButton::indicator:checked {{
 }}
 QCheckBox:disabled, QRadioButton:disabled {{ color: {pal.text_disabled}; }}
 
-QSlider::groove:horizontal {{ height: 4px; background: {pal.border_strong}; border-radius: 2px; }}
-QSlider::sub-page:horizontal {{ background: {accent}; border-radius: 2px; }}
+QSlider {{ min-height: 24px; }}
+QSlider::groove:horizontal {{ height: 6px; background: {pal.border_strong}; border-radius: 3px; }}
+QSlider::sub-page:horizontal {{ background: {accent}; border-radius: 3px; }}
 QSlider::handle:horizontal {{
-    background: {pal.text}; width: 14px; height: 14px; margin: -6px 0;
-    border-radius: 7px;
+    background: {pal.text}; width: 16px; height: 16px; margin: -6px 0;
+    border-radius: 8px;
 }}
 QSlider::handle:horizontal:hover {{ background: {accent}; }}
 
