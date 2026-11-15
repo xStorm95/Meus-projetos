@@ -309,7 +309,7 @@ class PcOptimizerTab(BaseTab):
 
         if not confirm(
             self, "Restaurar efeitos visuais",
-            "Todos os ajustes visuais aplicados pelo Nexus Booster serão revertidos "
+            "Todos os ajustes visuais aplicados pelo DK serão revertidos "
             "para os valores originais.",
             dangerous=True, confirm_text="Restaurar",
         ):

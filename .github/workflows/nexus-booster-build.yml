@@ -1,10 +1,10 @@
-name: Nexus Booster — Build Windows
+name: DK — Build Windows
 
 on:
   workflow_dispatch:
   push:
     branches: ["main", "arena/*"]
-    tags: ["nexus-booster-v*"]
+    tags: ["dk-v*", "nexus-booster-v*"]
     paths:
       - "NexusBooster/**"
       - ".github/workflows/nexus-booster-build.yml"
@@ -60,18 +60,18 @@ jobs:
         shell: bash
         run: |
           VERSION=$(python -c "from nexus.constants import APP_VERSION; print(APP_VERSION)")
-          TAG="nexus-booster-v${VERSION}"
-          ASSET="installer_output/NexusBooster-Setup-${VERSION}.exe"
+          TAG="dk-v${VERSION}"
+          ASSET="installer_output/DK-Setup-${VERSION}.exe"
           echo "Versão: ${VERSION}"
           ls -la installer_output || true
           if gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "Release ${TAG} já existe — mantida intacta (aumente a versão para publicar outra)."
           else
             gh release create "$TAG" "$ASSET" -R "$GITHUB_REPOSITORY" \
-              --title "Nexus Booster v${VERSION}" \
+              --title "DK v${VERSION}" \
               --notes "Otimizador profissional de desempenho para Windows e jogos.
 
-          **Instalação:** baixe \`NexusBooster-Setup-${VERSION}.exe\` abaixo, dê dois cliques e avance no assistente (atalho na área de trabalho opcional).
+          **Instalação:** baixe \`DK-Setup-${VERSION}.exe\` abaixo, dê dois cliques e avance no assistente (atalho na área de trabalho opcional).
 
           - Windows 10 (1709+) ou Windows 11, 64 bits
           - Inclui desinstalador completo
@@ -85,6 +85,6 @@ jobs:
       - name: Enviar artefato (backup)
         uses: actions/upload-artifact@v4
         with:
-          name: NexusBooster-Setup-${{ github.run_number }}
-          path: NexusBooster/installer_output/NexusBooster-Setup-*.exe
+          name: DK-Setup-${{ github.run_number }}
+          path: NexusBooster/installer_output/DK-Setup-*.exe
           if-no-files-found: error

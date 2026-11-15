@@ -2,10 +2,10 @@
 
 import platform
 
-APP_NAME = "Nexus Booster"
+APP_NAME = "DK"
 APP_ID = "nexusbooster"
-APP_VERSION = "1.3.0"
-ORG_NAME = "Nexus Booster"
+APP_VERSION = "1.4.0"
+ORG_NAME = "DK"
 
 # Cores base do tema (accent "roxo" = cor do ícone oficial da marca).
 ACCENTS = {

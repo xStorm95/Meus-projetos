@@ -81,23 +81,7 @@ def _rounded_pixmap(pm: QPixmap, size: int, radius: int = 10) -> QPixmap:
 
 
 def _brand_pixmap(size: int) -> QPixmap:
-    from nexus.core.paths import asset_path
-
-    pm = QPixmap()
-    # ícone oficial (assets/icon.png — emblema circular com transparência)
-    icon_file = asset_path("icon.png")
-    if icon_file.is_file():
-        pm.load(str(icon_file))
-        if not pm.isNull():
-            return pm.scaled(size, size, Qt.AspectRatioMode.KeepAspectRatio,
-                             Qt.TransformationMode.SmoothTransformation)
-    # fallback: imagem da marca em quadrado arredondado
-    if asset_path("brand.jpg").is_file():
-        pm.load(str(asset_path("brand.jpg")))
-    if pm.isNull():
-        pm = icons.pixmap("bolt_filled", "accent", size)
-    return _rounded_pixmap(pm.scaled(size, size, Qt.AspectRatioMode.KeepAspectRatioByExpanding,
-                                     Qt.TransformationMode.SmoothTransformation), size)
+    return icons.brand_pixmap(size)
 
 
 class NavButton(QFrame):
@@ -226,13 +210,18 @@ class MainWindow(QMainWindow):
     def __init__(self, services):
         super().__init__()
         self.services = services
-        self.setWindowTitle(f"Nexus Booster — Otimizador de Desempenho {__version__}")
+        self.setWindowTitle(f"DK — Otimizador de Desempenho {__version__}")
         self.setMinimumSize(1120, 700)
         self.resize(1340, 800)
 
         # tema salvo (modo + acento + densidade) — lido antes de construir
         s = services.settings
-        mode = s.get_str("theme_mode") or "dark"
+        mode = s.get_str("theme_mode") or "light"
+        # migração única: identidade DK é roxo & branco — quem nunca escolheu
+        # um tema explicitamente passa para o claro
+        if not s.get_str("theme_mode") and not s.get_bool("theme_migrated_claro"):
+            s.set("theme_mode", "light")
+            s.set("theme_migrated_claro", True)
         if mode == "system":
             mode = "dark" if theme.system_prefers_dark() else "light"
         accent_key = s.get_str("accent") or None
@@ -328,8 +317,8 @@ class MainWindow(QMainWindow):
         head.addWidget(self._logo)
         self._brand_col = QVBoxLayout()
         self._brand_col.setSpacing(0)
-        app = ThemeLabel("Nexus", "label")
-        sub = ThemeLabel("Booster", "accent")
+        app = ThemeLabel("DK", "label")
+        sub = ThemeLabel("Otimizador", "accent")
         self._brand_col.addWidget(app)
         self._brand_col.addWidget(sub)
         head.addLayout(self._brand_col)
@@ -605,10 +594,10 @@ class MainWindow(QMainWindow):
         if not QSystemTrayIcon.isSystemTrayAvailable():
             return
         self._tray = QSystemTrayIcon(QIcon(_brand_pixmap(64)), self)
-        self._tray.setToolTip(f"Nexus Booster v{__version__}")
+        self._tray.setToolTip(f"DK v{__version__}")
 
         menu = QMenu()
-        act_open = menu.addAction("Abrir Nexus Booster")
+        act_open = menu.addAction("Abrir DK")
         act_open.triggered.connect(self._show_from_tray)
         menu.addSeparator()
         act_opt = menu.addAction("Otimizar agora")
@@ -617,7 +606,7 @@ class MainWindow(QMainWindow):
         self._tray_stop_act.setEnabled(False)
         self._tray_stop_act.triggered.connect(self._tray_stop_boost)
         menu.addSeparator()
-        act_quit = menu.addAction("Sair do Nexus Booster")
+        act_quit = menu.addAction("Sair do DK")
         act_quit.triggered.connect(self._quit_from_tray)
         self._tray.setContextMenu(menu)
         self._tray.activated.connect(
@@ -647,7 +636,7 @@ class MainWindow(QMainWindow):
             ok, msg = res
             if self._tray is not None and self._tray.isVisible():
                 self._tray.showMessage(
-                    "Nexus Booster", msg,
+                    "DK", msg,
                     QSystemTrayIcon.MessageIcon.Information if ok
                     else QSystemTrayIcon.MessageIcon.Warning, 3000,
                 )
@@ -697,8 +686,8 @@ class MainWindow(QMainWindow):
             act.setEnabled(state.active)
         if self._tray is not None:
             self._tray.setToolTip(
-                f"Nexus Booster v{__version__} — boost ativo" if state.active
-                else f"Nexus Booster v{__version__}"
+                f"DK v{__version__} — boost ativo" if state.active
+                else f"DK v{__version__}"
             )
 
     def _render_boost_badge(self) -> None:
@@ -768,7 +757,7 @@ class MainWindow(QMainWindow):
             self.hide()
             if not self.services.settings.get_bool("tray_notice_shown"):
                 self._tray.showMessage(
-                    "Nexus Booster",
+                    "DK",
                     "O aplicativo continua ativo na bandeja (ícone roxo). "
                     "Clique duas vezes para reabrir ou use o botão direito → Sair "
                     "para encerrar de vez.",

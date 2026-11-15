@@ -41,7 +41,7 @@ class GameBoosterTab(BaseTab):
         self.session_status = ThemeLabel("Nenhuma sessão ativa", "title_sm")
         session_card.body_layout().addWidget(self.session_status)
         self.session_detail = ThemeLabel(
-            "Ao iniciar, o Nexus Booster ativa o plano de energia de desempenho e "
+            "Ao iniciar, o DK ativa o plano de energia de desempenho e "
             "suspende aplicativos em segundo plano. Ao encerrar (manualmente ou "
             "quando o jogo fecha), tudo é restaurado automaticamente.",
             "body_sm", wrap=True,
@@ -164,7 +164,7 @@ class GameBoosterTab(BaseTab):
         else:
             self.session_status.setText("Nenhuma sessão ativa")
             self.session_detail.setText(
-                "Ao iniciar, o Nexus Booster ativa o plano de energia de desempenho e "
+                "Ao iniciar, o DK ativa o plano de energia de desempenho e "
                 "suspende aplicativos em segundo plano. Tudo é restaurado ao final."
             )
             self.start_btn.setEnabled(True)

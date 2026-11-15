@@ -17,7 +17,7 @@ com medições reais.
 2. [Requisitos](#2-requisitos)
 3. [Instalação (usuário final)](#3-instalação-usuário-final)
 4. [Manual de utilização (por aba)](#4-manual-de-utilização-por-aba)
-5. [O que o Nexus Booster NUNCA faz](#5-o-que-o-nexus-booster-nunca-faz)
+5. [O que o DK NUNCA faz](#5-o-que-o-nexus-booster-nunca-faz)
 6. [Compilação e empacotamento (desenvolvedor)](#6-compilação-e-empacotamento-desenvolvedor)
 7. [Arquitetura do código](#7-arquitetura-do-código)
 8. [Execução em modo desenvolvimento](#8-execução-em-modo-desenvolvimento)
@@ -28,7 +28,7 @@ com medições reais.
 
 ## 1. Visão geral
 
-O Nexus Booster foi construído com três princípios:
+O DK foi construído com três princípios:
 
 | Princípio | Na prática |
 |---|---|
@@ -67,7 +67,7 @@ O Nexus Booster foi construído com três princípios:
 
 ### Modo 1 — Instalador pronto (recomendado)
 
-Baixe **`NexusBooster-Setup-1.3.0.exe`** nos [**Releases do GitHub**](https://github.com/xStorm95/Meus-projetos/releases),
+Baixe **`DK-Setup-1.4.0.exe`** nos [**Releases do GitHub**](https://github.com/xStorm95/Meus-projetos/releases),
 dê dois cliques e avance no assistente (atalho na área de trabalho é opcional).
 
 O instalador inclui **desinstalador completo** e prepara o terreno para **atualizações
@@ -92,7 +92,7 @@ Detalhes em `COMO-INSTALAR.txt`.
 
 ### 🏠 Dashboard
 
-Ao abrir, o Nexus Booster identifica seu hardware (CPU, GPU, RAM, discos, placa-mãe)
+Ao abrir, o DK identifica seu hardware (CPU, GPU, RAM, discos, placa-mãe)
 e começa a monitorar em tempo real.
 
 - **Anel "Status geral"** — índice simplificado calculado com métricas atuais
@@ -108,7 +108,7 @@ e começa a monitorar em tempo real.
 | Etapa | Descrição | Reversível |
 |---|---|---|
 | Limpeza rápida | Temporários do usuário + caches de shader + relatórios de erro antigos | ✅ (arquivos apagados, mas apenas caches) |
-| Plano de energia | Ativa/cria o plano "Nexus Booster — Desempenho" | ✅ restaura o anterior |
+| Plano de energia | Ativa/cria o plano "DK — Desempenho" | ✅ restaura o anterior |
 | Efeitos visuais | Desativa transparências/animações não essenciais (fontes preservadas) | ✅ valores originais salvos |
 | Cache DNS | `ipconfig /flushdns` | — |
 | Suspender apps | Suspende (não fecha) apps da lista do perfil | ✅ retoma automaticamente |
@@ -120,7 +120,7 @@ e começa a monitorar em tempo real.
    congelados na memória, prontos para voltar
 3. Ao encerrar (botão ou quando o jogo fecha), **tudo é restaurado automaticamente**
 
-Ative **detecção automática** para o Nexus Booster perceber quando você abre um jogo
+Ative **detecção automática** para o DK perceber quando você abre um jogo
 da biblioteca — com **boost automático** opcional. Nada é enviado para a internet.
 
 ### 🎮 Biblioteca de Jogos
@@ -143,7 +143,7 @@ apresentação real de quadros do processo do jogo:
 4. **Registrar resultado** permite comparar antes × depois de otimizações
 
 > ⚠️ Sem PresentMon o recurso fica marcado como **não suportado** — por decisão de
-> projeto, o Nexus Booster não estima FPS.
+> projeto, o DK não estima FPS.
 
 ### 🧹 Limpeza Avançada
 
@@ -179,7 +179,7 @@ arquivos criados nos últimos 10 minutos ficam de fora.
 
 ---
 
-## 5. O que o Nexus Booster NUNCA faz
+## 5. O que o DK NUNCA faz
 
 - ❌ Não desativa Windows Defender, Firewall, Windows Update ou serviços essenciais
 - ❌ Não finaliza/suspende processos críticos do Windows (lista de proteção ativa)
@@ -205,10 +205,10 @@ NexusBooster/
 │   ├── windows/
 │   │   ├── nexusbooster.spec   # spec do PyInstaller
 │   │   ├── version_info.txt    # versão do .exe
-│   │   └── build.bat           # gera dist/NexusBooster.exe
+│   │   └── build.bat           # gera dist/DK.exe
 │   └── installer/
 │       ├── nexusbooster.iss    # script Inno Setup
-│       └── build_installer.bat # gera NexusBooster-Setup-1.3.0.exe
+│       └── build_installer.bat # gera DK-Setup-1.4.0.exe
 ├── tools/
 │   ├── make_icon.py            # logo.svg → icon.ico
 │   ├── dev_ui_check.py         # verificação headless da interface
@@ -219,7 +219,7 @@ NexusBooster/
 ### Gerar o .EXE (Windows)
 
 Jeito automático (nuvem): todo push que altera `NexusBooster/**` dispara o workflow
-**"Nexus Booster — Build Windows"** (GitHub Actions), que compila o instalador e
+**"DK — Build Windows"** (GitHub Actions), que compila o instalador e
 publica em [Releases](https://github.com/xStorm95/Meus-projetos/releases). Também pode
 ser disparado manualmente na aba *Actions* do repositório.
 
@@ -231,17 +231,17 @@ packaging\windows\build.bat
 ```
 
 O script: cria venv → instala dependências → gera o ícone → compila com PyInstaller
-(**sem console**, ícone e versão embutidos) → gera `dist\NexusBooster.exe`.
+(**sem console**, ícone e versão embutidos) → gera `dist\DK.exe`.
 
 ### Gerar o instalador
 
-Pré-requisito: [Inno Setup 6](https://jrsoftware.org/isdl.php) + `dist\NexusBooster.exe` gerado.
+Pré-requisito: [Inno Setup 6](https://jrsoftware.org/isdl.php) + `dist\DK.exe` gerado.
 
 ```bat
 packaging\installer\build_installer.bat
 ```
 
-Saída: `installer_output\NexusBooster-Setup-1.3.0.exe` — instalação simples, atalho
+Saída: `installer_output\DK-Setup-1.4.0.exe` — instalação simples, atalho
 opcional na área de trabalho, desinstalador, tarefas opcionais (iniciar com o Windows)
 e suporte a atualizações (versões futuras sobrescrevem mantendo dados).
 
@@ -325,7 +325,7 @@ QT_QPA_PLATFORM=offscreen python tools/take_screenshots.py
 ## 9. Perguntas frequentes
 
 **O app promete mais FPS?**
-Não. O Nexus Booster otimiza recursos do sistema e recomenda ajustes reais de cada
+Não. O DK otimiza recursos do sistema e recomenda ajustes reais de cada
 jogo. O ganho varia por máquina — por isso o FPS Monitor existe: para você **medir**
 antes e depois com dados reais.
 
@@ -359,4 +359,4 @@ inicialização em `startup_backup\`. Removê-los não afeta o Windows.
 
 ---
 
-**Nexus Booster v1.3.0** · Python 3.12 · PySide6 · psutil · SQLite
+**DK v1.4.0** · Python 3.12 · PySide6 · psutil · SQLite

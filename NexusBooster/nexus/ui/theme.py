@@ -1,4 +1,4 @@
-"""Sistema de design do Nexus Booster: tokens, paletas e geração de QSS.
+"""Sistema de design do DK: tokens, paletas e geração de QSS.
 
 Tokens semânticos (dark/light), derivação de accent (hover/pressed/subtle),
 escala de espaçamento/raios/durações, detecção de "reduzir animações" do
@@ -116,16 +116,16 @@ DARK = Palette(
 
 LIGHT = Palette(
     name="light",
-    bg="#eef0f4",
-    surface1="#f7f8fa",
+    bg="#f4f2fa",          # branco com leve tint roxo (identidade DK)
+    surface1="#faf9fd",
     surface2="#ffffff",
-    surface3="#ffffff",
-    border="#e2e6ec",
-    border_strong="#c8ced9",
-    text="#1a1d24",
-    text_muted="#4d5563",
-    text_faint="#6b7280",
-    text_disabled="#9aa2af",
+    surface3="#f3f1f9",
+    border="#e6e2f1",      # bordas com tint roxo
+    border_strong="#cfc7e3",
+    text="#221a33",        # texto quase-preto com fundo roxo
+    text_muted="#55506b",
+    text_faint="#736d8c",
+    text_disabled="#a49fb8",
     success="#157f4f",
     success_bg="#e3f5ec",
     warning="#8a5a00",
@@ -142,9 +142,9 @@ ACCENT_KEYS = list(ACCENTS.keys())
 
 # Estado corrente -----------------------------------------------------------
 
-MODE: str = "dark"
+MODE: str = "light"
 ACCENT: str = ACCENTS[DEFAULT_ACCENT]
-_palette: Palette = DARK
+_palette: Palette = LIGHT
 
 # Alias compatíveis com o código existente (atualizados por set_theme()).
 BG = _palette.bg
@@ -418,10 +418,10 @@ QPushButton[variant="primary"]:disabled {{
 }}
 
 QPushButton[variant="subtle"] {{
-    background: transparent; color: {pal.text_muted}; border: 1px solid transparent;
+    background: {pal.surface3}; color: {pal.text}; border: 1px solid {pal.border_strong};
 }}
 QPushButton[variant="subtle"]:hover {{
-    background: {acc_subtle}; color: {acc_text};
+    background: {acc_subtle}; color: {acc_text}; border-color: {acc_text};
 }}
 QPushButton[variant="subtle"]:pressed {{ background: {pal.border}; }}
 QPushButton[variant="subtle"]:focus {{ border: 2px solid {focus}; padding: 6px 15px; }}

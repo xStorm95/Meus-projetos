@@ -1,6 +1,6 @@
 """Regras de segurança: processos/serviços protegidos e validação de exclusões.
 
-O Nexus Booster NUNCA permite:
+O DK NUNCA permite:
 - finalizar/suspender processos essenciais do Windows ou de segurança;
 - desativar serviços de segurança (Defender, Firewall, Windows Update...);
 - excluir arquivos fora das raízes aprovadas de limpeza;

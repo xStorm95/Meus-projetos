@@ -7,7 +7,7 @@ Nenhum arquivo externo; nada de emojis como ícones.
 from __future__ import annotations
 
 from PySide6.QtCore import QByteArray, QRectF, Qt
-from PySide6.QtGui import QIcon, QImage, QPainter, QPixmap
+from PySide6.QtGui import QIcon, QImage, QPainter, QPainterPath, QPixmap
 from PySide6.QtSvg import QSvgRenderer
 
 from nexus.ui import theme
@@ -131,6 +131,42 @@ def icon(name: str, color: str = "accent", size: int = 24) -> QIcon:
 
 def pixmap(name: str, color: str = "accent", size: int = 24) -> QPixmap:
     return _render(name, _role_color(color), size)
+
+
+def _rounded(pm: QPixmap, radius: int) -> QPixmap:
+    out = QPixmap(pm.size())
+    out.fill(Qt.GlobalColor.transparent)
+    p = QPainter(out)
+    p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+    path = QPainterPath()
+    path.addRoundedRect(QRectF(0, 0, pm.width(), pm.height()), radius, radius)
+    p.setClipPath(path)
+    p.drawPixmap(0, 0, pm)
+    p.end()
+    return out
+
+
+def brand_pixmap(size: int) -> QPixmap:
+    """Marca oficial do app: assets/icon.png (badge circular com transparência).
+
+    Fallbacks: brand.jpg em quadrado arredondado → ícone 'bolt_filled'.
+    """
+    from nexus.core.paths import asset_path
+
+    pm = QPixmap()
+    icon_file = asset_path("icon.png")
+    if icon_file.is_file():
+        pm.load(str(icon_file))
+        if not pm.isNull():
+            return pm.scaled(size, size, Qt.AspectRatioMode.KeepAspectRatio,
+                             Qt.TransformationMode.SmoothTransformation)
+    if asset_path("brand.jpg").is_file():
+        pm.load(str(asset_path("brand.jpg")))
+    if pm.isNull():
+        return pixmap("bolt_filled", "accent", size)
+    pm = pm.scaled(size, size, Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+                   Qt.TransformationMode.SmoothTransformation)
+    return _rounded(pm, max(6, size // 5))
 
 
 NAMES = list(_BODIES.keys())

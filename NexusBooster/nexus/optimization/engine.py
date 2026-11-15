@@ -60,7 +60,7 @@ class OptimizationEngine:
         steps.append(
             Step(
                 "power_plan", "Plano de energia de alto desempenho",
-                "Ativa (ou cria) o plano 'Nexus Booster — Desempenho' baseado no plano "
+                "Ativa (ou cria) o plano 'DK — Desempenho' baseado no plano "
                 "Alto Desempenho do Windows. Reversível a qualquer momento.",
                 "baixo", True,
                 available=lambda: (True, "") if power.list_plans() else

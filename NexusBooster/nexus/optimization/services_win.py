@@ -1,6 +1,6 @@
 """Gerenciamento de serviços do Windows com catálogo de segurança.
 
-O Nexus Booster NUNCA permite parar/desativar serviços de segurança
+O DK NUNCA permite parar/desativar serviços de segurança
 (Windows Defender, Firewall, Windows Update e serviços essenciais) — veja
 nexus.core.safety.PROTECTED_SERVICES.
 """
@@ -97,7 +97,7 @@ def enumerate_services() -> Optional[list[WinServiceInfo]]:
         protected = safety.is_protected_service(name)
         safe, reason = SAFE_CATALOG.get(name, (False, "Fora do catálogo de segurança — ajuste não recomendado."))
         if protected:
-            safe, reason = False, "Serviço essencial/de segurança — bloqueado pelo Nexus Booster."
+            safe, reason = False, "Serviço essencial/de segurança — bloqueado pelo DK."
         out.append(
             WinServiceInfo(
                 name=name,

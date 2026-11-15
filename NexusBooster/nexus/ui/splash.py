@@ -83,7 +83,7 @@ class NexusSplash(QWidget):
         f.setWeight(QFont.Weight.DemiBold)
         p.setFont(f)
         p.setPen(QColor(theme.TEXT))
-        p.drawText(QRectF(0, 124, w, 26), Qt.AlignmentFlag.AlignHCenter, "Nexus Booster")
+        p.drawText(QRectF(0, 124, w, 26), Qt.AlignmentFlag.AlignHCenter, "DK")
         p.setFont(QFont())
         fp = QFont()
         fp.setPixelSize(11)

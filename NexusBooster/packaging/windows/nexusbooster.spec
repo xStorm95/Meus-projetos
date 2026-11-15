@@ -49,7 +49,7 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name="NexusBooster",
+    name="DK",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

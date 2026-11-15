@@ -13,7 +13,7 @@ from nexus.system import powershell as ps
 log = logging.getLogger("nexus.power")
 
 HIGH_PERF_GUID = "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c"
-NEXUS_PLAN_NAME = "Nexus Booster — Desempenho"
+NEXUS_PLAN_NAME = "DK — Desempenho"
 
 
 @dataclass
@@ -81,7 +81,7 @@ def _find_or_create_nexus_plan() -> Optional[str]:
     if not m:
         return None
     new_guid = m.group(1)
-    _powercfg(["/changename", new_guid, NEXUS_PLAN_NAME, "Plano criado pelo Nexus Booster"])
+    _powercfg(["/changename", new_guid, NEXUS_PLAN_NAME, "Plano criado pelo DK"])
     log.info("plano de energia criado: %s", new_guid)
     return new_guid
 

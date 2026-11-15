@@ -58,7 +58,7 @@ class AddGameDialog(QDialog):
         lay.addLayout(row)
 
         hint = ThemeLabel(
-            "O Nexus Booster usa o executável para lançar o jogo e identificar o "
+            "O DK usa o executável para lançar o jogo e identificar o "
             "processo durante as sessões de boost.", "caption", wrap=True,
         )
         lay.addWidget(hint)

@@ -18,7 +18,10 @@ class BaseTab(SmoothScrollArea):
         self.setStyleSheet("QScrollArea { background: transparent; border: none; }")
 
         self._content = QWidget()
-        self._content.setStyleSheet("background: transparent;")
+        # objectName + seletor: stylesheet SEM seletor no Qt vale para TODOS os
+        # descendentes (sobrescreveria o background de cada botão/card da página)
+        self._content.setObjectName("pageContent")
+        self._content.setStyleSheet("#pageContent { background: transparent; }")
         self.setWidget(self._content)
 
         self.vbox = QVBoxLayout(self._content)

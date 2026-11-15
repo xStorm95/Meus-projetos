@@ -30,7 +30,7 @@ def protection_enabled() -> bool | None:
     return False
 
 
-def create(description: str = "Nexus Booster") -> tuple[bool, str]:
+def create(description: str = "DK") -> tuple[bool, str]:
     """Cria ponto de restauração (elevação UAC). Honestidade total no resultado."""
     from nexus.core.elevation import run_elevated_ps
 
@@ -56,5 +56,5 @@ def create(description: str = "Nexus Booster") -> tuple[bool, str]:
     return False, (
         f"Não foi possível criar o ponto de restauração: {out[:200] or 'motivo desconhecido'}. "
         "O Windows limita a criação a um ponto a cada 24h por padrão — os ajustes ainda são "
-        "reversíveis pelo botão 'Desfazer' do Nexus Booster."
+        "reversíveis pelo botão 'Desfazer' do DK."
     )

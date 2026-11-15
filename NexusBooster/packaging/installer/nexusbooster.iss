@@ -1,6 +1,6 @@
 ; ============================================================
-;  Nexus Booster — Instalador profissional (Inno Setup 6+)
-;  Gera: NexusBooster-Setup-1.3.0.exe
+;  DK — Instalador profissional (Inno Setup 6+)
+;  Gera: DK-Setup-1.4.0.exe
 ;
 ;  Como usar:
 ;    1. Instale o Inno Setup 6 (https://jrsoftware.org/isinfo.php)
@@ -9,10 +9,10 @@
 ;       iscc packaging\installer\nexusbooster.iss
 ; ============================================================
 
-#define MyAppName "Nexus Booster"
-#define MyAppVersion "1.3.0"
-#define MyAppPublisher "Nexus Booster"
-#define MyAppExeName "NexusBooster.exe"
+#define MyAppName "DK"
+#define MyAppVersion "1.4.0"
+#define MyAppPublisher "DK"
+#define MyAppExeName "DK.exe"
 #define MyAppId "{{8E7B3C2A-9F4D-4C1E-B6A5-NEXUSBOOSTER1}"
 
 [Setup]
@@ -21,12 +21,12 @@ AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppVerName={#MyAppName} {#MyAppVersion}
 AppPublisher={#MyAppPublisher}
-DefaultDirName={autopf}\Nexus Booster
-DefaultGroupName=Nexus Booster
+DefaultDirName={autopf}\DK
+DefaultGroupName=DK
 UninstallDisplayName={#MyAppName}
 UninstallDisplayIcon={app}\{#MyAppExeName}
 OutputDir=..\..\installer_output
-OutputBaseFilename=NexusBooster-Setup-{#MyAppVersion}
+OutputBaseFilename=DK-Setup-{#MyAppVersion}
 ; Versão 1.0.1: corrige falha de inicialização em builds sem console
 ; (sys.stderr None / faulthandler) — veja nexus/app.py::_ensure_streams.
 SetupIconFile=..\..\assets\icon.ico
@@ -47,10 +47,10 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
-Name: "runatstartup"; Description: "Iniciar o Nexus Booster com o Windows (opcional)"; GroupDescription: "Opções:"; Flags: unchecked
+Name: "runatstartup"; Description: "Iniciar o DK com o Windows (opcional)"; GroupDescription: "Opções:"; Flags: unchecked
 
 [Files]
-Source: "..\..\dist\NexusBooster.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\..\dist\DK.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\..\assets\logo.svg"; DestDir: "{app}\assets"; Flags: ignoreversion
 Source: "..\..\README.md"; DestDir: "{app}"; DestName: "Manual de utilizacao.md"; Flags: ignoreversion
 ; NOTE: adicione aqui arquivos futuros (ex.: PresentMon opcional embutido)
@@ -64,7 +64,7 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 [Registry]
 ; Inicialização opcional com o Windows (reversível pelo próprio app)
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; \
-    ValueType: string; ValueName: "NexusBooster"; \
+    ValueType: string; ValueName: "DK"; \
     ValueData: """{app}\{#MyAppExeName}"""; Flags: uninsdeletevalue; Tasks: runatstartup
 
 [Run]

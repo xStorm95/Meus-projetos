@@ -14,7 +14,7 @@ from pathlib import Path
 from dataclasses import dataclass, field
 from typing import Optional
 
-from PySide6.QtCore import QObject, QTimer, Signal
+from PySide6.QtCore import QObject, Qt, QTimer, Signal
 
 from nexus.core import safety
 from nexus.core.settings import Settings
@@ -49,6 +49,11 @@ class BoostSession(QObject):
     log_message = Signal(str)
     session_ended = Signal(object)   # BoostState final
 
+    # marshal thread-safe: start/stop podem ser chamados de um worker
+    # (run_task roda em QThread; QTimer só pode ser tocado na sua thread)
+    _watch_start_requested = Signal()
+    _watch_stop_requested = Signal()
+
     def __init__(self, db, settings: Settings, parent: Optional[QObject] = None):
         super().__init__(parent)
         self._db = db
@@ -57,6 +62,10 @@ class BoostSession(QObject):
         self._watch_timer = QTimer(self)
         self._watch_timer.setInterval(4000)
         self._watch_timer.timeout.connect(self._watchdog)
+        self._watch_start_requested.connect(
+            self._watch_timer.start, Qt.ConnectionType.QueuedConnection)
+        self._watch_stop_requested.connect(
+            self._watch_timer.stop, Qt.ConnectionType.QueuedConnection)
 
     # ---------------------------------------------------------- sessão
     def start(self, game: Optional[Game] = None) -> tuple[bool, str]:
@@ -110,7 +119,7 @@ class BoostSession(QObject):
             self.state.processes_to_watch = list(profile.process_names)
 
         self.state.session_id = self._db.session_start(
-            game.id if game else None,
+            getattr(game, "id", None) if game else None,
             game.name if game else "Boost rápido",
             {"suspended": self.state.suspended, "power_undo": self.state.power_undo},
         )
@@ -120,14 +129,14 @@ class BoostSession(QObject):
             description="; ".join(msgs) or "Sessão iniciada.",
         )
         self.log_message.emit("Sessão de boost iniciada: " + "; ".join(msgs))
-        self._watch_timer.start()
+        self._watch_start_requested.emit()
         self.state_changed.emit(self.state)
         return True, "Sessão de boost iniciada."
 
     def stop(self, reason: str = "encerrada manualmente") -> tuple[bool, str]:
         if not self.state.active:
             return False, "Nenhuma sessão ativa."
-        self._watch_timer.stop()
+        self._watch_stop_requested.emit()
 
         msgs: list[str] = []
         # 1) Retoma processos suspensos
@@ -167,7 +176,7 @@ class BoostSession(QObject):
     def _watchdog(self) -> None:
         """Encerra a sessão quando o jogo fecha; detecta jogos automaticamente."""
         if not self.state.active:
-            self._watch_timer.stop()
+            self._watch_stop_requested.emit()
             return
         if self.state.game and self.state.processes_to_watch:
             alive = sys_processes.find_by_names(self.state.processes_to_watch)

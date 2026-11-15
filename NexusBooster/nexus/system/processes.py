@@ -74,7 +74,7 @@ def guard_process(name: str) -> Optional[str]:
     if safety.is_protected_process(name):
         return (
             f"'{name}' é um processo essencial do Windows e não pode ser "
-            "modificado (proteção de segurança do Nexus Booster)."
+            "modificado (proteção de segurança do DK)."
         )
     return None
 
@@ -93,7 +93,7 @@ def terminate(pid: int, name: str = "") -> tuple[bool, str]:
         p.kill()
         return True, f"Processo '{p.name()}'' finalizado (forçado)."
     except psutil.AccessDenied:
-        return False, "Acesso negado — execute o Nexus Booster como administrador."
+        return False, "Acesso negado — execute o DK como administrador."
     except (psutil.NoSuchProcess, Exception) as exc:  # noqa: BLE001
         return False, f"Falha ao finalizar: {exc}"
 

@@ -44,7 +44,7 @@ class ProfilesTab(BaseTab):
         intro = Card("Perfis de otimização", "sliders")
         txt = ThemeLabel(
             "Cada perfil define o que o boost faz naquele jogo: apps suspensos, plano "
-            "de energia e recomendações reais de configuração. O Nexus Booster não "
+            "de energia e recomendações reais de configuração. O DK não "
             "promete FPS garantido — aplica apenas ajustes compatíveis com seu "
             "hardware e cada jogo.",
             "body_sm", wrap=True,
@@ -129,7 +129,7 @@ class ProfilesTab(BaseTab):
 
             if not prof.recommendations and not prof.launch_options:
                 card.body_layout().addWidget(
-                    ThemeLabel("Perfil genérico — boost padrão do Nexus Booster.",
+                    ThemeLabel("Perfil genérico — boost padrão do DK.",
                                "caption")
                 )
 

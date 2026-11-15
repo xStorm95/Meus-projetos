@@ -252,7 +252,7 @@ class HistoryTab(BaseTab):
         from PySide6.QtWidgets import QFileDialog
 
         path, _ = QFileDialog.getSaveFileName(
-            self, "Exportar histórico", "nexus-historico.csv", "Planilha CSV (*.csv)"
+            self, "Exportar histórico", "dk-historico.csv", "Planilha CSV (*.csv)"
         )
         if not path:
             return

@@ -1,4 +1,4 @@
-"""Biblioteca de componentes visuais do Nexus Booster (design system 2026).
+"""Biblioteca de componentes visuais do DK (design system 2026).
 
 Componentes pintados com QPainter (gráficos, cartões, toggles) e widgets
 QSS-driven derivados dos tokens de tema — tudo reage em tempo real a
@@ -267,7 +267,7 @@ class HeroCard(Card):
             target = QRectF(w - target_w * 0.62, (h - target_h) / 2, target_w, target_h)
             p.save()
             p.setClipPath(path)
-            p.setOpacity(0.30 if theme.MODE == "dark" else 0.16)
+            p.setOpacity(0.30 if theme.MODE == "dark" else 0.22)
             p.drawPixmap(target.toRect(), self._pm)
             p.restore()
             # esmaece em direção ao conteúdo
@@ -1489,7 +1489,10 @@ class ToastHost(QWidget):
         self._reposition()
 
     def _reposition(self) -> None:
-        host = self.parentWidget()
+        try:
+            host = self.parentWidget()
+        except RuntimeError:
+            return  # host já destruído (encerramento do app)
         if not host:
             return
         y = host.height() - 52
@@ -1556,7 +1559,10 @@ class EmptyState(QFrame):
     def __init__(self, icon_name: str, title: str, subtitle: str = "",
                  action_text: str = "", on_action=None, parent=None):
         super().__init__(parent)
-        self.setStyleSheet("background: transparent; border: none;")
+        # seletor próprio: sem ele o Qt aplicaria o estilo a TODOS os filhos
+        # (incluindo o botão de ação, que perderia o preenchimento)
+        self.setObjectName("emptyState")
+        self.setStyleSheet("#emptyState { background: transparent; border: none; }")
         lay = QVBoxLayout(self)
         lay.setContentsMargins(theme.pad("xl"), theme.pad("xl"), theme.pad("xl"), theme.pad("xl"))
         lay.setSpacing(theme.pad("sm"))

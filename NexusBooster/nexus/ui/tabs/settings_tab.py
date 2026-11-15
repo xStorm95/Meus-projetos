@@ -44,7 +44,7 @@ class SettingsTab(BaseTab):
 
         row_theme = QHBoxLayout()
         row_theme.setSpacing(theme.pad("md"))
-        current_mode = s.get_str("theme_mode") or "dark"
+        current_mode = s.get_str("theme_mode") or "light"
         self.theme_seg = SegmentedControl(
             [("dark", "Escuro"), ("light", "Claro"), ("system", "Sistema")],
             current_mode,
@@ -159,7 +159,7 @@ class SettingsTab(BaseTab):
 
         w2 = QHBoxLayout()
         self.autorun = ToggleSwitch(s.get_bool("launch_with_windows"))
-        lbl = ThemeLabel("Iniciar o Nexus Booster com o Windows", "body")
+        lbl = ThemeLabel("Iniciar o DK com o Windows", "body")
         self.autorun.toggled.connect(self._toggle_autorun)
         w2.addWidget(self.autorun)
         w2.addWidget(lbl)
@@ -201,7 +201,7 @@ class SettingsTab(BaseTab):
         # ------------------------------------------------------------- sobre
         about = Card("Sobre", "info")
         a = ThemeLabel(
-            f"<b>Nexus Booster</b> — v{APP_VERSION}<br><br>"
+            f"<b>DK</b> — v{APP_VERSION}<br><br>"
             "Otimizador de desempenho para Windows e jogos.<br>"
             "Monitoramento real via psutil/WMI · Persistência SQLite · "
             "Interface PySide6.<br><br>"
@@ -257,7 +257,7 @@ class SettingsTab(BaseTab):
 
     def _relaunch_admin(self) -> None:
         if confirm(self, "Reiniciar como administrador",
-                   "O Nexus Booster será fechado e reaberto com privilégios de "
+                   "O DK será fechado e reaberto com privilégios de "
                    "administrador (UAC).", confirm_text="Reiniciar"):
             if elevation.relaunch_as_admin():
                 self.window().close()
@@ -272,12 +272,12 @@ class SettingsTab(BaseTab):
             toast_for(self, "Opção aplicável apenas no Windows.", "warning")
             return
         run_key = r"Software\Microsoft\Windows\CurrentVersion\Run"
-        name = "NexusBooster"
+        name = "DK"
         if on:
             from nexus.core.paths import exe_path
 
             if reg.write("HKCU", run_key, name, f'"{exe_path()}"'):
-                toast_for(self, "O Nexus Booster iniciará com o Windows.", "success")
+                toast_for(self, "O DK iniciará com o Windows.", "success")
             else:
                 toast_for(self, "Falha ao registrar a inicialização.", "error")
         else:

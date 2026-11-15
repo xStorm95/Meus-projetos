@@ -36,9 +36,9 @@ echo [5/5] Compilando com PyInstaller...
 pyinstaller --noconfirm --clean packaging\windows\nexusbooster.spec || goto :fail
 
 echo.
-if exist dist\NexusBooster.exe (
+if exist dist\DK.exe (
     echo ============================================================
-    echo  SUCESSO: dist\NexusBooster.exe
+    echo  SUCESSO: dist\DK.exe
     echo  Para gerar o instalador, execute packaging\installer\build_installer.bat
     echo ============================================================
 ) else (

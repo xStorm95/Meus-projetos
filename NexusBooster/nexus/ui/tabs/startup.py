@@ -99,7 +99,7 @@ class StartupTab(BaseTab):
 
         intro = Card("Aplicativos que iniciam com o Windows", "power")
         txt = ThemeLabel(
-            "Cada item desativado é guardado pelo Nexus Booster — nada é excluído — "
+            "Cada item desativado é guardado pelo DK — nada é excluído — "
             "e pode ser reativado aqui ou pelo Histórico. Itens de segurança "
             "(Windows Defender) são bloqueados.",
             "body_sm", wrap=True,

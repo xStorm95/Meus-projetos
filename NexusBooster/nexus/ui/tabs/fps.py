@@ -41,7 +41,7 @@ class FpsTab(BaseTab):
         src_card = Card("Fonte de dados de FPS", "activity")
         st = ThemeLabel(
             "O FPS é medido com o PresentMon (ferramenta oficial da Intel/GPUOpen), "
-            "que captura a apresentação real de quadros. O Nexus Booster não estima "
+            "que captura a apresentação real de quadros. O DK não estima "
             "nem inventa valores: sem o PresentMon, o recurso fica marcado como "
             "não suportado.",
             "body_sm", wrap=True,

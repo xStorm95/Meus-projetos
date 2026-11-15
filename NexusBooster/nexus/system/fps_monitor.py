@@ -1,6 +1,6 @@
 """Monitoramento de FPS real via PresentMon (Intel/GameTechDev).
 
-O Nexus Booster NÃO inventa métricas: o FPS só é exibido quando o usuário
+O DK NÃO inventa métricas: o FPS só é exibido quando o usuário
 configura o caminho do PresentMon.exe (download gratuito no GitHub oficial).
 Sem o PresentMon, a interface mostra claramente "recurso não suportado".
 """

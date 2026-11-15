@@ -86,9 +86,9 @@ def _excepthook(exc_type, exc, tb) -> None:  # pragma: no cover
 
 def run() -> int:
     app = QApplication(sys.argv)
-    app.setApplicationName("Nexus Booster")
+    app.setApplicationName("DK")
     app.setApplicationVersion(__version__)
-    app.setOrganizationName("Nexus Booster")
+    app.setOrganizationName("DK")
 
     # barra de título escura no Windows 10/11
     if sys.platform == "win32":
@@ -105,7 +105,7 @@ def run() -> int:
             pass
 
     setup_logging()
-    log.info("Nexus Booster %s iniciando…", __version__)
+    log.info("DK %s iniciando…", __version__)
 
     # Garante uma única instância em execução.
     from nexus import singleinstance
@@ -116,8 +116,8 @@ def run() -> int:
         log.warning("outra instância já está em execução — encerrando.")
         QMessageBox.information(
             None,
-            "Nexus Booster",
-            "O Nexus Booster já está em execução.\nVerifique a bandeja do sistema "
+            "DK",
+            "O DK já está em execução.\nVerifique a bandeja do sistema "
             "ou a barra de tarefas.",
         )
         return 0
@@ -162,7 +162,7 @@ def run() -> int:
     QTimer.singleShot(650, splash.close)
 
     code = app.exec()
-    log.info("Nexus Booster encerrado (código %s).", code)
+    log.info("DK encerrado (código %s).", code)
     logging.shutdown()
     # Saída imediata: evita crashes conhecidos de finalização do PySide6
     # (todo recurso já foi encerrado de forma limpa acima).

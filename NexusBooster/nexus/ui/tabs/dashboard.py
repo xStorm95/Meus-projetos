@@ -131,6 +131,13 @@ class DashboardTab(BaseTab):
         hero_h = QHBoxLayout()
         hero_h.setSpacing(theme.pad("lg"))
 
+        # capa do app: logo oficial (badge circular roxo) em destaque
+        cover = QLabel()
+        cover.setPixmap(icons.brand_pixmap(76))
+        cover.setFixedSize(76, 76)
+        cover.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        hero_h.addWidget(cover, 0, Qt.AlignmentFlag.AlignVCenter)
+
         col = QVBoxLayout()
         col.setSpacing(theme.pad("xs"))
         title = ThemeLabel("Desempenho do computador", "title_sm")

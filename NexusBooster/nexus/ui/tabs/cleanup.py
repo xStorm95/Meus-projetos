@@ -69,7 +69,8 @@ class _CategoryRow(QFrame):
         lay.addWidget(self.toggle, 0, Qt.AlignmentFlag.AlignVCenter)
 
     def paintEvent(self, event) -> None:
-        from PySide6.QtGui import QPainter, QPainterPath, QPen, QColor, QRectF
+        from PySide6.QtCore import QRectF
+        from PySide6.QtGui import QPainter, QPainterPath, QPen, QColor
 
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -92,7 +93,7 @@ class CleanupTab(BaseTab):
 
         intro = Card("Limpeza segura de arquivos", "shield_check")
         txt = ThemeLabel(
-            "O Nexus Booster analisa antes de excluir, mostra o espaço recuperável de "
+            "O DK analisa antes de excluir, mostra o espaço recuperável de "
             "cada categoria e nunca toca em documentos pessoais, fotos, jogos, saves "
             "ou configurações. Arquivos em uso são preservados automaticamente.",
             "body_sm", wrap=True,
