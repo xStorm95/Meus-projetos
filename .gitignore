@@ -22,3 +22,12 @@ web/dist/
 
 # rascunhos locais de depuração
 .tmp/
+
+# Python / NexusBooster
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+NexusBooster/dist/
+NexusBooster/output/
+*.egg-info/

@@ -237,3 +237,15 @@ tests/              testes de integração das regras
 - Anonimização de cliente (direito ao esquecimento) e retenção configurável.
 
 Consulte `docs/` para os procedimentos operacionais.
+
+---
+
+## 📁 Nexus Booster — Otimizador de Desempenho para Windows e Jogos
+
+Aplicativo **desktop nativo** (Python 3.12 + PySide6 + psutil + SQLite) para
+otimização segura de PCs Windows e preparação para jogos: monitoramento em tempo
+real, limpeza avançada auditável, game booster com perfis por jogo (Valorant,
+Fortnite, CS2, GTA V/FiveM, LoL…), FPS real via PresentMon, ferramentas de rede e
+sistema completo de desfazer.
+
+➡️ **Documentação completa, manual e build do instalador:** [`NexusBooster/README.md`](NexusBooster/README.md)
