@@ -18,12 +18,16 @@ SVG = ROOT / "assets" / "logo.svg"
 
 
 def _render_brand(size: int):
-    """Ícone a partir da imagem da marca (fundo escuro + cantos arredondados)."""
-    from PySide6.QtCore import QRectF, Qt
-    from PySide6.QtGui import QBrush, QColor, QImage, QLinearGradient, QPainter, QPainterPath, QPen, QPixmap
+    """Ícone a partir da imagem da marca (fundo escuro + cantos arredondados).
 
-    pm = QPixmap(str(BRAND))
-    if pm.isNull():
+    Usa apenas QImage/QPainter — sem QPixmap, portanto não exige
+    QApplication (importante: roda como ferramenta de build no CI).
+    """
+    from PySide6.QtCore import QRectF, Qt
+    from PySide6.QtGui import QBrush, QColor, QImage, QLinearGradient, QPainter, QPainterPath, QPen
+
+    src = QImage(str(BRAND))
+    if src.isNull():
         return None
     img = QImage(size, size, QImage.Format.Format_ARGB32_Premultiplied)
     img.fill(Qt.GlobalColor.transparent)
@@ -42,13 +46,13 @@ def _render_brand(size: int):
     # imagem central (cover, 92% da área)
     inner = rect.adjusted(rect.width() * 0.04, rect.height() * 0.04,
                           -rect.width() * 0.04, -rect.height() * 0.04)
-    scaled = pm.scaled(
+    scaled = src.scaled(
         int(inner.width()), int(inner.height()),
         Qt.AspectRatioMode.KeepAspectRatioByExpanding,
         Qt.TransformationMode.SmoothTransformation,
     )
     p.setClipPath(path)
-    p.drawPixmap(
+    p.drawImage(
         int(inner.x() + (inner.width() - scaled.width()) / 2),
         int(inner.y() + (inner.height() - scaled.height()) / 2),
         scaled,
@@ -100,6 +104,9 @@ def main() -> int:
         from PIL import Image  # noqa: PLC0415
 
         pil_images = [Image.open(io.BytesIO(b)).convert("RGBA") for b in png_bytes]
+        # A imagem base do .ico deve ser a MAIOR: o Pillow descarta tamanhos
+        # maiores que a imagem base ao montar o arquivo.
+        pil_images.sort(key=lambda im2: im2.width, reverse=True)
         pil_images[0].save(out, format="ICO", append_images=pil_images[1:])
         print(f"Ícone gerado: {out}")
     except ImportError:
