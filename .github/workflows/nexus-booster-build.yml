@@ -52,9 +52,9 @@ jobs:
           )
 
       - name: Publicar no GitHub Releases
-        # Release apenas quando uma tag nexus-booster-v* é enviada —
-        # pushes de branch apenas compilam e publicam o artefato (backup).
-        if: startsWith(github.ref, 'refs/tags/nexus-booster-v')
+        # Cria a release da versão atual se ainda não existir (com o instalador).
+        # Uma release já publicada NUNCA é sobrescrita — para publicar uma nova,
+        # aumente a versão do app.
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -65,9 +65,9 @@ jobs:
           echo "Versão: ${VERSION}"
           ls -la installer_output || true
           if gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "Release existe — atualizando asset..."
+            echo "Release ${TAG} já existe — mantida intacta (aumente a versão para publicar outra)."
           else
-            gh release create "$TAG" -R "$GITHUB_REPOSITORY" \
+            gh release create "$TAG" "$ASSET" -R "$GITHUB_REPOSITORY" \
               --title "Nexus Booster v${VERSION}" \
               --notes "Otimizador profissional de desempenho para Windows e jogos.
 
@@ -78,10 +78,9 @@ jobs:
           - FPS nos jogos: opcionalmente baixe o PresentMon (link dentro do app, aba FPS Monitor)
           - Recursos de administrador são opcionais (o app pede UAC quando necessário)" \
               --target "$GITHUB_SHA"
+            echo "=== URL do download ==="
+            gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json assets -q '.assets[].browser_download_url'
           fi
-          gh release upload "$TAG" "$ASSET" --clobber -R "$GITHUB_REPOSITORY"
-          echo "=== URL do download ==="
-          gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json assets -q '.assets[].browser_download_url'
 
       - name: Enviar artefato (backup)
         uses: actions/upload-artifact@v4
