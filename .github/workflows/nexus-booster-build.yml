@@ -55,17 +55,19 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          TAG="nexus-booster-v1.0.0"
-          ASSET="installer_output/NexusBooster-Setup-1.0.0.exe"
+          VERSION=$(python -c "from nexus.constants import APP_VERSION; print(APP_VERSION)")
+          TAG="nexus-booster-v${VERSION}"
+          ASSET="installer_output/NexusBooster-Setup-${VERSION}.exe"
+          echo "Versão: ${VERSION}"
           ls -la installer_output || true
           if gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "Release existe — atualizando asset..."
           else
             gh release create "$TAG" -R "$GITHUB_REPOSITORY" \
-              --title "Nexus Booster v1.0.0" \
+              --title "Nexus Booster v${VERSION}" \
               --notes "Otimizador profissional de desempenho para Windows e jogos.
 
-          **Instalação:** baixe \`NexusBooster-Setup-1.0.0.exe\` abaixo, dê dois cliques e avance no assistente (atalho na área de trabalho opcional).
+          **Instalação:** baixe \`NexusBooster-Setup-${VERSION}.exe\` abaixo, dê dois cliques e avance no assistente (atalho na área de trabalho opcional).
 
           - Windows 10 (1709+) ou Windows 11, 64 bits
           - Inclui desinstalador completo
@@ -80,6 +82,6 @@ jobs:
       - name: Enviar artefato (backup)
         uses: actions/upload-artifact@v4
         with:
-          name: NexusBooster-Setup-1.0.0
-          path: NexusBooster/installer_output/NexusBooster-Setup-1.0.0.exe
+          name: NexusBooster-Setup-${{ github.run_number }}
+          path: NexusBooster/installer_output/NexusBooster-Setup-*.exe
           if-no-files-found: error

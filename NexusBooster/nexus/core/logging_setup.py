@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import logging.handlers
+import sys
 import traceback
 
 _LOG = None
@@ -40,10 +41,11 @@ def setup_logging() -> logging.Logger:
     file_handler.setFormatter(fmt)
     logger.addHandler(file_handler)
 
-    console = logging.StreamHandler()
-    console.setLevel(logging.INFO)
-    console.setFormatter(fmt)
-    logger.addHandler(console)
+    console = logging.StreamHandler()  # usa sys.stderr se existir
+    if sys.stderr is not None:
+        console.setLevel(logging.INFO)
+        console.setFormatter(fmt)
+        logger.addHandler(console)
 
     class ErrorCapture(logging.Handler):
         def emit(self, record: logging.LogRecord) -> None:

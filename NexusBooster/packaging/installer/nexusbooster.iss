@@ -1,6 +1,6 @@
 ; ============================================================
 ;  Nexus Booster — Instalador profissional (Inno Setup 6+)
-;  Gera: NexusBooster-Setup-1.0.0.exe
+;  Gera: NexusBooster-Setup-1.0.1.exe
 ;
 ;  Como usar:
 ;    1. Instale o Inno Setup 6 (https://jrsoftware.org/isinfo.php)
@@ -10,7 +10,7 @@
 ; ============================================================
 
 #define MyAppName "Nexus Booster"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.0.1"
 #define MyAppPublisher "Nexus Booster"
 #define MyAppExeName "NexusBooster.exe"
 #define MyAppId "{{8E7B3C2A-9F4D-4C1E-B6A5-NEXUSBOOSTER1}"
@@ -27,6 +27,8 @@ UninstallDisplayName={#MyAppName}
 UninstallDisplayIcon={app}\{#MyAppExeName}
 OutputDir=..\..\installer_output
 OutputBaseFilename=NexusBooster-Setup-{#MyAppVersion}
+; Versão 1.0.1: corrige falha de inicialização em builds sem console
+; (sys.stderr None / faulthandler) — veja nexus/app.py::_ensure_streams.
 SetupIconFile=..\..\assets\icon.ico
 Compression=lzma2/max
 SolidCompression=yes

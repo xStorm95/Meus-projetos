@@ -2,14 +2,44 @@
 
 from __future__ import annotations
 
-import faulthandler
 import logging
+import os
 import sys
 
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QApplication, QMessageBox
+_STREAMS_KEEPALIVE: list = []
+
+
+def _ensure_streams() -> None:
+    """Corrige builds PyInstaller 'sem console' (sys.stdout/stderr = None).
+
+    No modo windowed o PyInstaller deixa stdout/stderr como None; qualquer
+    biblioteca que escreva neles (faulthandler, logging, avisos do Qt) falha
+    com 'RuntimeError: sys.stderr is None'. Redireciona para o log do app
+    (ou devnull) ANTES de qualquer outro import.
+    """
+    if sys.stdout is not None and sys.stderr is not None:
+        return
+    try:
+        from nexus.core.paths import logs_dir
+
+        target = open(logs_dir() / "stderr.log", "w", encoding="utf-8", errors="replace")
+    except Exception:
+        target = open(os.devnull, "w", encoding="utf-8")
+    _STREAMS_KEEPALIVE.append(target)
+    if sys.stdout is None:
+        sys.stdout = target
+    if sys.stderr is None:
+        sys.stderr = target
+
+
+_ensure_streams()
+
+import faulthandler  # noqa: E402
 
 faulthandler.enable()
+
+from PySide6.QtCore import Qt  # noqa: E402
+from PySide6.QtWidgets import QApplication, QMessageBox  # noqa: E402
 
 from nexus import __version__  # noqa: E402
 from nexus.core.database import Database  # noqa: E402
