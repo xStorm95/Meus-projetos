@@ -874,21 +874,24 @@ class GaugeRing(QFrame):
             p.setPen(QPen(color, pen_w, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
             p.drawArc(rect, start, int(span * ratio))
 
-        # textos
+        # textos — value centrado acima do centro; label e sub bem separados
         p.setPen(QColor(theme.TEXT))
         p.setFont(px_font(max(14, int(w * 0.16)), QFont.Weight.DemiBold))
         if self._target is None:
-            p.drawText(rect.adjusted(0, -4, 0, 0), Qt.AlignmentFlag.AlignCenter, "N/D")
+            p.drawText(QRectF(0, h * 0.28, w, h * 0.30),
+                       Qt.AlignmentFlag.AlignCenter, "N/D")
         else:
-            p.drawText(rect.adjusted(0, -4, 0, 0), Qt.AlignmentFlag.AlignCenter,
+            p.drawText(QRectF(0, h * 0.28, w, h * 0.30), Qt.AlignmentFlag.AlignCenter,
                        f"{self._display:.0f}{self._suffix}")
         p.setPen(QColor(theme.TEXT_MUTED))
         p.setFont(px_font(max(10, int(w * 0.085))))
-        p.drawText(QRectF(0, h * 0.56, w, h * 0.2), Qt.AlignmentFlag.AlignHCenter, self._label)
+        p.drawText(QRectF(0, h * 0.58, w, h * 0.16), Qt.AlignmentFlag.AlignHCenter,
+                   self._label)
         if self._sub:
             p.setPen(QColor(theme.TEXT_FAINT))
             p.setFont(px_font(max(9, int(w * 0.075))))
-            p.drawText(QRectF(0, h * 0.70, w, h * 0.18), Qt.AlignmentFlag.AlignHCenter, self._sub)
+            p.drawText(QRectF(0, h * 0.73, w, h * 0.16), Qt.AlignmentFlag.AlignHCenter,
+                       self._sub)
         p.end()
 
 
@@ -955,7 +958,7 @@ class LineChart(QFrame):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         w, h = self.width(), self.height()
-        pad_l, pad_r, pad_t, pad_b = 4.0, 52.0, 10.0, 8.0
+        pad_l, pad_r, pad_t, pad_b = 4.0, 56.0, 10.0, 8.0
 
         top = self._max if self._fixed else max(1.0, self.current_max() * 1.25)
         inner_w = w - pad_l - pad_r
@@ -968,17 +971,45 @@ class LineChart(QFrame):
                 y = pad_t + inner_h * i / 3
                 p.drawLine(QPointF(pad_l, y), QPointF(w - pad_r, y))
 
-        # escala à direita
-        p.setFont(px_font(10))
+        # retângulos dos rótulos da escala (desenhados depois, evitando pílulas)
+        scale_rects: list[tuple[QRectF, str]] = []
         for i in range(4):
             val = top * (1 - i / 3)
             label = f"{val:.0f}" if val >= 10 or val == 0 else f"{val:.1f}"
-            p.setPen(QColor(theme.TEXT_FAINT))
-            p.drawText(
-                QRectF(w - pad_r + 6, pad_t + inner_h * i / 3 - 7, pad_r - 8, 14),
-                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, label,
-            )
+            scale_rects.append((
+                QRectF(w - pad_r + 6, pad_t + inner_h * i / 3 - 7, pad_r - 10, 14),
+                label,
+            ))
 
+        # pílulas de valor atual — posição do último ponto de cada série,
+        # SEMPRE na faixa da escala (fora da área de desenho da linha).
+        pill_h = 17.0
+        pill_rects: list[tuple[QRectF, str, QColor]] = []
+        for name, data in self._series.items():
+            if not data or data[-1] is None:
+                continue
+            y = pad_t + inner_h * (1 - min(data[-1], top) / top)
+            rect = QRectF(w - pad_r + 2, 0.0, pad_r - 6, pill_h)
+            rect.moveCenter(QPointF(rect.center().x(), y))
+            if rect.top() < pad_t:
+                rect.moveTop(pad_t)
+            if rect.bottom() > h - pad_b:
+                rect.moveBottom(h - pad_b)
+            txt = f"{data[-1]:.0f}" if self._unit == "%" else f"{data[-1]:.1f}"
+            pill_rects.append((rect, txt, self._series_color(name)))
+
+        # desempilha pílulas que colidem entre si (duas séries próximas)
+        pill_rects.sort(key=lambda t: t[0].center().y())
+        for i in range(1, len(pill_rects)):
+            rect, txt, color = pill_rects[i]
+            prev = pill_rects[i - 1][0]
+            if rect.top() < prev.bottom() + 2:
+                rect.moveTop(prev.bottom() + 2)
+                if rect.bottom() > h - pad_b:
+                    rect.moveBottom(h - pad_b)
+                pill_rects[i] = (rect, txt, color)
+
+        # séries
         legend_x = pad_l + 2
         legend_y = pad_t + 4
         for name, data in self._series.items():
@@ -1011,19 +1042,11 @@ class LineChart(QFrame):
                 p.setPen(QPen(color, 2.0, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
                 p.drawPoint(pts[0])
 
-            # ponto + valor atual
+            # marcador do último ponto
             if pts:
-                last = pts[-1]
                 p.setPen(Qt.PenStyle.NoPen)
                 p.setBrush(color)
-                p.drawEllipse(last, 2.6, 2.6)
-                val_txt = data[-1]
-                if val_txt is not None:
-                    txt = f"{val_txt:.0f}" if self._unit == "%" else f"{val_txt:.1f}"
-                    p.setPen(color)
-                    p.setFont(px_font(10, QFont.Weight.DemiBold))
-                    p.drawText(QRectF(last.x() + 5, last.y() - 8, pad_r - 10, 16),
-                               Qt.AlignmentFlag.AlignLeft, txt)
+                p.drawEllipse(pts[-1], 2.6, 2.6)
 
             # legenda (chips no topo esquerdo, empilhados)
             p.setPen(Qt.PenStyle.NoPen)
@@ -1034,6 +1057,24 @@ class LineChart(QFrame):
             p.drawText(QRectF(legend_x + 10, legend_y - 3, 120, 14),
                        Qt.AlignmentFlag.AlignLeft, name)
             legend_y += 15
+
+        # escala à direita — pula rótulos que cairiam sob uma pílula
+        p.setFont(px_font(10))
+        for rect, label in scale_rects:
+            if any(rect.intersects(pr) for pr, _t, _c in pill_rects):
+                continue
+            p.setPen(QColor(theme.TEXT_FAINT))
+            p.drawText(rect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+                       label)
+
+        # pílulas de valor atual (fundo opaco + borda da série)
+        for rect, txt, color in pill_rects:
+            p.setPen(QPen(color, 1.0))
+            p.setBrush(QColor(theme.CARD))
+            p.drawRoundedRect(rect, 5.0, 5.0)
+            p.setPen(color)
+            p.setFont(px_font(10, QFont.Weight.DemiBold))
+            p.drawText(rect, Qt.AlignmentFlag.AlignCenter, txt)
         p.end()
 
 
@@ -1244,8 +1285,12 @@ def fade_in(widget: QWidget, duration_ms: int = 160, slide: int = 8) -> None:
 
 
 def page_transition(widget: QWidget) -> None:
-    """Transição padrão de troca de página: fade + deslocamento curto."""
-    fade_in(widget, duration_ms=180, slide=10)
+    """Transição padrão de troca de página: fade puro (sem mexer na geometria —
+
+    mover widgets dentro de um QStackedWidget deixa deslocamento permanente
+    quando a animação é interrompida por outra navegação).
+    """
+    fade_in(widget, duration_ms=170, slide=0)
 
 
 class SmoothScrollArea(QScrollArea):
