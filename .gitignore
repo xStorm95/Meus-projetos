@@ -33,3 +33,5 @@ NexusBooster/output/
 *.egg-info/
 # artefatos de download gerados localmente
 NexusBooster-v*.zip
+# prévias visuais de desenvolvimento (offscreen)
+redesign-preview/

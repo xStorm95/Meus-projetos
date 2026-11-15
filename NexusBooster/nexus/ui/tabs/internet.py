@@ -4,13 +4,10 @@ from __future__ import annotations
 
 import time
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import (
     QComboBox,
     QHBoxLayout,
-    QLabel,
-    QLineEdit,
-    QPushButton,
     QVBoxLayout,
     QWidget,
 )
@@ -18,7 +15,17 @@ from PySide6.QtWidgets import (
 from nexus.core.worker import run_task
 from nexus.network import diagnostics
 from nexus.ui import icons, theme
-from nexus.ui.components import Card, LineChart, Pill, StatTile, ToggleSwitch, confirm, toast_for
+from nexus.ui.components import (
+    Button,
+    Card,
+    LineChart,
+    Pill,
+    StatTile,
+    ThemeLabel,
+    ToggleSwitch,
+    confirm,
+    toast_for,
+)
 from nexus.ui.tabs.base import BaseTab
 
 
@@ -39,19 +46,19 @@ class InternetTab(BaseTab):
             ("google.com", "google.com"),
         ):
             self.host_combo.addItem(label, host)
-        self.ping_btn = QPushButton("Testar ping")
-        self.ping_btn.setProperty("accent", True)
+        self.ping_btn = Button("Testar ping", "primary")
         self.ping_btn.clicked.connect(self._test_ping)
-        row.addWidget(QLabel("Destino:"))
+        row.addWidget(ThemeLabel("Destino:"))
         row.addWidget(self.host_combo, 1)
         row.addWidget(self.ping_btn)
         ping_card.body_layout().addLayout(row)
 
         self.ping_chart = LineChart(unit="ms", fixed_max=None)
-        self.ping_chart.add_series("Latência", theme.ACCENT)
+        self.ping_chart.add_series("Latência", "accent")
         ping_card.body_layout().addWidget(self.ping_chart)
 
         stats_row = QHBoxLayout()
+        stats_row.setSpacing(theme.pad("md"))
         self.ping_avg = StatTile("activity", "Média", "—")
         self.ping_min = StatTile("check", "Mínimo", "—")
         self.ping_max = StatTile("alert", "Máximo", "—")
@@ -63,8 +70,7 @@ class InternetTab(BaseTab):
         mon_row = QHBoxLayout()
         self.ping_monitor = ToggleSwitch(False)
         mon_row.addWidget(self.ping_monitor)
-        mon_lbl = QLabel("Monitorar continuamente (a cada 2s)")
-        mon_lbl.setStyleSheet(f"color: {theme.TEXT_MUTED}; font-size: 12px;")
+        mon_lbl = ThemeLabel("Monitorar continuamente (a cada 2s)", "body_sm")
         mon_row.addWidget(mon_lbl)
         mon_row.addStretch(1)
         ping_card.body_layout().addLayout(mon_row)
@@ -74,14 +80,13 @@ class InternetTab(BaseTab):
         # -------------------------------------------------------- velocidade
         speed_card = Card("Teste de velocidade", "download")
         srow = QHBoxLayout()
-        self.speed_btn = QPushButton("  Iniciar teste (Cloudflare)")
-        self.speed_btn.setProperty("accent", True)
-        self.speed_btn.setIcon(icons.icon("download", "#04121f", 16))
+        self.speed_btn = Button("Iniciar teste (Cloudflare)", "primary", "download")
         self.speed_btn.clicked.connect(self._speed_test)
         srow.addWidget(self.speed_btn)
         srow.addStretch(1)
         speed_card.body_layout().addLayout(srow)
         srow2 = QHBoxLayout()
+        srow2.setSpacing(theme.pad("md"))
         self.down_tile = StatTile("download", "Download", "—", "Mbps")
         self.up_tile = StatTile("upload", "Upload", "—", "Mbps")
         self.ip_tile = StatTile("globe", "Seu IP local", "—")
@@ -89,11 +94,11 @@ class InternetTab(BaseTab):
         srow2.addWidget(self.up_tile)
         srow2.addWidget(self.ip_tile)
         speed_card.body_layout().addLayout(srow2)
-        note = QLabel(
-            "Estimativa de vazão real baixando/enviando dados ao servidor da Cloudflare. "
-            "O resultado varia com a rede, Wi-Fi e horário."
+        note = ThemeLabel(
+            "Estimativa de vazão real baixando/enviando dados ao servidor da "
+            "Cloudflare. O resultado varia com a rede, Wi-Fi e horário.",
+            "caption", wrap=True,
         )
-        note.setStyleSheet(f"color: {theme.TEXT_FAINT}; font-size: 11px;")
         speed_card.body_layout().addWidget(note)
         self.add(speed_card)
         self.ip_tile.set_value(diagnostics.local_ip())
@@ -101,26 +106,24 @@ class InternetTab(BaseTab):
         # --------------------------------------------------------------- DNS
         dns_card = Card("Diagnóstico e recomendação de DNS", "server")
         drow = QHBoxLayout()
-        dns_btn = QPushButton("Testar latência dos DNS populares")
+        dns_btn = Button("Testar latência dos DNS populares", "secondary", "activity")
         dns_btn.clicked.connect(self._test_dns)
         drow.addWidget(dns_btn)
         drow.addStretch(1)
         dns_card.body_layout().addLayout(drow)
         self.dns_result = QVBoxLayout()
         dns_card.body_layout().addLayout(self.dns_result)
-        self.dns_current = QLabel("Servidores DNS atuais: —")
-        self.dns_current.setStyleSheet(f"color: {theme.TEXT_MUTED}; font-size: 12px;")
-        self.dns_current.setWordWrap(True)
+        self.dns_current = ThemeLabel("Servidores DNS atuais: —", "body_sm", wrap=True)
         dns_card.body_layout().addWidget(self.dns_current)
 
         apply_row = QHBoxLayout()
         self.iface_combo = QComboBox()
         self.dns_combo = QComboBox()
-        apply_btn = QPushButton("Aplicar DNS recomendado")
+        apply_btn = Button("Aplicar DNS recomendado", "secondary", "check")
         apply_btn.clicked.connect(self._apply_dns)
-        apply_row.addWidget(QLabel("Interface:"))
+        apply_row.addWidget(ThemeLabel("Interface:"))
         apply_row.addWidget(self.iface_combo, 1)
-        apply_row.addWidget(QLabel("DNS:"))
+        apply_row.addWidget(ThemeLabel("DNS:"))
         apply_row.addWidget(self.dns_combo, 1)
         apply_row.addWidget(apply_btn)
         dns_card.body_layout().addLayout(apply_row)
@@ -129,21 +132,19 @@ class InternetTab(BaseTab):
 
         # ------------------------------------------------------------ reparos
         rep_card = Card("Ferramentas de reparo de rede", "shield")
-        rnote = QLabel(
+        rnote = ThemeLabel(
             "Cada reparo exige sua confirmação. Alterações de DNS são reversíveis "
-            "pelo Histórico; o Winsock requer reinicialização."
+            "pelo Histórico; o Winsock requer reinicialização.",
+            "body_sm", wrap=True,
         )
-        rnote.setStyleSheet(f"color: {theme.TEXT_MUTED}; font-size: 12px;")
         rep_card.body_layout().addWidget(rnote)
 
         def mk_repair(label: str, fn, danger: bool, desc: str):
             row = QHBoxLayout()
-            btn = QPushButton(label)
-            btn.setProperty("danger", danger)
+            btn = Button(label, "danger" if danger else "secondary")
             btn.clicked.connect(lambda: self._run_repair(label, desc, fn))
             row.addWidget(btn)
-            d = QLabel(desc)
-            d.setStyleSheet(f"color: {theme.TEXT_MUTED}; font-size: 11px;")
+            d = ThemeLabel(desc, "caption", wrap=True)
             row.addWidget(d, 1)
             rep_card.body_layout().addLayout(row)
 
@@ -208,6 +209,7 @@ class InternetTab(BaseTab):
     # ---------------------------------------------------------- velocidade
     def _speed_test(self) -> None:
         self.speed_btn.setEnabled(False)
+        self.speed_btn.set_loading(True, "Testando…")
         self.down_tile.set_value("testando…", "aguarde")
         self.up_tile.set_value("…", "aguarde")
 
@@ -218,6 +220,7 @@ class InternetTab(BaseTab):
 
         def done(res) -> None:
             self.speed_btn.setEnabled(True)
+            self.speed_btn.set_loading(False)
             if res.error and not res.ok:
                 self.down_tile.set_value("falha", "sem conexão")
                 self.up_tile.set_value("—", "")
@@ -229,6 +232,7 @@ class InternetTab(BaseTab):
 
         def fail(msg) -> None:
             self.speed_btn.setEnabled(True)
+            self.speed_btn.set_loading(False)
             self.down_tile.set_value("erro", msg[:30])
 
         run_task(job, on_done=done, on_error=fail)
@@ -260,8 +264,9 @@ class InternetTab(BaseTab):
             item = self.dns_result.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
-        loading = QLabel("Medindo latência real (conexão TCP porta 53)…")
-        loading.setStyleSheet(f"color: {theme.TEXT_FAINT}; font-size: 12px;")
+        from nexus.ui.components import SkeletonBlock
+
+        loading = SkeletonBlock(height=14)
         self.dns_result.addWidget(loading)
 
         def job():
@@ -273,30 +278,28 @@ class InternetTab(BaseTab):
                 if item.widget():
                     item.widget().deleteLater()
             if not results:
-                none = QLabel("Teste indisponível neste ambiente.")
-                none.setStyleSheet(f"color: {theme.TEXT_FAINT}; font-size: 12px;")
+                none = ThemeLabel("Teste indisponível neste ambiente.", "caption")
                 self.dns_result.addWidget(none)
                 return
             best = results[0]
             for r in results:
                 row = QHBoxLayout()
-                name = QLabel(f"{r['label']} ({r['ip']})")
-                name.setStyleSheet(f"color: {theme.TEXT}; font-size: 12px;")
+                name = ThemeLabel(f"{r['label']} ({r['ip']})", "body_sm")
                 row.addWidget(name, 1)
                 if r["avg_ms"] is not None:
-                    pill = Pill(f"{r['avg_ms']:.0f} ms", "success" if r is best else "muted")
+                    pill = Pill(f"{r['avg_ms']:.0f} ms",
+                                "success" if r is best else "muted")
                 else:
                     pill = Pill("sem resposta", "danger")
                 row.addWidget(pill)
                 host = QWidget()
                 host.setLayout(row)
                 self.dns_result.addWidget(host)
-            rec = QLabel(
+            rec = ThemeLabel(
                 f"Recomendação baseada na medição: {best['label']} ({best['ip']}) "
-                "teve a menor latência. Aplique abaixo apenas se quiser."
+                "teve a menor latência. Aplique abaixo apenas se quiser.",
+                "accent", wrap=True,
             )
-            rec.setWordWrap(True)
-            rec.setStyleSheet(f"color: {theme.ACCENT}; font-size: 12px; font-weight: 600;")
             self.dns_result.addWidget(rec)
             self.dns_combo.clear()
             for r in results:
@@ -310,7 +313,8 @@ class InternetTab(BaseTab):
         if not iface or not ip:
             toast_for(self, "Teste os DNS e selecione interface/servidor.", "warning")
             return
-        partners = {"1.1.1.1": ["1.1.1.1", "1.0.0.1"], "8.8.8.8": ["8.8.8.8", "8.8.4.4"],
+        partners = {"1.1.1.1": ["1.1.1.1", "1.0.0.1"],
+                    "8.8.8.8": ["8.8.8.8", "8.8.4.4"],
                     "9.9.9.9": ["9.9.9.9", "149.112.112.112"],
                     "208.67.222.222": ["208.67.222.222", "208.67.220.220"]}
         servers = partners.get(ip, [ip])

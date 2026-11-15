@@ -1,9 +1,10 @@
-"""Classe base das abas: área rolável (suave) com layout vertical padrão."""
+"""Classe base das abas: área rolável suave com layout vertical padrão."""
 
 from __future__ import annotations
 
 from PySide6.QtWidgets import QFrame, QVBoxLayout, QWidget
 
+from nexus.ui import theme
 from nexus.ui.components import SmoothScrollArea
 
 
@@ -21,9 +22,14 @@ class BaseTab(SmoothScrollArea):
         self.setWidget(self._content)
 
         self.vbox = QVBoxLayout(self._content)
-        self.vbox.setContentsMargins(24, 20, 24, 24)
-        self.vbox.setSpacing(16)
-        self.vbox.addStretch(1)
+        self._apply_density()
+        theme.manager.changed.connect(self._apply_density)
+
+    def _apply_density(self) -> None:
+        self.vbox.setContentsMargins(theme.pad("xl"), theme.pad("lg"),
+                                     theme.pad("xl"), theme.pad("xl"))
+        self.vbox.setSpacing(theme.pad("lg"))
+        self._content.update()
 
     def add(self, widget: QWidget, stretch: int = 0) -> QWidget:
         """Adiciona widget antes do espaçador final."""

@@ -10,55 +10,78 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QProgressBar,
-    QPushButton,
-    QScrollArea,
     QVBoxLayout,
-    QWidget,
 )
 
 from nexus.core.worker import run_task
 from nexus.optimization import cleaner
 from nexus.ui import icons, theme
-from nexus.ui.components import Card, Pill, SectionTitle, ToggleSwitch, confirm, toast_for
+from nexus.ui.components import (
+    Button,
+    Card,
+    Pill,
+    ProportionBar,
+    ThemeLabel,
+    ToggleSwitch,
+    confirm,
+    toast_for,
+)
 from nexus.ui.tabs.base import BaseTab
 
 
 class _CategoryRow(QFrame):
+    """Linha de categoria: ícone, nome, chip de risco + admin, resultado e toggle."""
+
     def __init__(self, cat: cleaner.Category, parent=None):
         super().__init__(parent)
         self.cat = cat
-        self.setStyleSheet(
-            f"background: {theme.PANEL}; border: 1px solid {theme.BORDER}; border-radius: 10px;"
-        )
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
+        self.setStyleSheet("QFrame { background: transparent; border: none; }")
         lay = QHBoxLayout(self)
-        lay.setContentsMargins(14, 10, 14, 10)
-        lay.setSpacing(12)
+        lay.setContentsMargins(theme.pad("md"), theme.pad("sm") + 2,
+                               theme.pad("md"), theme.pad("sm") + 2)
+        lay.setSpacing(theme.pad("md"))
+
+        self._icon = QLabel()
+        self._icon.setPixmap(icons.pixmap(cat.icon if hasattr(cat, "icon") else "folder",
+                                          "accent_text", 18))
+        lay.addWidget(self._icon, 0, Qt.AlignmentFlag.AlignVCenter)
 
         col = QVBoxLayout()
         col.setSpacing(2)
         head = QHBoxLayout()
-        head.setSpacing(8)
-        name = QLabel(cat.label)
-        name.setStyleSheet(f"color: {theme.TEXT}; font-size: 13px; font-weight: 700;")
+        head.setSpacing(theme.pad("sm"))
+        name = ThemeLabel(cat.label, "body")
         head.addWidget(name)
         risk = Pill(cat.risk, "success" if cat.risk == "baixo" else "warning")
         head.addWidget(risk)
         if cat.needs_admin:
-            adm = Pill("admin", "muted")
-            head.addWidget(adm)
+            head.addWidget(Pill("admin", "muted"))
         head.addStretch(1)
-        self.result = QLabel("")
-        self.result.setStyleSheet(f"color: {theme.ACCENT}; font-size: 12px; font-weight: 700;")
+        self.result = ThemeLabel("", "accent")
         head.addWidget(self.result)
         col.addLayout(head)
-        desc = QLabel(cat.description)
-        desc.setWordWrap(True)
-        desc.setStyleSheet(f"color: {theme.TEXT_MUTED}; font-size: 11px;")
+        desc = ThemeLabel(cat.description, "caption", wrap=True)
         col.addWidget(desc)
         lay.addLayout(col, 1)
 
         self.toggle = ToggleSwitch()
         lay.addWidget(self.toggle, 0, Qt.AlignmentFlag.AlignVCenter)
+
+    def paintEvent(self, event) -> None:
+        from PySide6.QtGui import QPainter, QPainterPath, QPen, QColor, QRectF
+
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        radius = float(theme.RADIUS["control"])
+        rect = QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QColor(theme.SURFACE1))
+        p.drawRoundedRect(rect, radius, radius)
+        p.setPen(QPen(QColor(theme.BORDER), 1.0))
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.drawRoundedRect(rect, radius, radius)
+        p.end()
 
 
 class CleanupTab(BaseTab):
@@ -68,14 +91,20 @@ class CleanupTab(BaseTab):
         self._selected: set[str] = set()
 
         intro = Card("Limpeza segura de arquivos", "shield_check")
-        txt = QLabel(
+        txt = ThemeLabel(
             "O Nexus Booster analisa antes de excluir, mostra o espaço recuperável de "
             "cada categoria e nunca toca em documentos pessoais, fotos, jogos, saves "
-            "ou configurações. Arquivos em uso são preservados automaticamente."
+            "ou configurações. Arquivos em uso são preservados automaticamente.",
+            "body_sm", wrap=True,
         )
-        txt.setWordWrap(True)
-        txt.setStyleSheet(f"color: {theme.TEXT_MUTED}; font-size: 12px;")
         intro.body_layout().addWidget(txt)
+
+        # barra de proporção do espaço por categoria
+        self.proportion = ProportionBar()
+        intro.body_layout().addWidget(self.proportion)
+        self.total_label = ThemeLabel("Nenhuma análise nesta sessão — clique em "
+                                      "“Analisar espaço”.", "caption", wrap=True)
+        intro.body_layout().addWidget(self.total_label)
         self.add(intro)
 
         # barra de ações
@@ -83,18 +112,14 @@ class CleanupTab(BaseTab):
         bar.setStyleSheet("background: transparent; border: none;")
         bar_l = QHBoxLayout(bar)
         bar_l.setContentsMargins(0, 0, 0, 0)
-        bar_l.setSpacing(10)
-        self.analyze_btn = QPushButton("  Analisar espaço")
-        self.analyze_btn.setProperty("accent", True)
-        self.analyze_btn.setIcon(icons.icon("search", "#04121f", 16))
+        bar_l.setSpacing(theme.pad("sm"))
+        self.analyze_btn = Button("Analisar espaço", "primary", "search")
         self.analyze_btn.clicked.connect(self._analyze)
-        self.clean_btn = QPushButton("  Limpar selecionados")
-        self.clean_btn.setIcon(icons.icon("broom", "accent", 16))
+        self.clean_btn = Button("Limpar selecionados", "secondary", "broom")
         self.clean_btn.setEnabled(False)
         self.clean_btn.clicked.connect(self._clean)
         self.select_all = ToggleSwitch()
-        sel_lbl = QLabel("Selecionar todas as categorias")
-        sel_lbl.setStyleSheet(f"color: {theme.TEXT_MUTED}; font-size: 12px;")
+        sel_lbl = ThemeLabel("Selecionar todas", "body_sm")
         self.progress = QProgressBar()
         self.progress.setVisible(False)
         bar_l.addWidget(self.analyze_btn)
@@ -122,9 +147,8 @@ class CleanupTab(BaseTab):
 
         # relatório
         self.report_card = Card("Relatório da última limpeza", "history")
-        self.report_label = QLabel("Nenhuma limpeza executada nesta sessão.")
-        self.report_label.setWordWrap(True)
-        self.report_label.setStyleSheet(f"color: {theme.TEXT_MUTED}; font-size: 12px;")
+        self.report_label = ThemeLabel("Nenhuma limpeza executada nesta sessão.",
+                                       "body_sm", wrap=True)
         self.report_card.body_layout().addWidget(self.report_label)
         self.add(self.report_card)
 
@@ -144,6 +168,7 @@ class CleanupTab(BaseTab):
     # ------------------------------------------------------------ análise
     def _analyze(self) -> None:
         self.analyze_btn.setEnabled(False)
+        self.analyze_btn.set_loading(True, "Analisando…")
         self.progress.setVisible(True)
         self.progress.setRange(0, 0)
 
@@ -154,11 +179,13 @@ class CleanupTab(BaseTab):
             self._analysis = results
             self.progress.setVisible(False)
             self.analyze_btn.setEnabled(True)
+            self.analyze_btn.set_loading(False)
             total = sum(r.bytes for r in results.values())
             for cid, res in results.items():
                 self.rows[cid].result.setText(
                     f"{res.files} arquivos · {cleaner.format_size(res.bytes)}"
                 )
+            self._render_proportion(results, total)
             self.services.settings.set(
                 "last_clean_analysis", {"ts": time.time(), "total_bytes": total}
             )
@@ -171,9 +198,25 @@ class CleanupTab(BaseTab):
         def fail(msg) -> None:
             self.progress.setVisible(False)
             self.analyze_btn.setEnabled(True)
+            self.analyze_btn.set_loading(False)
             toast_for(self, f"Falha na análise: {msg}", "error")
 
         run_task(job, on_done=done, on_error=fail)
+
+    def _render_proportion(self, results, total: float) -> None:
+        segments = []
+        for cid, res in results.items():
+            if res.bytes > 0:
+                segments.append((self.rows[cid].cat.label, res.bytes))
+        self.proportion.set_segments(segments)
+        if total > 0:
+            self.total_label.setText(
+                f"Total recuperável estimado: {cleaner.format_size(total)} — "
+                "marque as categorias que deseja limpar."
+            )
+        else:
+            self.total_label.setText("Nada recuperável encontrado — seu sistema "
+                                     "está limpo.")
 
     # ------------------------------------------------------------- limpeza
     def _clean(self) -> None:
@@ -210,19 +253,15 @@ class CleanupTab(BaseTab):
             self.clean_btn.setEnabled(True)
             self.analyze_btn.setEnabled(True)
             lines = [
-                f"✔ Espaço liberado: {cleaner.format_size(report.freed_bytes)}",
-                f"✔ Arquivos removidos: {report.deleted}",
-                f"✔ Preservados (em uso/protegidos): {report.skipped}",
+                f"Espaço liberado: {cleaner.format_size(report.freed_bytes)}",
+                f"Arquivos removidos: {report.deleted}",
+                f"Preservados (em uso/protegidos): {report.skipped}",
             ]
             per_cat = []
             for cid, res in report.per_category.items():
                 label = self.rows[cid].cat.label
                 per_cat.append(f"{label}: {cleaner.format_size(res.bytes)}")
-            text = "<br>".join(lines)
-            if per_cat:
-                text += "<br><br>" + "<br>".join(per_cat)
-            self.report_label.setTextFormat(Qt.TextFormat.RichText)
-            self.report_label.setText(text)
+            self.report_label.setText("\n".join(lines + [""] + per_cat))
             self.services.db.history_add(
                 "clean",
                 "Limpeza avançada",

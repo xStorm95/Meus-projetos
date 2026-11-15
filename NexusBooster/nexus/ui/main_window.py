@@ -1,20 +1,22 @@
-"""Janela principal: sidebar, barra superior, área de abas e barra de status."""
+"""Janela principal: sidebar retrátil, cabeçalho de página, atalhos e statusbar."""
 
 from __future__ import annotations
 
 import logging
 from typing import Optional
 
-from PySide6.QtCore import QRectF, Qt, QTimer, Signal
+from PySide6.QtCore import QEasingCurve, QRectF, Qt, QTimer, QVariantAnimation, Signal
 from PySide6.QtGui import (
     QCloseEvent,
     QColor,
     QFont,
-    QMouseEvent,
+    QIcon,
+    QKeySequence,
     QPainter,
     QPainterPath,
     QPen,
     QPixmap,
+    QShortcut,
 )
 from PySide6.QtWidgets import (
     QApplication,
@@ -23,8 +25,8 @@ from PySide6.QtWidgets import (
     QLabel,
     QMainWindow,
     QPushButton,
-    QScrollArea,
     QStackedWidget,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -32,7 +34,7 @@ from PySide6.QtWidgets import (
 from nexus import __version__
 from nexus.core import elevation
 from nexus.ui import icons, theme
-from nexus.ui.components import ToastHost, toast_for
+from nexus.ui.components import Button, ThemeLabel, ToastHost, toast_for
 
 log = logging.getLogger("nexus.ui.main")
 
@@ -55,9 +57,12 @@ NAV_ITEMS = [
 
 GROUP_LABELS = {1: "Geral", 2: "Ferramentas", 3: "Sistema"}
 
+SIDEBAR_WIDE = 224
+SIDEBAR_COMPACT = 60
+
 
 def _rounded_pixmap(pm: QPixmap, size: int, radius: int = 10) -> QPixmap:
-    """Redimensiona a imagem com cantos arredondados."""
+    """Redimensiona a imagem com cantos arredondados (ícone da janela/sidebar)."""
     out = QPixmap(size, size)
     out.fill(Qt.GlobalColor.transparent)
     p = QPainter(out)
@@ -67,111 +72,121 @@ def _rounded_pixmap(pm: QPixmap, size: int, radius: int = 10) -> QPixmap:
     p.setClipPath(path)
     p.drawPixmap(0, 0, size, size, pm)
     p.setClipping(False)
-    acc = QColor(theme.ACCENT)
-    p.setPen(QPen(QColor(acc.red(), acc.green(), acc.blue(), 170), 1))
+    p.setPen(QPen(QColor(theme.BORDER_STRONG), 1))
     p.drawPath(path)
     p.end()
     return out
 
 
-class NeonEdge(QFrame):
-    """Moldura neon nas bordas da janela (decorativa, não captura mouse)."""
+def _brand_pixmap(size: int) -> QPixmap:
+    from nexus.core.paths import asset_path
 
-    def __init__(self, parent: QWidget):
-        super().__init__(parent)
-        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-        self.setAttribute(Qt.WidgetAttribute.WA_NoSystemBackground, True)
-        self.raise_()
-
-    def paintEvent(self, event) -> None:
-        p = QPainter(self)
-        p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        acc = QColor(theme.ACCENT)
-        r, g, b = acc.red(), acc.green(), acc.blue()
-        rect = QRectF(self.rect()).adjusted(1.0, 1.0, -1.0, -1.0)
-        p.setBrush(Qt.BrushStyle.NoBrush)
-        p.setPen(QPen(QColor(r, g, b, 120), 1))
-        p.drawRect(rect)
-        p.setPen(QPen(QColor(r, g, b, 35), 3))
-        p.drawRect(rect.adjusted(1.5, 1.5, -1.5, -1.5))
-        # destaques de canto
-        p.setPen(QPen(QColor(r, g, b, 220), 2))
-        for cx, cy, sx, sy in (
-            (2, 2, 1, 1), (self.width() - 2, 2, -1, 1),
-            (2, self.height() - 2, 1, -1), (self.width() - 2, self.height() - 2, -1, -1),
-        ):
-            p.drawLine(cx, cy, cx + 14 * sx, cy)
-            p.drawLine(cx, cy, cx, cy + 14 * sy)
-        p.end()
+    pm = QPixmap()
+    if asset_path("brand.jpg").is_file():
+        pm.load(str(asset_path("brand.jpg")))
+    if pm.isNull():
+        pm = icons.pixmap("bolt_filled", "accent", size)
+    return _rounded_pixmap(pm.scaled(size, size, Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+                                     Qt.TransformationMode.SmoothTransformation), size)
 
 
-class SidebarButton(QFrame):
-    """Botão de navegação com indicador lateral animado."""
+class NavButton(QFrame):
+    """Item da sidebar: indicador lateral de acento + hover suave."""
 
     clicked = Signal(str)
 
     def __init__(self, item_id: str, icon_name: str, label: str, parent=None):
         super().__init__(parent)
         self._id = item_id
+        self._icon_name = icon_name
+        self._label_text = label
         self._active = False
+        self._hover = False
+        self._indicator = 0.0
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setFixedHeight(38)
-        lay = QHBoxLayout(self)
-        lay.setContentsMargins(14, 0, 10, 0)
-        lay.setSpacing(10)
-        self._icon = QLabel()
-        self._icon.setPixmap(icons.pixmap(icon_name, "muted", 18))
-        self._label = QLabel(label)
-        self._label.setStyleSheet(
-            f"color: {theme.TEXT_MUTED}; font-size: 13px; font-weight: 600; background: transparent;"
-        )
-        lay.addWidget(self._icon)
-        lay.addWidget(self._label)
-        lay.addStretch(1)
+        self.setFixedHeight(36)
+        self.setToolTip(label)
+
+        self._anim = QVariantAnimation(self)
+        self._anim.valueChanged.connect(self._on_anim)
+        theme.manager.changed.connect(self.update)
+        self.setAccessibleName(label)
+
+    def _on_anim(self, v: float) -> None:
+        self._indicator = v
+        self.update()
 
     def set_active(self, active: bool) -> None:
         self._active = active
-        icon_name = dict((i[0], i[1]) for i in NAV_ITEMS)[self._id]
-        if active:
-            self._icon.setPixmap(icons.pixmap(icon_name, "accent", 18))
-            self._label.setStyleSheet(
-                f"color: {theme.TEXT}; font-size: 13px; font-weight: 700; background: transparent;"
-            )
-            self.setStyleSheet(
-                f"""
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 {theme.ACCENT}22, stop:1 transparent);
-                border-left: 3px solid {theme.ACCENT};
-                border-top-right-radius: 8px; border-bottom-right-radius: 8px;
-                """
-            )
-        else:
-            self._icon.setPixmap(icons.pixmap(icon_name, "muted", 18))
-            self._label.setStyleSheet(
-                f"color: {theme.TEXT_MUTED}; font-size: 13px; font-weight: 600; background: transparent;"
-            )
-            self.setStyleSheet("background: transparent; border-left: 3px solid transparent;")
+        d = theme.dur("fast")
+        if d <= 0:
+            self._indicator = 1.0 if active else 0.0
+            self.update()
+            return
+        self._anim.stop()
+        self._anim.setDuration(d)
+        self._anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self._anim.setStartValue(self._indicator)
+        self._anim.setEndValue(1.0 if active else 0.0)
+        self._anim.start()
 
-    def mousePressEvent(self, event: QMouseEvent) -> None:
+    def enterEvent(self, event) -> None:
+        self._hover = True
+        self.update()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event) -> None:
+        self._hover = False
+        self.update()
+        super().leaveEvent(event)
+
+    def mousePressEvent(self, event) -> None:
         if event.button() == Qt.MouseButton.LeftButton:
             self.clicked.emit(self._id)
         else:
             super().mousePressEvent(event)
 
-    def enterEvent(self, event) -> None:
-        if not self._active:
-            self.setStyleSheet(
-                f"""
-                background: {theme.CARD}; border-left: 3px solid transparent;
-                border-top-right-radius: 8px; border-bottom-right-radius: 8px;
-                """
-            )
-        super().enterEvent(event)
+    def paintEvent(self, event) -> None:
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        w, h = self.width(), self.height()
+        compact = w < (SIDEBAR_WIDE + SIDEBAR_COMPACT) / 2
 
-    def leaveEvent(self, event) -> None:
-        if not self._active:
-            self.setStyleSheet("background: transparent; border-left: 3px solid transparent;")
-        super().leaveEvent(event)
+        if self._hover or self._active:
+            bg = QColor(theme.with_alpha(theme.ACCENT, 22 if self._active else 12))
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(bg)
+            p.drawRoundedRect(QRectF(4, 2, w - 8, h - 4), 7, 7)
+
+        # indicador lateral
+        if self._indicator > 0.01:
+            acc = QColor(theme.ACCENT)
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(acc)
+            ind_h = (h - 12) * self._indicator
+            p.drawRoundedRect(QRectF(4, (h - ind_h) / 2, 3, ind_h), 1.5, 1.5)
+
+        # ícone
+        icon_size = 18
+        if compact:
+            ix = (w - icon_size) / 2
+        else:
+            ix = 16
+        color = "accent_text" if self._active else ("text" if self._hover else "muted")
+        p.drawPixmap(int(ix), (h - icon_size) // 2,
+                     icons.pixmap(self._icon_name, color, icon_size))
+
+        # rótulo
+        if not compact:
+            p.setFont(QFont())
+            f = p.font()
+            f.setPixelSize(13)
+            f.setWeight(QFont.Weight.DemiBold if self._active else QFont.Weight.Normal)
+            p.setFont(f)
+            p.setPen(QColor(theme.TEXT if self._active else theme.TEXT_MUTED))
+            p.drawText(QRectF(ix + icon_size + 10, 0, w - ix - icon_size - 18, h),
+                       Qt.AlignmentFlag.AlignVCenter, self._label_text)
+        p.end()
 
 
 class MainWindow(QMainWindow):
@@ -181,39 +196,43 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.services = services
         self.setWindowTitle(f"Nexus Booster — Otimizador de Desempenho {__version__}")
-        self.setMinimumSize(1180, 720)
-        self.resize(1360, 820)
+        self.setMinimumSize(1120, 700)
+        self.resize(1340, 800)
 
-        # Ícone da janela a partir da imagem da marca
-        from nexus.core.paths import asset_path
+        # tema salvo (modo + acento + densidade) — lido antes de construir
+        s = services.settings
+        mode = s.get_str("theme_mode") or "dark"
+        if mode == "system":
+            mode = "dark" if theme.system_prefers_dark() else "light"
+        theme.set_theme(mode, s.get_str("accent") or None, s.get_str("density") or None)
 
-        brand = QPixmap()
-        if asset_path("brand.jpg").is_file():
-            brand.load(str(asset_path("brand.jpg")))
-        if not brand.isNull():
-            from PySide6.QtGui import QIcon
-
-            self.setWindowIcon(QIcon(_rounded_pixmap(brand, 64, radius=14)))
+        self.setWindowIcon(QIcon(_brand_pixmap(64)))
 
         self._tabs: dict[str, QWidget] = {}
-        self._nav_buttons: dict[str, SidebarButton] = {}
+        self._nav_buttons: dict[str, NavButton] = {}
         self._current_tab: Optional[str] = None
+        self._sidebar_compact = s.get_bool("sidebar_compact")
 
         central = QWidget()
-        central.setStyleSheet(f"background: {theme.BG};")
+        central.setObjectName("central")
         self.setCentralWidget(central)
         root = QHBoxLayout(central)
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
 
-        root.addWidget(self._build_sidebar())
+        self._sidebar_host = QFrame()
+        self._sidebar_host.setObjectName("sidebar")
+        self._sidebar_anim = QVariantAnimation(self)
+        self._sidebar_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self._sidebar_anim.valueChanged.connect(self._set_sidebar_width)
+        root.addWidget(self._sidebar_host)
+        self._build_sidebar()
 
         right = QVBoxLayout()
         right.setContentsMargins(0, 0, 0, 0)
         right.setSpacing(0)
         right.addWidget(self._build_topbar())
         self.stack = QStackedWidget()
-        self.stack.setStyleSheet(f"background: {theme.BG};")
         right.addWidget(self.stack, 1)
         right.addWidget(self._build_statusbar())
         root.addLayout(right, 1)
@@ -222,11 +241,8 @@ class MainWindow(QMainWindow):
         self.toast_host = ToastHost(central)
         services.toast_host = self.toast_host
 
-        # Moldura neon nas bordas da janela
-        self.neon_edge = NeonEdge(central)
-        self.neon_edge.raise_()
-
         self._build_tabs()
+        self._apply_sidebar_width()
         self.navigate("dashboard")
 
         # Conexões de monitoramento
@@ -240,86 +256,118 @@ class MainWindow(QMainWindow):
         if self.services.settings.get_bool("auto_detect_games"):
             self._autodetect_timer.start()
 
+        self._install_shortcuts()
+        self._apply_sidebar_style()
+        self._mica_active = False
+        theme.manager.changed.connect(self._apply_sidebar_style)
+        theme.manager.changed.connect(self._retheme_chrome)
+        theme.manager.changed.connect(self._apply_topbar_style)
+        theme.manager.changed.connect(self._apply_statusbar_style)
+        QTimer.singleShot(0, self._try_backdrop)
+
     # ------------------------------------------------------------- sidebar
-    def _build_sidebar(self) -> QWidget:
-        bar = QFrame()
-        bar.setFixedWidth(232)
-        bar.setStyleSheet(
-            f"""
-            QFrame {{
-                background: {theme.PANEL};
-                border-right: 1px solid {theme.BORDER};
-            }}
-            """
-        )
+    def _build_sidebar(self) -> None:
+        bar = self._sidebar_host
         lay = QVBoxLayout(bar)
-        lay.setContentsMargins(0, 18, 0, 14)
+        lay.setContentsMargins(0, 12, 0, 12)
         lay.setSpacing(2)
 
-        # logo (imagem da marca enviada pelo usuário; fallback: ícone raio)
-        logo_row = QHBoxLayout()
-        logo_row.setContentsMargins(16, 0, 16, 18)
-        logo_icon = QLabel()
-        from nexus.core.paths import asset_path
-
-        brand = QPixmap()
-        if asset_path("brand.jpg").is_file():
-            brand.load(str(asset_path("brand.jpg")))
-        if not brand.isNull():
-            logo_icon.setPixmap(_rounded_pixmap(brand, 40))
-        else:
-            logo_icon.setPixmap(icons.pixmap("bolt_filled", "accent", 30))
-        logo_row.addWidget(logo_icon)
-        name_col = QVBoxLayout()
-        name_col.setSpacing(0)
-        app = QLabel("NEXUS")
-        app.setStyleSheet(
-            f"color: {theme.TEXT}; font-size: 16px; font-weight: 900; letter-spacing: 2px; background: transparent;"
-        )
-        sub = QLabel("BOOSTER")
-        sub.setStyleSheet(
-            f"color: {theme.ACCENT}; font-size: 16px; font-weight: 900; letter-spacing: 3px; background: transparent;"
-        )
-        name_col.addWidget(app)
-        name_col.addWidget(sub)
-        logo_row.addLayout(name_col)
-        logo_row.addStretch(1)
-        lay.addLayout(logo_row)
+        # cabeçalho: marca + nome + botão de recolher
+        head = QHBoxLayout()
+        head.setContentsMargins(14, 0, 10, 14)
+        head.setSpacing(10)
+        self._logo = QLabel()
+        self._logo.setPixmap(_brand_pixmap(32))
+        head.addWidget(self._logo)
+        self._brand_col = QVBoxLayout()
+        self._brand_col.setSpacing(0)
+        app = ThemeLabel("Nexus", "label")
+        sub = ThemeLabel("Booster", "accent")
+        self._brand_col.addWidget(app)
+        self._brand_col.addWidget(sub)
+        head.addLayout(self._brand_col)
+        head.addStretch(1)
+        self.collapse_btn = QToolButton()
+        self.collapse_btn.setIcon(icons.icon("panel_left", "muted", 16))
+        self.collapse_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.collapse_btn.setToolTip("Recolher painel (Ctrl+B)")
+        self.collapse_btn.setAccessibleName("Recolher painel de navegação")
+        self.collapse_btn.clicked.connect(self.toggle_sidebar)
+        head.addWidget(self.collapse_btn)
+        lay.addLayout(head)
 
         current_group = 0
         for item_id, icon_name, label, group in NAV_ITEMS:
             if group != current_group:
                 current_group = group
-                gl = QLabel(GROUP_LABELS[group])
-                gl.setStyleSheet(
-                    f"color: {theme.TEXT_FAINT}; font-size: 10px; font-weight: 700;"
-                    f"letter-spacing: 1.5px; background: transparent;"
-                )
+                gl = ThemeLabel(GROUP_LABELS[group], "caption")
                 gl.setContentsMargins(18, 12, 0, 4)
+                self._brand_col_wrapper = gl
                 lay.addWidget(gl)
-            btn = SidebarButton(item_id, icon_name, label)
+            btn = NavButton(item_id, icon_name, label)
             btn.clicked.connect(self.navigate)
             self._nav_buttons[item_id] = btn
             lay.addWidget(btn)
         lay.addStretch(1)
 
-        # rodapé: admin + versão
+        # rodapé: estado do sistema (admin) + versão
         footer = QVBoxLayout()
-        footer.setContentsMargins(16, 0, 16, 0)
-        self.admin_pill = QLabel()
+        footer.setContentsMargins(14, 0, 14, 0)
+        footer.setSpacing(2)
+        self.admin_pill = ThemeLabel("", "caption")
+        self.admin_pill.setWordWrap(True)
         footer.addWidget(self.admin_pill)
-        ver = QLabel(f"v{__version__}")
-        ver.setStyleSheet(f"color: {theme.TEXT_FAINT}; font-size: 10px; background: transparent;")
-        footer.addWidget(ver)
+        self.version_lbl = ThemeLabel(f"v{__version__}", "caption")
+        footer.addWidget(self.version_lbl)
         lay.addLayout(footer)
         self._update_admin_pill()
-        return bar
+
+    def _apply_sidebar_style(self) -> None:
+        self._sidebar_host.setStyleSheet(
+            f"#sidebar {{ background: {theme.SURFACE1}; border-right: 1px solid {theme.BORDER}; }}"
+        )
+        self.collapse_btn.setStyleSheet(
+            f"QToolButton {{ background: transparent; border: none; border-radius: 6px; padding: 4px; }}"
+            f"QToolButton:hover {{ background: {theme.with_alpha(theme.ACCENT, 24)}; }}"
+        )
+
+    def _retheme_chrome(self) -> None:
+        # re-tinta rótulos e ícones construídos com estilo fixo
+        self._logo.setPixmap(_brand_pixmap(32))
+        self.collapse_btn.setIcon(icons.icon("panel_left", "muted", 16))
+        self._update_admin_pill()
+        for btn in self._nav_buttons.values():
+            btn.update()
+
+    def toggle_sidebar(self) -> None:
+        self._sidebar_compact = not self._sidebar_compact
+        self.services.settings.set("sidebar_compact", self._sidebar_compact)
+        self._apply_sidebar_width()
+
+    def _apply_sidebar_width(self) -> None:
+        target = SIDEBAR_COMPACT if self._sidebar_compact else SIDEBAR_WIDE
+        d = theme.dur("normal")
+        if d <= 0:
+            self._set_sidebar_width(float(target))
+            return
+        self._sidebar_anim.stop()
+        self._sidebar_anim.setDuration(d)
+        self._sidebar_anim.setStartValue(float(self._sidebar_host.width()))
+        self._sidebar_anim.setEndValue(float(target))
+        self._sidebar_anim.start()
+
+    def _set_sidebar_width(self, w: float) -> None:
+        self._sidebar_host.setFixedWidth(int(w))
+        compact = self._sidebar_host.width() < (SIDEBAR_WIDE + SIDEBAR_COMPACT) / 2
+        for lbl in self._sidebar_host.findChildren(QLabel):
+            if lbl is not self.admin_pill and lbl is not self.version_lbl:
+                lbl.setVisible(not compact)
 
     def _update_admin_pill(self) -> None:
         import sys
 
         if sys.platform != "win32":
-            txt, color = "MODO DESENVOLVIMENTO (não-Windows)", theme.TEXT_FAINT
+            txt, color = "Modo de desenvolvimento (não-Windows)", theme.TEXT_FAINT
         elif elevation.is_admin():
             txt, color = "● Executando como administrador", theme.SUCCESS
         else:
@@ -335,54 +383,55 @@ class MainWindow(QMainWindow):
     # -------------------------------------------------------------- topbar
     def _build_topbar(self) -> QWidget:
         bar = QFrame()
-        bar.setFixedHeight(74)
-        bar.setStyleSheet(
-            f"""
-            QFrame {{
-                background: {theme.PANEL};
-                border-bottom: 1px solid {theme.BORDER};
-            }}
-            """
-        )
+        bar.setObjectName("topbar")
+        bar.setFixedHeight(72)
         lay = QHBoxLayout(bar)
         lay.setContentsMargins(24, 0, 20, 0)
         lay.setSpacing(16)
 
         title_col = QVBoxLayout()
-        title_col.setSpacing(0)
-        self.page_title = QLabel("Dashboard")
-        self.page_title.setStyleSheet(
-            f"color: {theme.TEXT}; font-size: 17px; font-weight: 800; background: transparent;"
-        )
-        self.page_subtitle = QLabel("Visão geral do desempenho")
-        self.page_subtitle.setStyleSheet(
-            f"color: {theme.TEXT_MUTED}; font-size: 11px; background: transparent;"
-        )
+        title_col.setSpacing(1)
+        self.page_title = ThemeLabel("Dashboard", "title")
+        self.page_subtitle = ThemeLabel("Visão geral do desempenho", "body_sm")
         title_col.addWidget(self.page_title)
         title_col.addWidget(self.page_subtitle)
         lay.addLayout(title_col)
         lay.addStretch(1)
 
-        self.opt_btn = QPushButton("  OTIMIZAR AGORA")
-        self.opt_btn.setProperty("accent", True)
-        self.opt_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.opt_btn.setIcon(icons.icon("zap", "#04121f", 18))
+        self.boost_badge = QLabel("")
+        self.boost_badge.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.boost_badge.setToolTip("Sessão de boost ativa — clique para ver o Game Booster")
+        self.boost_badge.mousePressEvent = lambda e: self.navigate("booster")
+        lay.addWidget(self.boost_badge)
+
+        self.opt_btn = Button("Otimizar agora", "primary", "zap")
+        self.opt_btn.setMinimumSize(180, 40)
         self.opt_btn.clicked.connect(self.optimize_requested.emit)
         lay.addWidget(self.opt_btn)
+        self._apply_topbar_style()
         return bar
+
+    def _apply_topbar_style(self) -> None:
+        if getattr(self, "_mica_active", False):
+            self.centralWidget().setStyleSheet(
+                f"#central {{ background: {theme.with_alpha(theme.BG, 235)}; }}"
+                f"#topbar {{ background: {theme.with_alpha(theme.SURFACE1, 225)};"
+                f" border-bottom: 1px solid {theme.BORDER}; }}"
+            )
+        else:
+            self.centralWidget().setStyleSheet(
+                f"#central {{ background: {theme.BG}; }}"
+                f"#topbar {{ background: {theme.SURFACE1};"
+                f" border-bottom: 1px solid {theme.BORDER}; }}"
+            )
+        self._render_boost_badge()
+        self._apply_statusbar_style()
 
     # ------------------------------------------------------------ statusbar
     def _build_statusbar(self) -> QWidget:
         bar = QFrame()
-        bar.setFixedHeight(40)
-        bar.setStyleSheet(
-            f"""
-            QFrame {{
-                background: {theme.PANEL};
-                border-top: 1px solid {theme.BORDER};
-            }}
-            """
-        )
+        bar.setObjectName("statusbar")
+        bar.setFixedHeight(34)
         lay = QHBoxLayout(bar)
         lay.setContentsMargins(20, 0, 20, 0)
         lay.setSpacing(18)
@@ -394,22 +443,43 @@ class MainWindow(QMainWindow):
             row = QHBoxLayout()
             row.setSpacing(6)
             ic = QLabel()
-            ic.setPixmap(icons.pixmap(icon_name, "muted", 14))
+            ic.setPixmap(icons.pixmap(icon_name, "faint", 13))
             lbl = QLabel("—")
             lbl.setStyleSheet(
-                f"color: {theme.TEXT_MUTED}; font-size: 11px; font-weight: 600; background: transparent;"
+                f"color: {theme.TEXT_MUTED}; font-size: 11px; font-weight: 600;"
+                f"font-family: {theme.MONO_STACK}; background: transparent;"
             )
             row.addWidget(ic)
             row.addWidget(lbl)
-            self._status_labels[key] = lbl
+            self._status_labels[key] = (ic, lbl)
             lay.addLayout(row)
         lay.addStretch(1)
-        self.boost_label = QLabel("")
-        self.boost_label.setStyleSheet(
-            f"color: {theme.ACCENT}; font-size: 11px; font-weight: 700; background: transparent;"
-        )
-        lay.addWidget(self.boost_label)
         return bar
+
+    def _apply_statusbar_style(self) -> None:
+        bar = self.findChild(QFrame, "statusbar")
+        if bar is not None:
+            bar.setStyleSheet(
+                f"#statusbar {{ background: {theme.SURFACE1}; border-top: 1px solid {theme.BORDER}; }}"
+            )
+        if not hasattr(self, "_status_labels"):
+            return
+        for key, (ic, lbl) in self._status_labels.items():
+            icon_name = {"cpu": "cpu", "ram": "ram", "gpu": "gpu",
+                         "disk": "disk", "net": "activity"}[key]
+            ic.setPixmap(icons.pixmap(icon_name, "faint", 13))
+            lbl.setStyleSheet(
+                f"color: {theme.TEXT_MUTED}; font-size: 11px; font-weight: 600;"
+                f"font-family: {theme.MONO_STACK}; background: transparent;"
+            )
+
+    def _try_backdrop(self) -> None:
+        """Mica (Win11 22H2+) com fallback sólido elegante."""
+        if self.services.settings.get_bool("disable_mica"):
+            return
+        if theme.try_enable_mica(self):
+            self._mica_active = True
+            self._apply_topbar_style()
 
     # ---------------------------------------------------------------- tabs
     def _build_tabs(self) -> None:
@@ -464,27 +534,31 @@ class MainWindow(QMainWindow):
         }
         self.page_subtitle.setText(subtitles.get(tab_id, ""))
         self.stack.setCurrentWidget(self._tabs[tab_id])
-        # transição suave entre abas
-        from nexus.ui.components import fade_in
+        # transição suave entre abas (fade + deslocamento curto)
+        from nexus.ui.components import page_transition
 
-        fade_in(self._tabs[tab_id], duration_ms=200)
+        page_transition(self._tabs[tab_id])
+
+    # ------------------------------------------------------------- atalhos
+    def _install_shortcuts(self) -> None:
+        for i, (tab_id, _icon, _label, _g) in enumerate(NAV_ITEMS[:9], start=1):
+            sc = QShortcut(QKeySequence(f"Ctrl+{i}"), self)
+            sc.activated.connect(lambda t=tab_id: self.navigate(t))
+        QShortcut(QKeySequence("Ctrl+,"), self, activated=lambda: self.navigate("settings"))
+        QShortcut(QKeySequence("Ctrl+B"), self, activated=self.toggle_sidebar)
 
     # -------------------------------------------------------- monitor route
     def _on_monitor_update(self, snap) -> None:
         labels = self._status_labels
-        labels["cpu"].setText(f"CPU {snap.cpu_percent:.0f}%")
-        labels["ram"].setText(f"RAM {snap.ram_percent:.0f}%")
+        labels["cpu"][1].setText(f"CPU {snap.cpu_percent:.0f}%")
+        labels["ram"][1].setText(f"RAM {snap.ram_percent:.0f}%")
         if snap.gpu and snap.gpu.utilization is not None:
-            labels["gpu"].setText(f"GPU {snap.gpu.utilization:.0f}%")
-        elif snap.gpu:
-            labels["gpu"].setText("GPU N/D")
+            labels["gpu"][1].setText(f"GPU {snap.gpu.utilization:.0f}%")
         else:
-            labels["gpu"].setText("GPU N/D")
+            labels["gpu"][1].setText("GPU N/D")
         if snap.disks:
-            labels["disk"].setText(f"Disco {snap.disks[0].percent:.0f}%")
-        labels["net"].setText(
-            f"↓{snap.net_down_mbs:.1f} ↑{snap.net_up_mbs:.1f} MB/s"
-        )
+            labels["disk"][1].setText(f"Disco {snap.disks[0].percent:.0f}%")
+        labels["net"][1].setText(f"↓{snap.net_down_mbs:.1f} ↑{snap.net_up_mbs:.1f} MB/s")
 
         # Roteia a atualização para a aba visível (gráficos ao vivo).
         tab = self._tabs.get(self._current_tab)
@@ -499,14 +573,28 @@ class MainWindow(QMainWindow):
     def _on_boost_state(self, state) -> None:
         if state.active:
             game = state.game.name if state.game else "Boost rápido"
-            self.boost_label.setText(f"⚡ BOOST ATIVO — {game}")
+            self._boost_text = f"⚡ {game}"
         else:
-            self.boost_label.setText("")
+            self._boost_text = ""
+        self._render_boost_badge()
+
+    def _render_boost_badge(self) -> None:
+        text = getattr(self, "_boost_text", "")
+        if not text:
+            self.boost_badge.setText("")
+            self.boost_badge.setVisible(False)
+            return
+        self.boost_badge.setVisible(True)
+        self.boost_badge.setStyleSheet(
+            f"color: {theme.ACCENT_TEXT}; background: {theme.with_alpha(theme.ACCENT, 26)};"
+            f"border: 1px solid {theme.with_alpha(theme.ACCENT, 90)}; border-radius: 9px;"
+            "padding: 3px 10px; font-size: 11px; font-weight: 700;"
+        )
+        self.boost_badge.setText(text)
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
-        if hasattr(self, "neon_edge"):
-            self.neon_edge.setGeometry(self.centralWidget().rect())
+        self.toast_host.setGeometry(0, 0, self.centralWidget().width(), self.centralWidget().height())
 
     # ------------------------------------------------------------ autodetect
     def _auto_detect_game(self) -> None:
@@ -573,6 +661,8 @@ class MainWindow(QMainWindow):
             self.services.monitor.hardware_ready.disconnect()
         except (TypeError, RuntimeError):
             pass
+        theme.manager.changed.disconnect(self._apply_sidebar_style)
+        theme.manager.changed.disconnect(self._retheme_chrome)
         self.services.shutdown()
         super().closeEvent(event)
         QApplication.quit()

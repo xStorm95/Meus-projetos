@@ -4,6 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches: ["main", "arena/*"]
+    tags: ["nexus-booster-v*"]
     paths:
       - "NexusBooster/**"
       - ".github/workflows/nexus-booster-build.yml"
@@ -51,6 +52,9 @@ jobs:
           )
 
       - name: Publicar no GitHub Releases
+        # Release apenas quando uma tag nexus-booster-v* é enviada —
+        # pushes de branch apenas compilam e publicam o artefato (backup).
+        if: startsWith(github.ref, 'refs/tags/nexus-booster-v')
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash

@@ -2,19 +2,14 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QComboBox,
     QFileDialog,
-    QFrame,
     QHBoxLayout,
     QHeaderView,
-    QLabel,
     QLineEdit,
-    QPushButton,
     QTableWidget,
     QTableWidgetItem,
-    QVBoxLayout,
 )
 
 from nexus.core.worker import run_task
@@ -23,11 +18,12 @@ from nexus.system import fps_monitor as fpsmod
 from nexus.system import processes as sys_processes
 from nexus.ui import icons, theme
 from nexus.ui.components import (
+    Button,
     Card,
-    EmptyState,
     LineChart,
     Pill,
     StatTile,
+    ThemeLabel,
     confirm,
     toast_for,
 )
@@ -43,23 +39,21 @@ class FpsTab(BaseTab):
 
         # ---------------------------------------------------- fonte de dados
         src_card = Card("Fonte de dados de FPS", "activity")
-        st = QLabel(
+        st = ThemeLabel(
             "O FPS é medido com o PresentMon (ferramenta oficial da Intel/GPUOpen), "
             "que captura a apresentação real de quadros. O Nexus Booster não estima "
             "nem inventa valores: sem o PresentMon, o recurso fica marcado como "
-            "não suportado."
+            "não suportado.",
+            "body_sm", wrap=True,
         )
-        st.setWordWrap(True)
-        st.setStyleSheet(f"color: {theme.TEXT_MUTED}; font-size: 12px;")
         src_card.body_layout().addWidget(st)
 
         path_row = QHBoxLayout()
         self.pm_path = QLineEdit(self.services.settings.get_str("presentmon_path"))
         self.pm_path.setPlaceholderText(r"C:\Caminho\Para\PresentMon.exe")
-        browse = QPushButton("Procurar…")
-        browse.setIcon(icons.icon("folder", "accent", 16))
+        browse = Button("Procurar…", "secondary", "folder")
         browse.clicked.connect(self._browse_pm)
-        save = QPushButton("Salvar")
+        save = Button("Salvar", "secondary")
         save.clicked.connect(self._save_pm_path)
         self.pm_status = Pill("verificando…", "muted")
         path_row.addWidget(self.pm_path, 1)
@@ -69,15 +63,13 @@ class FpsTab(BaseTab):
         src_card.body_layout().addLayout(path_row)
 
         dl_row = QHBoxLayout()
-        dl = QPushButton("  Abrir página de download do PresentMon")
-        dl.setIcon(icons.icon("download", "accent", 16))
+        dl = Button("Abrir página de download do PresentMon", "subtle", "download")
         dl.clicked.connect(self._open_pm_download)
-        hint = QLabel(
-            "Baixe a versão CLI (ex.: PresentMon-2.x-x64), extraia e aponte o caminho acima. "
-            "Em algumas versões é necessário executar como administrador."
+        hint = ThemeLabel(
+            "Baixe a versão CLI (ex.: PresentMon-2.x-x64), extraia e aponte o caminho "
+            "acima. Em algumas versões é necessário executar como administrador.",
+            "caption", wrap=True,
         )
-        hint.setStyleSheet(f"color: {theme.TEXT_FAINT}; font-size: 11px;")
-        hint.setWordWrap(True)
         dl_row.addWidget(dl)
         dl_row.addWidget(hint, 1)
         src_card.body_layout().addLayout(dl_row)
@@ -89,30 +81,27 @@ class FpsTab(BaseTab):
         sel_row = QHBoxLayout()
         self.proc_combo = QComboBox()
         self.proc_combo.setMinimumWidth(280)
-        self.refresh_proc = QPushButton("Atualizar lista")
+        self.refresh_proc = Button("Atualizar lista", "secondary", "refresh")
         self.refresh_proc.clicked.connect(self._load_processes)
-        self.start_btn = QPushButton("  Iniciar captura")
-        self.start_btn.setProperty("accent", True)
-        self.start_btn.setIcon(icons.icon("play", "#04121f", 16))
-        self.stop_btn = QPushButton("  Parar")
-        self.stop_btn.setProperty("danger", True)
+        self.start_btn = Button("Iniciar captura", "primary", "play")
+        self.stop_btn = Button("Parar", "danger", "stop")
         self.stop_btn.setEnabled(False)
         self.stop_btn.clicked.connect(self._stop)
         self.start_btn.clicked.connect(self._start)
-        sel_row.addWidget(QLabel("Processo do jogo:"))
+        sel_row.addWidget(ThemeLabel("Processo do jogo:"))
         sel_row.addWidget(self.proc_combo, 1)
         sel_row.addWidget(self.refresh_proc)
         sel_row.addWidget(self.start_btn)
         sel_row.addWidget(self.stop_btn)
         session_card.body_layout().addLayout(sel_row)
-        self.session_note = QLabel("Selecione o processo do jogo em execução.")
-        self.session_note.setStyleSheet(f"color: {theme.TEXT_FAINT}; font-size: 11px;")
+        self.session_note = ThemeLabel("Selecione o processo do jogo em execução.",
+                                       "caption", wrap=True)
         session_card.body_layout().addWidget(self.session_note)
         self.add(session_card)
 
         # ------------------------------------------------------- estatísticas
         stats_row = QHBoxLayout()
-        stats_row.setSpacing(14)
+        stats_row.setSpacing(theme.pad("md"))
         self.fps_now = StatTile("activity", "FPS atual", "—", color="accent")
         self.fps_avg = StatTile("gauge", "FPS médio", "—", color="accent")
         self.fps_low = StatTile("alert", "FPS 1% low", "—", color="warning")
@@ -123,35 +112,32 @@ class FpsTab(BaseTab):
 
         # ----------------------------------------------------------- gráficos
         charts = QHBoxLayout()
+        charts.setSpacing(theme.pad("md"))
         fps_chart_card = Card("FPS ao vivo", "activity")
         self.fps_chart = LineChart(unit="FPS", fixed_max=None, show_grid=True)
-        self.fps_chart.add_series("FPS", theme.ACCENT)
+        self.fps_chart.add_series("FPS", "accent")
         fps_chart_card.body_layout().addWidget(self.fps_chart)
         charts.addWidget(fps_chart_card)
 
-        ft_chart_card = Card("Frametime (ms)", "clock")
+        ft_chart_card = Card("Frametime", "clock")
         self.ft_chart = LineChart(unit="ms", fixed_max=None)
-        self.ft_chart.add_series("Frametime", theme.WARNING)
+        self.ft_chart.add_series("Frametime", "warning")
         ft_chart_card.body_layout().addWidget(self.ft_chart)
         charts.addWidget(ft_chart_card)
         self.add_layout(charts)
 
         # -------------------------------------------------------- gargalos
         bn_card = Card("Análise de gargalo (heurística)", "cpu")
-        bn_note = QLabel(
+        bn_note = ThemeLabel(
             "Durante a captura, comparamos o uso real de CPU e GPU. É uma heurística "
-            "informativa — resultados variam por cena e configuração."
+            "informativa — resultados variam por cena e configuração.",
+            "body_sm", wrap=True,
         )
-        bn_note.setWordWrap(True)
-        bn_note.setStyleSheet(f"color: {theme.TEXT_MUTED}; font-size: 12px;")
         bn_card.body_layout().addWidget(bn_note)
-        self.bn_verdict = QLabel("Inicie uma captura para analisar.")
-        self.bn_verdict.setStyleSheet(
-            f"color: {theme.TEXT}; font-size: 15px; font-weight: 800; background: transparent;"
-        )
+        self.bn_verdict = ThemeLabel("Inicie uma captura para analisar.", "title_sm")
         bn_card.body_layout().addWidget(self.bn_verdict)
         self.cpu_chart = LineChart(unit="%", fixed_max=100.0)
-        self.cpu_chart.add_series("CPU", theme.ACCENT)
+        self.cpu_chart.add_series("CPU", "accent")
         self.gpu_chart = LineChart(unit="%", fixed_max=100.0)
         self.gpu_chart.add_series("GPU", "#a78bfa")
         row = QHBoxLayout()
@@ -162,16 +148,16 @@ class FpsTab(BaseTab):
 
         # --------------------------------------------- antes x depois
         bench_card = Card("Comparação antes × depois", "history")
-        bnote = QLabel(
+        bnote = ThemeLabel(
             "Registre o resultado de uma sessão para comparar depois de otimizar. "
-            "Somente sessões reais capturadas aparecem aqui."
+            "Somente sessões reais capturadas aparecem aqui.",
+            "body_sm", wrap=True,
         )
-        bnote.setStyleSheet(f"color: {theme.TEXT_MUTED}; font-size: 12px;")
         bench_card.body_layout().addWidget(bnote)
         reg_row = QHBoxLayout()
         self.bench_game = QLineEdit()
         self.bench_game.setPlaceholderText("Nome do jogo (opcional)")
-        reg_btn = QPushButton("Registrar resultado atual")
+        reg_btn = Button("Registrar resultado atual", "secondary", "check")
         reg_btn.clicked.connect(self._register_bench)
         reg_row.addWidget(self.bench_game, 1)
         reg_row.addWidget(reg_btn)
@@ -181,7 +167,9 @@ class FpsTab(BaseTab):
         self.bench_table.setHorizontalHeaderLabels(
             ["Data", "Jogo", "FPS médio", "FPS 1% low", "Δ vs anterior"]
         )
-        self.bench_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        self.bench_table.horizontalHeader().setSectionResizeMode(
+            1, QHeaderView.ResizeMode.Stretch
+        )
         self.bench_table.verticalHeader().setVisible(False)
         self.bench_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.bench_table.setMaximumHeight(220)
@@ -193,7 +181,8 @@ class FpsTab(BaseTab):
     # ------------------------------------------------------------ PresentMon
     def _browse_pm(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
-            self, "Selecionar PresentMon.exe", "", "PresentMon (PresentMon*.exe;PresentMon.exe)"
+            self, "Selecionar PresentMon.exe", "",
+            "PresentMon (PresentMon*.exe;PresentMon.exe)"
         )
         if path:
             self.pm_path.setText(path)
@@ -253,7 +242,8 @@ class FpsTab(BaseTab):
                 )
             else:
                 self.session_note.setText(
-                    "Processos com maior consumo aparecem também. Alguns podem ser do sistema."
+                    "Processos com maior consumo aparecem também. "
+                    "Alguns podem ser do sistema."
                 )
 
         run_task(job, on_done=done)
@@ -357,7 +347,9 @@ class FpsTab(BaseTab):
             )
             return
         game = self.bench_game.text().strip() or "Sessão sem nome"
-        self.services.db.bench_add(game, stats["avg"], stats["low1"], f"{stats['frames']} quadros")
+        self.services.db.bench_add(
+            game, stats["avg"], stats["low1"], f"{stats['frames']} quadros"
+        )
         toast_for(self, "Resultado registrado para comparação.", "success")
         self._load_bench()
 
@@ -367,11 +359,15 @@ class FpsTab(BaseTab):
         t.setRowCount(0)
         prev_avg = None
         import time as _t
+        from PySide6.QtGui import QColor
 
         for e in reversed(entries):  # mais antigo primeiro para delta
             row = t.rowCount()
             t.insertRow(row)
-            t.setItem(row, 0, QTableWidgetItem(_t.strftime("%d/%m %H:%M", _t.localtime(e.ts))))
+            t.setItem(
+                row, 0,
+                QTableWidgetItem(_t.strftime("%d/%m %H:%M", _t.localtime(e.ts))),
+            )
             t.setItem(row, 1, QTableWidgetItem(e.game_name))
             t.setItem(row, 2, QTableWidgetItem(f"{e.avg_fps:.0f}"))
             t.setItem(row, 3, QTableWidgetItem(f"{e.low_fps:.0f}"))
@@ -379,7 +375,7 @@ class FpsTab(BaseTab):
                 delta = e.avg_fps - prev_avg
                 item = QTableWidgetItem(f"{delta:+.0f} FPS")
                 item.setForeground(
-                    Qt.GlobalColor.green if delta >= 0 else Qt.GlobalColor.red
+                    QColor(theme.SUCCESS) if delta >= 0 else QColor(theme.DANGER)
                 )
                 t.setItem(row, 4, item)
             else:
@@ -394,5 +390,7 @@ class FpsTab(BaseTab):
         else:
             self.cpu_chart.push("CPU", snap.cpu_percent)
             self.gpu_chart.push(
-                "GPU", snap.gpu.utilization if snap.gpu and snap.gpu.utilization is not None else None
+                "GPU",
+                snap.gpu.utilization
+                if snap.gpu and snap.gpu.utilization is not None else None,
             )

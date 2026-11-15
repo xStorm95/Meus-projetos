@@ -5,20 +5,25 @@ from __future__ import annotations
 import time
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QComboBox,
     QHBoxLayout,
     QHeaderView,
-    QLabel,
-    QPushButton,
-    QTableWidget,
     QTableWidgetItem,
-    QVBoxLayout,
+    QTableWidget,
 )
 
 from nexus.core.worker import run_task
 from nexus.ui import icons, theme
-from nexus.ui.components import Card, Pill, confirm, toast_for
+from nexus.ui.components import (
+    Button,
+    Card,
+    Pill,
+    ThemeLabel,
+    confirm,
+    toast_for,
+)
 from nexus.ui.tabs.base import BaseTab
 
 CATEGORY_LABELS = {
@@ -48,14 +53,11 @@ class HistoryTab(BaseTab):
         for cid, label in CATEGORY_LABELS.items():
             self.filter.addItem(label, cid)
         self.filter.currentIndexChanged.connect(self._load)
-        refresh = QPushButton("Atualizar")
-        refresh.setIcon(icons.icon("refresh", "accent", 16))
+        refresh = Button("Atualizar", "secondary", "refresh")
         refresh.clicked.connect(self._load)
-        undo_all = QPushButton("  DESFAZER OTIMIZAÇÕES")
-        undo_all.setProperty("danger", True)
-        undo_all.setIcon(icons.icon("undo", "danger", 16))
+        undo_all = Button("Desfazer otimizações", "danger", "undo")
         undo_all.clicked.connect(self._undo_all)
-        row.addWidget(QLabel("Filtro:"))
+        row.addWidget(ThemeLabel("Filtro:"))
         row.addWidget(self.filter, 1)
         row.addWidget(refresh)
         row.addWidget(undo_all)
@@ -64,7 +66,9 @@ class HistoryTab(BaseTab):
 
         # ------------------------------------------------------------ tabela
         self.table = QTableWidget(0, 5)
-        self.table.setHorizontalHeaderLabels(["Data", "Categoria", "Ação", "Detalhes", "Estado"])
+        self.table.setHorizontalHeaderLabels(
+            ["Data", "Categoria", "Ação", "Detalhes", "Estado"]
+        )
         self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         self.table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
         self.table.setColumnWidth(0, 120)
@@ -79,15 +83,12 @@ class HistoryTab(BaseTab):
 
         # -------------------------------------------------------- detalhe + undo
         detail = Card("Detalhe da alteração", "info")
-        self.detail_label = QLabel("Selecione uma alteração para ver os detalhes.")
-        self.detail_label.setWordWrap(True)
+        self.detail_label = ThemeLabel("Selecione uma alteração para ver os detalhes.",
+                                       "body_sm", wrap=True)
         self.detail_label.setTextFormat(Qt.TextFormat.RichText)
-        self.detail_label.setStyleSheet(f"color: {theme.TEXT_MUTED}; font-size: 12px;")
         detail.body_layout().addWidget(self.detail_label)
         drow = QHBoxLayout()
-        self.undo_btn = QPushButton("  Desfazer esta alteração")
-        self.undo_btn.setProperty("danger", True)
-        self.undo_btn.setIcon(icons.icon("undo", "danger", 16))
+        self.undo_btn = Button("Desfazer esta alteração", "danger", "undo")
         self.undo_btn.setEnabled(False)
         self.undo_btn.clicked.connect(self._undo_selected)
         drow.addStretch(1)
@@ -98,24 +99,22 @@ class HistoryTab(BaseTab):
         # ------------------------------------------------------------- erros
         err_card = Card("Registro de erros", "alert")
         erow = QHBoxLayout()
-        err_refresh = QPushButton("Atualizar")
+        err_refresh = Button("Atualizar", "secondary", "refresh")
         err_refresh.clicked.connect(self._load_errors)
-        clear_err = QPushButton("Limpar registro")
-        clear_err.setProperty("danger", True)
+        clear_err = Button("Limpar registro", "danger")
         clear_err.clicked.connect(self._clear_errors)
-        open_logs = QPushButton("Abrir pasta de logs")
-        open_logs.setIcon(icons.icon("folder", "accent", 16))
+        open_logs = Button("Abrir pasta de logs", "secondary", "folder")
         open_logs.clicked.connect(self._open_logs)
         erow.addWidget(err_refresh)
         erow.addWidget(clear_err)
         erow.addWidget(open_logs)
         erow.addStretch(1)
         err_card.body_layout().addLayout(erow)
-        self.err_label = QLabel("Nenhum erro registrado.")
-        self.err_label.setWordWrap(True)
+        self.err_label = ThemeLabel("Nenhum erro registrado.", "caption", wrap=True)
+        self.err_label.setTextFormat(Qt.TextFormat.PlainText)
         self.err_label.setStyleSheet(
-            f"color: {theme.TEXT_MUTED}; font-size: 11px; background: {theme.PANEL};"
-            "border-radius: 8px; padding: 8px;"
+            f"color: {theme.TEXT_MUTED}; font-size: 11px; background: {theme.SURFACE1};"
+            f"border: 1px solid {theme.BORDER}; border-radius: 8px; padding: 8px;"
         )
         self.err_label.setMinimumHeight(60)
         err_card.body_layout().addWidget(self.err_label)
@@ -135,20 +134,33 @@ class HistoryTab(BaseTab):
         def done(entries) -> None:
             self._entries = entries
             t = self.table
+            t.setUpdatesEnabled(False)
             t.setRowCount(0)
             for e in entries:
                 row = t.rowCount()
                 t.insertRow(row)
-                t.setItem(row, 0, QTableWidgetItem(time.strftime("%d/%m/%y %H:%M", time.localtime(e.ts))))
-                t.setItem(row, 1, QTableWidgetItem(CATEGORY_LABELS.get(e.category, e.category)))
+                t.setItem(
+                    row, 0,
+                    QTableWidgetItem(
+                        time.strftime("%d/%m/%y %H:%M", time.localtime(e.ts))
+                    ),
+                )
+                t.setItem(
+                    row, 1,
+                    QTableWidgetItem(CATEGORY_LABELS.get(e.category, e.category)),
+                )
                 t.setItem(row, 2, QTableWidgetItem(e.action))
                 t.setItem(row, 3, QTableWidgetItem(e.description[:120]))
-                state = "✔ ativa" if not e.undone else ("↩ desfeita" if e.undone else "—")
-                item = QTableWidgetItem(state)
                 if e.undone:
-                    item.setForeground(Qt.GlobalColor.darkYellow)
-                t.setItem(row, 4, item)
+                    state = QTableWidgetItem("desfeita")
+                    state.setForeground(QColor(theme.TEXT_MUTED))
+                else:
+                    state = QTableWidgetItem("ativa")
+                    state.setForeground(QColor(theme.SUCCESS))
+                t.setItem(row, 4, state)
+                t.setRowHeight(row, 38)
             t.resizeRowsToContents()
+            t.setUpdatesEnabled(True)
 
         run_task(job, on_done=done)
 
@@ -168,11 +180,15 @@ class HistoryTab(BaseTab):
         self._selected_entry = e
         self.undo_btn.setEnabled(bool(e.undo) and not e.undone)
         if not e.undo:
-            self.undo_btn.setToolTip("Esta ação não possui reversão automática (ex.: limpeza de arquivos).")
+            self.undo_btn.setToolTip(
+                "Esta ação não possui reversão automática (ex.: limpeza de arquivos)."
+            )
         elif e.undone:
             self.undo_btn.setToolTip("Já desfeita.")
         else:
-            self.undo_btn.setToolTip("Reverte esta alteração usando os valores originais salvos.")
+            self.undo_btn.setToolTip(
+                "Reverte esta alteração usando os valores originais salvos."
+            )
 
     # ----------------------------------------------------------------- undo
     def _undo_selected(self) -> None:
@@ -244,8 +260,8 @@ class HistoryTab(BaseTab):
 
     def _clear_errors(self) -> None:
         if confirm(self, "Limpar registro de erros",
-                   "Apagar o registro de erros do banco? Os arquivos de log não são apagados.",
-                   confirm_text="Limpar"):
+                   "Apagar o registro de erros do banco? Os arquivos de log não são "
+                   "apagados.", confirm_text="Limpar"):
             self.services.db.errors_clear()
             self._load_errors()
 

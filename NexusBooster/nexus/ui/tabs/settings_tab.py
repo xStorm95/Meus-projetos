@@ -1,10 +1,10 @@
-"""Aba Configurações: preferências, PresentMon, inicialização, dados e sobre."""
+"""Aba Configurações: aparência, PresentMon, inicialização, dados e sobre."""
 
 from __future__ import annotations
 
 import sys
 
-from PySide6.QtCore import Qt, QTimer, QUrl
+from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QComboBox,
@@ -12,8 +12,6 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
-    QPushButton,
-    QSlider,
     QVBoxLayout,
 )
 
@@ -21,7 +19,17 @@ from nexus.constants import ACCENTS, APP_VERSION, PRESENTMON_URL
 from nexus.core import elevation
 from nexus.core.paths import app_data_dir
 from nexus.ui import icons, theme
-from nexus.ui.components import Card, Pill, ToggleSwitch, confirm, toast_for
+from nexus.ui.components import (
+    Button,
+    Card,
+    Pill,
+    SegmentedControl,
+    Slider,
+    ThemeLabel,
+    ToggleSwitch,
+    confirm,
+    toast_for,
+)
 from nexus.ui.tabs.base import BaseTab
 
 
@@ -30,54 +38,90 @@ class SettingsTab(BaseTab):
         super().__init__(services, main_window)
         s = services.settings
 
-        # ------------------------------------------------------------ geral
-        general = Card("Geral", "settings")
-        r1 = QHBoxLayout()
-        r1.addWidget(QLabel("Cor de destaque:"))
+        # ------------------------------------------------------ aparência
+        appearance = Card("Aparência", "settings")
+        appearance.body_layout().addWidget(ThemeLabel("Tema", "label"))
+
+        row_theme = QHBoxLayout()
+        row_theme.setSpacing(theme.pad("md"))
+        current_mode = s.get_str("theme_mode") or "dark"
+        self.theme_seg = SegmentedControl(
+            [("dark", "Escuro"), ("light", "Claro"), ("system", "Sistema")],
+            current_mode,
+        )
+        row_theme.addWidget(self.theme_seg)
+        row_theme.addStretch(1)
+        appearance.body_layout().addLayout(row_theme)
+
+        row_acc = QHBoxLayout()
+        row_acc.setSpacing(theme.pad("md"))
+        row_acc.addWidget(ThemeLabel("Cor de destaque:", "body"))
         self.accent_combo = QComboBox()
         for key, hexv in ACCENTS.items():
             self.accent_combo.addItem(key.upper(), key)
         self.accent_combo.setCurrentText(s.get_str("accent").upper())
         self.accent_combo.currentIndexChanged.connect(self._change_accent)
-        r1.addWidget(self.accent_combo)
-        r1.addStretch(1)
-        general.body_layout().addLayout(r1)
+        row_acc.addWidget(self.accent_combo)
+        row_acc.addStretch(1)
+        appearance.body_layout().addLayout(row_acc)
 
-        r2 = QHBoxLayout()
-        r2.addWidget(QLabel("Intervalo de monitoramento:"))
-        self.interval = QSlider(Qt.Orientation.Horizontal)
+        row_dens = QHBoxLayout()
+        row_dens.setSpacing(theme.pad("md"))
+        row_dens.addWidget(ThemeLabel("Densidade:", "body"))
+        self.density_seg = SegmentedControl(
+            [("comfortable", "Confortável"), ("compact", "Compacta")],
+            s.get_str("density") or "comfortable",
+        )
+        row_dens.addWidget(self.density_seg)
+        row_dens.addStretch(1)
+        appearance.body_layout().addLayout(row_dens)
+        self.add(appearance)
+
+        self.theme_seg.changed.connect(self._change_theme)
+        self.density_seg.changed.connect(self._change_density)
+
+        # --------------------------------------------------- monitoramento
+        mon = Card("Monitoramento", "activity")
+        row_m = QHBoxLayout()
+        row_m.setSpacing(theme.pad("md"))
+        row_m.addWidget(ThemeLabel("Intervalo de atualização:", "body"))
+        self.interval = Slider(Qt.Orientation.Horizontal)
         self.interval.setRange(500, 3000)
         self.interval.setSingleStep(250)
         self.interval.setValue(s.get_int("monitor_interval"))
         self.interval.setFixedWidth(220)
-        self.interval_label = QLabel(f"{self.interval.value()} ms")
+        self.interval_label = ThemeLabel(f"{self.interval.value()} ms", "body_sm")
         self.interval.valueChanged.connect(self._change_interval)
-        r2.addWidget(self.interval)
-        r2.addWidget(self.interval_label)
-        r2.addStretch(1)
-        general.body_layout().addLayout(r2)
-        self.add(general)
+        row_m.addWidget(self.interval)
+        row_m.addWidget(self.interval_label)
+        row_m.addStretch(1)
+        mon.body_layout().addLayout(row_m)
+        mon.body_layout().addWidget(
+            ThemeLabel("Define o equilíbrio entre fluidez dos gráficos e uso de CPU "
+                       "do monitoramento.", "caption", wrap=True)
+        )
+        self.add(mon)
 
         # ------------------------------------------------- PresentMon (FPS)
         pm = Card("FPS — PresentMon", "activity")
         p1 = QHBoxLayout()
         self.pm_edit = QLineEdit(s.get_str("presentmon_path"))
         self.pm_edit.setPlaceholderText(r"C:\Caminho\Para\PresentMon.exe")
-        browse = QPushButton("Procurar…")
+        browse = Button("Procurar…", "secondary", "folder")
         browse.clicked.connect(self._browse_pm)
-        save = QPushButton("Salvar")
+        save = Button("Salvar", "secondary")
         save.clicked.connect(self._save_pm)
         p1.addWidget(self.pm_edit, 1)
         p1.addWidget(browse)
         p1.addWidget(save)
         pm.body_layout().addLayout(p1)
         p2 = QHBoxLayout()
-        dl = QPushButton("  Abrir página oficial do PresentMon")
-        dl.setIcon(icons.icon("download", "accent", 16))
+        dl = Button("Abrir página oficial do PresentMon", "subtle", "download")
         dl.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(PRESENTMON_URL)))
-        note = QLabel("Necessário para medir FPS real. Sem ele, o FPS Monitor fica como 'não suportado'.")
-        note.setStyleSheet(f"color: {theme.TEXT_FAINT}; font-size: 11px;")
-        note.setWordWrap(True)
+        note = ThemeLabel(
+            "Necessário para medir FPS real. Sem ele, o FPS Monitor fica como "
+            "'não suportado'.", "caption", wrap=True,
+        )
         p2.addWidget(dl)
         p2.addWidget(note, 1)
         pm.body_layout().addLayout(p2)
@@ -88,23 +132,23 @@ class SettingsTab(BaseTab):
         w1 = QHBoxLayout()
         if sys.platform == "win32":
             if elevation.is_admin():
-                badge = Pill("Executando como administrador", "success")
-                w1.addWidget(badge)
+                w1.addWidget(Pill("Executando como administrador", "success"))
             else:
-                badge = Pill("Sem privilégios de administrador", "warning")
-                w1.addWidget(badge)
-                elevate_btn = QPushButton("Reiniciar como administrador")
+                w1.addWidget(Pill("Sem privilégios de administrador", "warning"))
+                elevate_btn = Button("Reiniciar como administrador", "secondary")
                 elevate_btn.clicked.connect(self._relaunch_admin)
                 w1.addWidget(elevate_btn)
         else:
-            w1.addWidget(QLabel("Executando em ambiente de desenvolvimento (não-Windows)."))
+            w1.addWidget(
+                ThemeLabel("Executando em ambiente de desenvolvimento (não-Windows).",
+                           "body_sm")
+            )
         w1.addStretch(1)
         win.body_layout().addLayout(w1)
 
         w2 = QHBoxLayout()
         self.autorun = ToggleSwitch(s.get_bool("launch_with_windows"))
-        lbl = QLabel("Iniciar o Nexus Booster com o Windows")
-        lbl.setStyleSheet(f"color: {theme.TEXT}; font-size: 13px;")
+        lbl = ThemeLabel("Iniciar o Nexus Booster com o Windows", "body")
         self.autorun.toggled.connect(self._toggle_autorun)
         w2.addWidget(self.autorun)
         w2.addWidget(lbl)
@@ -115,17 +159,15 @@ class SettingsTab(BaseTab):
         # ------------------------------------------------------------- dados
         data = Card("Dados do aplicativo", "folder")
         d1 = QHBoxLayout()
-        path_lbl = QLabel(str(app_data_dir()))
-        path_lbl.setStyleSheet(f"color: {theme.TEXT_MUTED}; font-size: 11px;")
-        open_btn = QPushButton("Abrir pasta")
+        path_lbl = ThemeLabel(str(app_data_dir()), "caption", wrap=True)
+        open_btn = Button("Abrir pasta", "secondary", "folder")
         open_btn.clicked.connect(self._open_data)
         d1.addWidget(path_lbl, 1)
         d1.addWidget(open_btn)
         data.body_layout().addLayout(d1)
 
         danger_row = QHBoxLayout()
-        reset = QPushButton("Apagar histórico e configurações (reset)")
-        reset.setProperty("danger", True)
+        reset = Button("Apagar histórico e configurações (reset)", "danger", "trash")
         reset.clicked.connect(self._reset_data)
         danger_row.addWidget(reset)
         danger_row.addStretch(1)
@@ -134,30 +176,44 @@ class SettingsTab(BaseTab):
 
         # ------------------------------------------------------------- sobre
         about = Card("Sobre", "info")
-        a = QLabel(
+        a = ThemeLabel(
             f"<b>Nexus Booster</b> — v{APP_VERSION}<br><br>"
             "Otimizador de desempenho para Windows e jogos.<br>"
             "Monitoramento real via psutil/WMI · Persistência SQLite · "
             "Interface PySide6.<br><br>"
-            "<span style='color:{theme.TEXT_FAINT}'>Ajustes seguros, reversíveis e "
+            f"<span style='color:{theme.TEXT_FAINT}'>Ajustes seguros, reversíveis e "
             "documentados. Nenhuma promessa de FPS garantido — métricas reais ou "
-            "'não suportado'.</span>"
+            "'não suportado'.</span>",
+            "body_sm", wrap=True,
         )
         a.setTextFormat(Qt.TextFormat.RichText)
-        a.setStyleSheet(f"color: {theme.TEXT_MUTED}; font-size: 12px;")
         about.body_layout().addWidget(a)
         self.add(about)
 
     # ------------------------------------------------------------- handlers
+    def _change_theme(self, mode: str) -> None:
+        self.services.settings.set("theme_mode", mode)
+        effective = mode
+        if mode == "system":
+            effective = "dark" if theme.system_prefers_dark() else "light"
+        theme.set_theme(effective, None, None)
+        toast_for(self, f"Tema alterado para {mode}.", "success")
+
     def _change_accent(self) -> None:
         key = self.accent_combo.currentData()
         self.services.settings.set("accent", key)
-        from PySide6.QtWidgets import QApplication
+        theme.set_theme(None, key, None)
+        toast_for(self, f"Cor de destaque alterada para {key}.", "success")
 
-        from nexus.ui.theme import apply_theme
-
-        apply_theme(QApplication.instance(), key)
-        toast_for(self, f"Tema alterado para {key}.", "success")
+    def _change_density(self, density: str) -> None:
+        self.services.settings.set("density", density)
+        theme.set_theme(None, None, density)
+        toast_for(
+            self,
+            "Densidade alterada para " + ("compacta." if density == "compact"
+                                          else "confortável."),
+            "success",
+        )
 
     def _change_interval(self, value: int) -> None:
         self.interval_label.setText(f"{value} ms")
@@ -228,7 +284,7 @@ class SettingsTab(BaseTab):
 
         try:
             self.services.db.close()
-            sqlite3.connect(str(db_path)).executescript(
+            sqlite3.connect(str(db_path())).executescript(
                 "DROP TABLE IF EXISTS history; DROP TABLE IF EXISTS settings;"
                 "DROP TABLE IF EXISTS games; DROP TABLE IF EXISTS game_sessions;"
                 "DROP TABLE IF EXISTS error_log; DROP TABLE IF EXISTS benchmarks;"
@@ -237,6 +293,7 @@ class SettingsTab(BaseTab):
 
             self.services.db = Database(db_path)
             self.services.settings._db = self.services.db
-            toast_for(self, "Dados apagados. Reinicie o aplicativo para recompor.", "success")
+            toast_for(self, "Dados apagados. Reinicie o aplicativo para recompor.",
+                      "success")
         except Exception as exc:  # noqa: BLE001
             toast_for(self, f"Falha ao resetar: {exc}", "error")

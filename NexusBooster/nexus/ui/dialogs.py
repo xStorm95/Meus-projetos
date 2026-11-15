@@ -1,27 +1,100 @@
-"""Diálogos auxiliares: seleção de processos, adicionar jogo e detalhes do jogo."""
+"""Diálogos auxiliares: lançar jogo, adicionar manual, escolher processo."""
 
 from __future__ import annotations
 
-import os
-import subprocess
-import sys
-
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QComboBox,
     QDialog,
     QFileDialog,
     QHBoxLayout,
     QLabel,
     QLineEdit,
-    QPushButton,
     QVBoxLayout,
 )
 
-from nexus.core.worker import run_task
-from nexus.games.profiles import get_profile
-from nexus.system import processes as sys_processes
+from nexus.core.database import GameRecord
 from nexus.ui import icons, theme
-from nexus.ui.components import Pill, SectionTitle, confirm, toast_for
+from nexus.ui.components import Button, SearchBox, ThemeLabel, toast_for
+from nexus.ui.tabs.processes import _ProcessTable
+
+
+class AddGameDialog(QDialog):
+    """Adiciona um jogo manualmente (nome, plataforma, caminho do exe)."""
+
+    def __init__(self, services, parent=None):
+        super().__init__(parent)
+        self.services = services
+        self.game = None
+        self.setWindowTitle("Adicionar jogo manualmente")
+        self.setMinimumWidth(480)
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(theme.pad("lg"), theme.pad("md"), theme.pad("lg"),
+                               theme.pad("md"))
+        lay.setSpacing(theme.pad("sm"))
+
+        lay.addWidget(ThemeLabel("Nome do jogo:", "label"))
+        self.name = QLineEdit()
+        self.name.setPlaceholderText("Ex.: FiveM")
+        lay.addWidget(self.name)
+
+        lay.addWidget(ThemeLabel("Plataforma:", "label"))
+        self.platform = QComboBox()
+        for pid, label in (
+            ("steam", "Steam"), ("epic", "Epic Games"), ("riot", "Riot Games"),
+            ("battlenet", "Battle.net"), ("manual", "Executável manual (qualquer)"),
+        ):
+            self.platform.addItem(label, pid)
+        lay.addWidget(self.platform)
+
+        lay.addWidget(ThemeLabel("Executável do jogo:", "label"))
+        row = QHBoxLayout()
+        self.exe = QLineEdit()
+        self.exe.setPlaceholderText(r"C:\Jogos\MeuJogo\jogo.exe")
+        browse = Button("Procurar…", "secondary", "folder")
+        browse.clicked.connect(self._browse)
+        row.addWidget(self.exe, 1)
+        row.addWidget(browse)
+        lay.addLayout(row)
+
+        hint = ThemeLabel(
+            "O Nexus Booster usa o executável para lançar o jogo e identificar o "
+            "processo durante as sessões de boost.", "caption", wrap=True,
+        )
+        lay.addWidget(hint)
+        lay.addStretch(1)
+
+        btns = QHBoxLayout()
+        btns.addStretch(1)
+        cancel = Button("Cancelar")
+        cancel.clicked.connect(self.reject)
+        save = Button("Adicionar jogo", "primary", "plus")
+        save.clicked.connect(self._save)
+        btns.addWidget(cancel)
+        btns.addWidget(save)
+        lay.addLayout(btns)
+
+    def _browse(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(self, "Selecionar executável do jogo",
+                                              "", "Executáveis (*.exe)")
+        if path:
+            self.exe.setText(path)
+
+    def _save(self) -> None:
+        name = self.name.text().strip()
+        exe = self.exe.text().strip()
+        if not name or not exe:
+            toast_for(self, "Informe o nome e o executável do jogo.", "warning")
+            return
+        self.game = GameRecord(
+            id=None,
+            name=name,
+            platform=self.platform.currentData(),
+            exe_path=exe,
+            launch_cmd=f'"{exe}"',
+            profile_id="generic",
+        )
+        self.accept()
 
 
 class ProcessPickerDialog(QDialog):
@@ -32,147 +105,69 @@ class ProcessPickerDialog(QDialog):
         self.services = services
         self.selected: list[str] = []
         self.setWindowTitle("Escolher processos em execução")
-        self.setMinimumSize(460, 520)
+        self.setMinimumSize(640, 480)
         lay = QVBoxLayout(self)
-        lay.setContentsMargins(18, 14, 18, 14)
-        lay.setSpacing(10)
+        lay.setContentsMargins(theme.pad("lg"), theme.pad("md"), theme.pad("lg"),
+                               theme.pad("md"))
+        lay.setSpacing(theme.pad("sm"))
 
-        hint = QLabel("Marque os aplicativos que devem ser suspensos durante o boost.")
-        hint.setStyleSheet(f"color: {theme.TEXT_MUTED}; font-size: 12px;")
-        lay.addWidget(hint)
-
-        from nexus.ui.tabs.processes import _ProcessTable
+        lay.addWidget(ThemeLabel(
+            "Marque os aplicativos que devem ser suspensos durante os jogos. "
+            "Processos protegidos do Windows não são listados.", "body_sm", wrap=True
+        ))
+        self.search = SearchBox("Filtrar…")
+        self.search.textChanged.connect(self._filter)
+        lay.addWidget(self.search)
 
         self.table = _ProcessTable(services, selectable_check=True)
         lay.addWidget(self.table, 1)
 
         btns = QHBoxLayout()
-        cancel = QPushButton("Cancelar")
-        cancel.clicked.connect(self.reject)
-        ok = QPushButton("Adicionar selecionados")
-        ok.setProperty("accent", True)
-        ok.clicked.connect(self._accept)
         btns.addStretch(1)
+        cancel = Button("Cancelar")
+        cancel.clicked.connect(self.reject)
+        ok = Button("Adicionar selecionados", "primary", "check")
+        ok.clicked.connect(self._ok)
         btns.addWidget(cancel)
         btns.addWidget(ok)
         lay.addLayout(btns)
 
         self.table.refresh()
 
-    def _accept(self) -> None:
-        self.selected = list(self.table.checked_names())
+    def _filter(self, text: str) -> None:
+        text = text.lower()
+        for row in range(self.table.rowCount()):
+            row_text = " ".join(
+                (self.table.item(row, c).text() if self.table.item(row, c) else "")
+                for c in range(1, 7)
+            ).lower()
+            self.table.setRowHidden(row, bool(text) and text not in row_text)
+
+    def _ok(self) -> None:
+        self.selected = self.table.checked_names()
         if not self.selected:
             toast_for(self, "Selecione pelo menos um processo.", "warning")
             return
         self.accept()
 
 
-class AddGameDialog(QDialog):
-    """Cadastro manual de jogo (nome + executável)."""
+def launch_game(services, game, parent=None) -> None:
+    """Lança o jogo pelo comando registrado (com aviso em caso de falha)."""
+    import os
+    import subprocess
 
-    def __init__(self, services, parent=None):
-        super().__init__(parent)
-        self.services = services
-        self.game = None
-        self.setWindowTitle("Adicionar jogo manualmente")
-        self.setMinimumWidth(480)
-        lay = QVBoxLayout(self)
-        lay.setContentsMargins(20, 16, 20, 16)
-        lay.setSpacing(12)
-
-        title = QLabel("Adicionar jogo à biblioteca")
-        title.setStyleSheet(f"color: {theme.TEXT}; font-size: 15px; font-weight: 800;")
-        lay.addWidget(title)
-
-        form = QVBoxLayout()
-        name_lbl = QLabel("Nome do jogo")
-        name_lbl.setStyleSheet(f"color: {theme.TEXT_MUTED}; font-size: 12px;")
-        self.name_edit = QLineEdit()
-        self.name_edit.setPlaceholderText("Ex.: EA FC 25")
-        form.addWidget(name_lbl)
-        form.addWidget(self.name_edit)
-
-        exe_lbl = QLabel("Executável do jogo (.exe)")
-        exe_lbl.setStyleSheet(f"color: {theme.TEXT_MUTED}; font-size: 12px;")
-        exe_row = QHBoxLayout()
-        self.exe_edit = QLineEdit()
-        browse = QPushButton("Procurar…")
-        browse.clicked.connect(self._browse)
-        exe_row.addWidget(self.exe_edit, 1)
-        exe_row.addWidget(browse)
-        form.addWidget(exe_lbl)
-        form.addLayout(exe_row)
-        lay.addLayout(form)
-
-        note = QLabel(
-            "O Nexus Booster detecta automaticamente o perfil ideal a partir do "
-            "nome/executável. Você também pode escolher o perfil depois."
-        )
-        note.setWordWrap(True)
-        note.setStyleSheet(f"color: {theme.TEXT_FAINT}; font-size: 11px;")
-        lay.addWidget(note)
-
-        btns = QHBoxLayout()
-        btns.addStretch(1)
-        cancel = QPushButton("Cancelar")
-        cancel.clicked.connect(self.reject)
-        add = QPushButton("Adicionar")
-        add.setProperty("accent", True)
-        add.clicked.connect(self._add)
-        btns.addWidget(cancel)
-        btns.addWidget(add)
-        lay.addLayout(btns)
-
-    def _browse(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(
-            self, "Selecionar executável do jogo", "", "Executáveis (*.exe);;Todos os arquivos (*)"
-        )
-        if path:
-            self.exe_edit.setText(path)
-            if not self.name_edit.text().strip():
-                self.name_edit.setText(os.path.splitext(os.path.basename(path))[0])
-
-    def _add(self) -> None:
-        from nexus.core.database import GameRecord
-        from nexus.games.profiles import find_profile
-
-        name = self.name_edit.text().strip()
-        exe = self.exe_edit.text().strip()
-        if not name:
-            toast_for(self, "Informe o nome do jogo.", "warning")
-            return
-        if not exe:
-            toast_for(self, "Informe o caminho do executável.", "warning")
-            return
-        profile = find_profile(name, exe)
-        self.game = GameRecord(
-            id=None, name=name, platform="manual", exe_path=exe,
-            launch_cmd=f'"{exe}"', profile_id=profile.id, manual=True,
-        )
-        self.accept()
-
-
-def launch_game(services, game, parent) -> None:
-    """Inicia um jogo (com boost opcional) usando o comando real da plataforma."""
-    cmd = game.launch_command(game.args or "")
+    cmd = game.launch_cmd or (f'"{game.exe_path}"' if game.exe_path else None)
     if not cmd:
-        toast_for(parent, "Comando de inicialização desconhecido para este jogo.", "error")
+        toast_for(parent, "Este jogo não possui comando de inicialização registrado.",
+                  "warning")
         return
-
-    def job():
-        if sys.platform == "win32":
-            os.startfile(cmd) if cmd.startswith(("steam://", "com.epicgames.")) else subprocess.Popen(
-                cmd, shell=True
-            )
-        else:
-            subprocess.Popen(cmd, shell=True)
-        return game.launch_cmd or game.exe_path
-
-    def done(_res) -> None:
-        services.db.games_update(game.id, last_played=__import__("time").time())
+    try:
+        subprocess.Popen(cmd, shell=True,
+                         cwd=os.path.dirname(game.exe_path) if game.exe_path else None)
+        services.db.history_add(
+            "session", f"Jogo iniciado: {game.name}",
+            description=f"Comando: {cmd[:200]}",
+        )
         toast_for(parent, f"Iniciando {game.name}…", "success")
-
-    def fail(msg) -> None:
-        toast_for(parent, f"Falha ao iniciar: {msg}", "error")
-
-    run_task(job, on_done=done, on_error=fail)
+    except Exception as exc:  # noqa: BLE001
+        toast_for(parent, f"Falha ao iniciar: {exc}", "error")

@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QComboBox,
     QFrame,
     QHBoxLayout,
     QHeaderView,
     QLabel,
-    QLineEdit,
-    QPushButton,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -20,8 +19,74 @@ from PySide6.QtWidgets import (
 from nexus.core.worker import run_task
 from nexus.optimization import power, services_win, visual_effects
 from nexus.ui import icons, theme
-from nexus.ui.components import Card, Pill, SectionTitle, Spinner, ToggleSwitch, toast_for
+from nexus.ui.components import (
+    Button,
+    Card,
+    Pill,
+    SearchBox,
+    SectionTitle,
+    Spinner,
+    ThemeLabel,
+    ToggleSwitch,
+    toast_for,
+)
 from nexus.ui.tabs.base import BaseTab
+
+
+class _ToggleRow(QFrame):
+    """Linha de configuração: nome + descrição + toggle (Win11 style)."""
+
+    def __init__(self, title: str, description: str, checked: bool = False, parent=None):
+        super().__init__(parent)
+        self.setStyleSheet("background: transparent; border: none;")
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(0, theme.pad("sm"), 0, theme.pad("sm"))
+        lay.setSpacing(theme.pad("md"))
+        col = QVBoxLayout()
+        col.setSpacing(1)
+        name = ThemeLabel(title, "body")
+        col.addWidget(name)
+        if description:
+            desc = ThemeLabel(description, "caption", wrap=True)
+            col.addWidget(desc)
+        lay.addLayout(col, 1)
+        self.toggle = ToggleSwitch(checked)
+        lay.addWidget(self.toggle, 0, Qt.AlignmentFlag.AlignVCenter)
+
+
+class _ProcessRow(QFrame):
+    """Linha de app em segundo plano com barras de consumo."""
+
+    def __init__(self, name: str, cpu: float, mem_mb: float, parent=None):
+        super().__init__(parent)
+        self.setStyleSheet("background: transparent; border: none;")
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(theme.pad("sm"), 6, theme.pad("sm"), 6)
+        lay.setSpacing(theme.pad("md"))
+        from nexus.ui.components import MiniBar
+
+        col = QVBoxLayout()
+        col.setSpacing(2)
+        head = QHBoxLayout()
+        head.setSpacing(theme.pad("sm"))
+        lbl = ThemeLabel(name, "body")
+        head.addWidget(lbl)
+        head.addStretch(1)
+        self.cpu_txt = ThemeLabel("", "caption")
+        self.cpu_txt.setStyleSheet(
+            f"color: {theme.TEXT_MUTED}; font-size: 11px; font-family: {theme.MONO_STACK};"
+            "background: transparent;"
+        )
+        head.addWidget(self.cpu_txt)
+        col.addLayout(head)
+        bars = QHBoxLayout()
+        bars.setSpacing(theme.pad("sm"))
+        self.cpu_bar = MiniBar()
+        self.mem_bar = MiniBar()
+        bars.addWidget(self.cpu_bar)
+        bars.addWidget(self.mem_bar)
+        col.addLayout(bars)
+        lay.addLayout(col, 1)
 
 
 class PcOptimizerTab(BaseTab):
@@ -31,27 +96,24 @@ class PcOptimizerTab(BaseTab):
 
         # -------------------------------------------------------- energia
         power_card = Card("Plano de energia", "zap")
-        intro = QLabel(
+        intro = ThemeLabel(
             "Ativa o modo de alto desempenho do Windows. O plano anterior é salvo e "
-            "pode ser restaurado no Histórico."
+            "pode ser restaurado no Histórico.",
+            "body_sm", wrap=True,
         )
-        intro.setWordWrap(True)
-        intro.setStyleSheet(f"color: {theme.TEXT_MUTED}; font-size: 12px;")
         power_card.body_layout().addWidget(intro)
         self.power_combo = QComboBox()
         self.power_combo.setMinimumWidth(320)
-        self.power_refresh = QPushButton("")
-        self.power_refresh.setIcon(icons.icon("refresh", "accent", 16))
+        self.power_refresh = Button("", "subtle", "refresh")
         self.power_refresh.setToolTip("Recarregar planos")
-        self.power_apply = QPushButton("Ativar plano selecionado")
-        self.power_apply.setProperty("accent", True)
+        self.power_refresh.setAccessibleName("Recarregar planos de energia")
+        self.power_apply = Button("Ativar plano selecionado", "primary")
         row = QHBoxLayout()
         row.addWidget(self.power_combo, 1)
         row.addWidget(self.power_refresh)
         row.addWidget(self.power_apply)
         power_card.body_layout().addLayout(row)
-        self.power_status = QLabel("")
-        self.power_status.setStyleSheet(f"color: {theme.TEXT_FAINT}; font-size: 11px;")
+        self.power_status = ThemeLabel("", "caption")
         power_card.body_layout().addWidget(self.power_status)
         self.add(power_card)
 
@@ -60,38 +122,21 @@ class PcOptimizerTab(BaseTab):
 
         # ------------------------------------------------- efeitos visuais
         vfx_card = Card("Efeitos visuais do Windows", "windows")
-        vintro = QLabel(
+        vintro = ThemeLabel(
             "Ajustes leves e 100% reversíveis que reduzem trabalho da GPU/CPU na "
-            "interface. Fontes e legibilidade são preservadas."
+            "interface. Fontes e legibilidade são preservadas.",
+            "body_sm", wrap=True,
         )
-        vintro.setWordWrap(True)
-        vintro.setStyleSheet(f"color: {theme.TEXT_MUTED}; font-size: 12px;")
         vfx_card.body_layout().addWidget(vintro)
         self.vfx_toggles: dict[str, ToggleSwitch] = {}
         for tweak in visual_effects.TWEAKS:
-            row = QFrame()
-            row.setStyleSheet("background: transparent; border: none;")
-            lay = QHBoxLayout(row)
-            lay.setContentsMargins(0, 4, 0, 4)
-            col = QVBoxLayout()
-            name = QLabel(tweak.label)
-            name.setStyleSheet(f"color: {theme.TEXT}; font-size: 13px; font-weight: 600;")
-            desc = QLabel(tweak.description)
-            desc.setWordWrap(True)
-            desc.setStyleSheet(f"color: {theme.TEXT_MUTED}; font-size: 11px;")
-            col.addWidget(name)
-            col.addWidget(desc)
-            lay.addLayout(col, 1)
-            tg = ToggleSwitch()
-            tg.setToolTip("Aplicar este ajuste")
-            self.vfx_toggles[tweak.id] = tg
-            lay.addWidget(tg, 0, Qt.AlignmentFlag.AlignVCenter)
-            vfx_card.body_layout().addWidget(row)
+            trow = _ToggleRow(tweak.label, tweak.description)
+            trow.toggle.setToolTip("Aplicar este ajuste")
+            self.vfx_toggles[tweak.id] = trow.toggle
+            vfx_card.body_layout().addWidget(trow)
         vfx_btns = QHBoxLayout()
-        self.vfx_apply = QPushButton("Aplicar ajustes selecionados")
-        self.vfx_apply.setProperty("accent", True)
-        self.vfx_restore = QPushButton("Restaurar tudo (desfazer)")
-        self.vfx_restore.setProperty("danger", True)
+        self.vfx_apply = Button("Aplicar ajustes selecionados", "primary")
+        self.vfx_restore = Button("Restaurar tudo (desfazer)", "danger")
         vfx_btns.addWidget(self.vfx_apply)
         vfx_btns.addWidget(self.vfx_restore)
         vfx_btns.addStretch(1)
@@ -103,64 +148,57 @@ class PcOptimizerTab(BaseTab):
 
         # --------------------------------------------------------- serviços
         svc_card = Card("Serviços do Windows", "server")
-        sintro = QLabel(
+        sintro = ThemeLabel(
             "Apenas serviços catalogados como seguros podem ser ajustados. "
             "Windows Defender, Firewall, Windows Update e serviços essenciais são "
-            "bloqueados e nunca exibidos como 'seguros'."
+            "bloqueados e nunca exibidos como 'seguros'.",
+            "body_sm", wrap=True,
         )
-        sintro.setWordWrap(True)
-        sintro.setStyleSheet(f"color: {theme.TEXT_MUTED}; font-size: 12px;")
         svc_card.body_layout().addWidget(sintro)
 
         filter_row = QHBoxLayout()
-        self.svc_filter = QLineEdit()
-        self.svc_filter.setPlaceholderText("Filtrar serviços…")
+        self.svc_filter = SearchBox("Filtrar serviços…")
         self.svc_only_safe = ToggleSwitch(False)
-        only_safe_lbl = QLabel("Mostrar somente os seguros de ajustar")
-        only_safe_lbl.setStyleSheet(f"color: {theme.TEXT_MUTED}; font-size: 12px;")
-        self.svc_refresh = QPushButton("Recarregar")
+        only_safe_lbl = ThemeLabel("Somente seguros de ajustar", "body_sm")
+        self.svc_refresh = Button("Recarregar", "secondary", "refresh")
         filter_row.addWidget(self.svc_filter, 1)
         filter_row.addWidget(self.svc_only_safe)
         filter_row.addWidget(only_safe_lbl)
         filter_row.addWidget(self.svc_refresh)
         svc_card.body_layout().addLayout(filter_row)
 
-        self.svc_table = QTableWidget(0, 5)
-        self.svc_table.setHorizontalHeaderLabels(
-            ["Serviço", "Status", "Inicialização", "Recomendação", "Ações"]
-        )
-        self.svc_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        self.svc_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
-        self.svc_table.verticalHeader().setVisible(False)
-        self.svc_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        self.svc_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.svc_table.setMinimumHeight(320)
-        svc_card.body_layout().addWidget(self.svc_table)
-        self.svc_detail = QLabel("Selecione um serviço para ver a descrição.")
-        self.svc_detail.setWordWrap(True)
+        self._svc_table = _ServiceTable()
+        self._svc_table.setMinimumHeight(320)
+        svc_card.body_layout().addWidget(self._svc_table)
+        self.svc_detail = ThemeLabel("Selecione um serviço para ver a descrição.", "caption",
+                                     wrap=True)
         self.svc_detail.setStyleSheet(
-            f"color: {theme.TEXT_MUTED}; font-size: 11px; background: {theme.PANEL};"
-            "border-radius: 8px; padding: 8px;"
+            f"color: {theme.TEXT_MUTED}; font-size: 11px; background: {theme.SURFACE1};"
+            f"border: 1px solid {theme.BORDER}; border-radius: 8px; padding: 8px;"
         )
         self.svc_detail.setMinimumHeight(40)
         svc_card.body_layout().addWidget(self.svc_detail)
         self.add(svc_card)
 
         self.svc_refresh.clicked.connect(self._load_services)
-        self.svc_filter.textChanged.connect(self._render_services)
-        self.svc_only_safe.toggled.connect(self._render_services)
-        self.svc_table.currentCellChanged.connect(self._svc_selected)
+        self.svc_filter.textChanged.connect(self._svc_table.set_filter)
+        self.svc_only_safe.toggled.connect(
+            lambda on: self._svc_table.set_only_safe(on)
+        )
+        self._svc_table.service_selected.connect(self._show_service_detail)
+        self._svc_table.service_stop_requested.connect(self._stop_service)
+        self._svc_table.service_start_requested.connect(self._start_service)
+        self._svc_table.service_type_change_requested.connect(self._svc_type_changed)
 
         # ------------------------------------------- apps em segundo plano
         bg_card = Card("Aplicativos em segundo plano", "list")
-        bgintro = QLabel(
+        bgintro = ThemeLabel(
             "Principais aplicativos consumindo recursos agora. Você pode suspendê-los "
-            "(retomáveis depois) ou finalizá-los. Processos essenciais são protegidos."
+            "(retomáveis depois) ou finalizá-los. Processos essenciais são protegidos.",
+            "body_sm", wrap=True,
         )
-        bgintro.setWordWrap(True)
-        bgintro.setStyleSheet(f"color: {theme.TEXT_MUTED}; font-size: 12px;")
         bg_card.body_layout().addWidget(bgintro)
-        self.bg_refresh = QPushButton("Atualizar lista")
+        self.bg_refresh = Button("Atualizar lista", "secondary", "refresh")
         self.bg_refresh.clicked.connect(self._load_bg)
         bg_card.body_layout().addWidget(self.bg_refresh)
         self.bg_list = QVBoxLayout()
@@ -272,7 +310,8 @@ class PcOptimizerTab(BaseTab):
         if not confirm(
             self, "Restaurar efeitos visuais",
             "Todos os ajustes visuais aplicados pelo Nexus Booster serão revertidos "
-            "para os valores originais.", dangerous=True, confirm_text="Restaurar",
+            "para os valores originais.",
+            dangerous=True, confirm_text="Restaurar",
         ):
             return
 
@@ -287,7 +326,9 @@ class PcOptimizerTab(BaseTab):
         def job():
             if not payload:
                 # restaura padrões documentados do Windows
-                visual_effects.restore({"tweaks": {t.id: t.on_default for t in visual_effects.TWEAKS}})
+                visual_effects.restore(
+                    {"tweaks": {t.id: t.on_default for t in visual_effects.TWEAKS}}
+                )
                 return True, "Valores padrão do Windows restaurados."
             ok, msg = visual_effects.restore(payload)
             if ok and entries:
@@ -303,80 +344,26 @@ class PcOptimizerTab(BaseTab):
 
     # ----------------------------------------------------------- serviços
     def _load_services(self) -> None:
-        self.svc_table.setRowCount(0)
+        self._svc_table.begin_load()
 
         def job():
             return services_win.enumerate_services()
 
         def done(svcs) -> None:
             if svcs is None:
-                self._services = []
+                self._svc_table.set_services([])
                 self.svc_detail.setText(
                     "Serviços do Windows disponíveis somente no Windows."
                 )
                 return
-            self._services = svcs
-            self._render_services()
+            self._svc_table.set_services(svcs)
 
         run_task(job, on_done=done)
 
-    def _render_services(self) -> None:
-        text = self.svc_filter.text().lower()
-        only_safe = self.svc_only_safe.isChecked()
-        table = self.svc_table
-        table.setRowCount(0)
-        for svc in getattr(self, "_services", []):
-            if text and text not in f"{svc.name} {svc.display_name}".lower():
-                continue
-            if only_safe and not svc.safe_to_disable:
-                continue
-            row = table.rowCount()
-            table.insertRow(row)
-            table.setItem(row, 0, QTableWidgetItem(f"{svc.display_name}\n{svc.name}"))
-            status = QTableWidgetItem(svc.status_label)
-            table.setItem(row, 1, status)
-            table.setItem(row, 2, QTableWidgetItem(svc.start_label))
-            rec = QTableWidgetItem("✔ seguro ajustar" if svc.safe_to_disable else "⚠ não recomendado")
-            rec.setForeground(Qt.GlobalColor.green if svc.safe_to_disable else Qt.GlobalColor.yellow)
-            table.setItem(row, 3, rec)
-
-            actions = QWidget()
-            al = QHBoxLayout(actions)
-            al.setContentsMargins(4, 2, 4, 2)
-            al.setSpacing(4)
-            if svc.status == "running":
-                stop_btn = QPushButton("Parar")
-                stop_btn.setProperty("danger", True)
-                stop_btn.clicked.connect(lambda _=False, n=svc.name: self._stop_service(n))
-                al.addWidget(stop_btn)
-            else:
-                start_btn = QPushButton("Iniciar")
-                start_btn.setProperty("success", True)
-                start_btn.clicked.connect(lambda _=False, n=svc.name: self._start_service(n))
-                al.addWidget(start_btn)
-            combo = QComboBox()
-            combo.addItem("Tipo…")
-            combo.addItem("Automático", "auto")
-            combo.addItem("Manual", "demand")
-            combo.addItem("Desativado", "disabled")
-            combo.currentIndexChanged.connect(
-                lambda idx, n=svc.name, c=combo: self._svc_type_changed(n, c)
-            )
-            al.addWidget(combo)
-            table.setCellWidget(row, 4, actions)
-        table.resizeRowsToContents()
-
-    def _svc_selected(self, row: int, *_args) -> None:
-        if row < 0:
-            return
-        item = self.svc_table.item(row, 0)
-        if not item:
-            return
-        name = item.text().split("\n")[-1]
-        for svc in getattr(self, "_services", []):
-            if svc.name == name:
-                self.svc_detail.setText(f"{svc.reason} — {svc.description or 'sem descrição.'}")
-                break
+    def _show_service_detail(self, svc) -> None:
+        self.svc_detail.setText(
+            f"{svc.reason} — {svc.description or 'sem descrição.'}"
+        )
 
     def _stop_service(self, name: str) -> None:
         from nexus.ui.components import confirm
@@ -407,18 +394,13 @@ class PcOptimizerTab(BaseTab):
 
         run_task(job, on_done=done)
 
-    def _svc_type_changed(self, name: str, combo: QComboBox) -> None:
-        idx = combo.currentIndex()
-        if idx <= 0:
-            return
-        stype = combo.itemData(idx)
-        combo.setCurrentIndex(0)
+    def _svc_type_changed(self, name: str, stype: str, target_label: str) -> None:
         from nexus.ui.components import confirm
 
         if not confirm(
             self, "Alterar inicialização do serviço",
             f"Alterar o tipo de inicialização de '{name}' para "
-            f"'{combo.itemText(idx)}'?\nIsso pede elevação (UAC) e é reversível "
+            f"'{target_label}'?\nIsso pede elevação (UAC) e é reversível "
             "pelo Histórico.", dangerous=True, confirm_text="Alterar",
         ):
             return
@@ -453,37 +435,30 @@ class PcOptimizerTab(BaseTab):
 
         def done(procs) -> None:
             if not procs:
-                empty = QLabel("Nenhum processo consumindo recursos agora.")
-                empty.setStyleSheet(f"color: {theme.TEXT_FAINT}; font-size: 12px;")
+                empty = ThemeLabel("Nenhum processo consumindo recursos agora.",
+                                   "caption")
                 self.bg_list.addWidget(empty)
                 return
             from nexus.core import safety
 
             for p in procs:
-                row = QFrame()
-                row.setStyleSheet(
-                    f"background: {theme.PANEL}; border: 1px solid {theme.BORDER}; border-radius: 8px;"
-                )
-                lay = QHBoxLayout(row)
-                lay.setContentsMargins(12, 6, 12, 6)
-                info = QLabel(f"{p.name}   ·   CPU {p.cpu:.0f}%   ·   RAM {p.mem_mb:.0f} MB")
-                info.setStyleSheet(f"color: {theme.TEXT}; font-size: 12px;")
-                lay.addWidget(info, 1)
+                row = _ProcessRow(p.name, p.cpu, p.mem_mb)
+                row.cpu_bar.set_value(min(100.0, p.cpu))
+                row.mem_bar.set_value(min(100.0, p.mem_mb / 64.0))
+                row.cpu_txt.setText(f"CPU {p.cpu:.0f}% · RAM {p.mem_mb:.0f} MB")
                 if not safety.is_protected_process(p.name):
-                    suspend_btn = QPushButton("Suspender")
+                    suspend_btn = Button("Suspender", "secondary")
                     suspend_btn.clicked.connect(
                         lambda _=False, pid=p.pid, n=p.name: self._suspend_bg(pid, n)
                     )
-                    lay.addWidget(suspend_btn)
-                    kill_btn = QPushButton("Finalizar")
-                    kill_btn.setProperty("danger", True)
+                    row.layout().addWidget(suspend_btn)
+                    kill_btn = Button("Finalizar", "danger")
                     kill_btn.clicked.connect(
                         lambda _=False, pid=p.pid, n=p.name: self._kill_bg(pid, n)
                     )
-                    lay.addWidget(kill_btn)
+                    row.layout().addWidget(kill_btn)
                 else:
-                    prot = Pill("protegido", "muted")
-                    lay.addWidget(prot)
+                    row.layout().addWidget(Pill("protegido", "muted"))
                 self.bg_list.addWidget(row)
 
         run_task(job, on_done=done)
@@ -512,3 +487,134 @@ class PcOptimizerTab(BaseTab):
             self._load_bg()
 
         run_task(job, on_done=done)
+
+
+# ------------------------------------------------------------ tabela
+
+
+class _ServiceTable(QTableWidget):
+    service_selected = Signal(object)
+    service_stop_requested = Signal(str)
+    service_start_requested = Signal(str)
+    service_type_change_requested = Signal(str, str, str)  # name, stype, label
+
+    def __init__(self, parent=None):
+        super().__init__(0, 5, parent)
+        self._services: list = []
+        self._filter = ""
+        self._only_safe = False
+        self.setHorizontalHeaderLabels(
+            ["Serviço", "Status", "Inicialização", "Recomendação", "Ações"]
+        )
+        self.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        self.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
+        self.verticalHeader().setVisible(False)
+        self.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.currentCellChanged.connect(self._on_select)
+
+    def _on_select(self, row: int, *_args) -> None:
+        if row < 0:
+            return
+        item = self.item(row, 0)
+        if not item:
+            return
+        name = item.data(Qt.ItemDataRole.UserRole)
+        for svc in self._services:
+            if svc.name == name:
+                self.service_selected.emit(svc)
+                break
+
+    def begin_load(self) -> None:
+        self.setRowCount(0)
+
+    def set_filter(self, text: str) -> None:
+        self._filter = text.lower()
+        self._populate()
+
+    def set_only_safe(self, on: bool) -> None:
+        self._only_safe = on
+        self._populate()
+
+    def set_services(self, svcs) -> None:
+        self._services = svcs or []
+        self._populate()
+
+    def _populate(self) -> None:
+        self.setUpdatesEnabled(False)
+        self.setRowCount(0)
+        for svc in self._services:
+            if self._filter and self._filter not in f"{svc.name} {svc.display_name}".lower():
+                continue
+            if self._only_safe and not svc.safe_to_disable:
+                continue
+            row = self.rowCount()
+            self.insertRow(row)
+            name_item = QTableWidgetItem(f"{svc.display_name}\n{svc.name}")
+            name_item.setData(Qt.ItemDataRole.UserRole, svc.name)
+            self.setItem(row, 0, name_item)
+            status_item = QTableWidgetItem(svc.status_label)
+            status_item.setForeground(QColor(theme.SUCCESS) if svc.status == "running"
+                                      else QColor(theme.TEXT_MUTED))
+            self.setItem(row, 1, status_item)
+            self.setItem(row, 2, QTableWidgetItem(svc.start_label))
+            rec = _RecWidget(svc.safe_to_disable)
+            self.setCellWidget(row, 3, rec)
+            actions = _SvcActions(svc)
+            actions.stop_requested.connect(self.service_stop_requested)
+            actions.start_requested.connect(self.service_start_requested)
+            actions.type_change_requested.connect(self.service_type_change_requested)
+            self.setCellWidget(row, 4, actions)
+            self.setRowHeight(row, 48)
+        self.setUpdatesEnabled(True)
+
+
+class _RecWidget(QWidget):
+    """Célula de recomendação: chip de risco com texto."""
+
+    def __init__(self, safe: bool, parent=None):
+        super().__init__(parent)
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(4, 4, 4, 4)
+        pill = Pill("seguro ajustar" if safe else "não recomendado",
+                    "success" if safe else "warning")
+        lay.addWidget(pill)
+        lay.addStretch(1)
+
+
+class _SvcActions(QWidget):
+    """Ações do serviço na linha: Parar/Iniciar + tipo de inicialização."""
+
+    stop_requested = Signal(str)
+    start_requested = Signal(str)
+    type_change_requested = Signal(str, str, str)  # name, stype, label
+
+    def __init__(self, svc, parent=None):
+        super().__init__(parent)
+        self._svc = svc
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(4, 4, 4, 4)
+        lay.setSpacing(6)
+        if svc.status == "running":
+            stop_btn = Button("Parar", "danger")
+            stop_btn.clicked.connect(lambda: self.stop_requested.emit(svc.name))
+            lay.addWidget(stop_btn)
+        else:
+            start_btn = Button("Iniciar", "secondary")
+            start_btn.clicked.connect(lambda: self.start_requested.emit(svc.name))
+            lay.addWidget(start_btn)
+        combo = QComboBox()
+        combo.addItem("Tipo…")
+        combo.addItem("Automático", "auto")
+        combo.addItem("Manual", "demand")
+        combo.addItem("Desativado", "disabled")
+        combo.currentIndexChanged.connect(lambda idx, c=combo: self._type(idx, c))
+        lay.addWidget(combo)
+
+    def _type(self, idx: int, combo: QComboBox) -> None:
+        if idx <= 0:
+            return
+        stype = combo.itemData(idx)
+        label = combo.itemText(idx)
+        combo.setCurrentIndex(0)
+        self.type_change_requested.emit(self._svc.name, stype, label)

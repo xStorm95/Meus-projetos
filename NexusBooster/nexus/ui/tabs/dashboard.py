@@ -1,4 +1,4 @@
-"""Aba Dashboard: status geral, medidores, gráficos em tempo real e ações rápidas."""
+"""Aba Dashboard: saúde do sistema, recomendações, gráficos e atalhos."""
 
 from __future__ import annotations
 
@@ -10,53 +10,55 @@ from PySide6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QLabel,
-    QPushButton,
     QVBoxLayout,
     QWidget,
 )
 
-from nexus.optimization import cleaner, startup as startup_mod
+from nexus.optimization import startup as startup_mod
 from nexus.ui import icons, theme
 from nexus.ui.components import (
+    Button,
     Card,
     CoreBars,
     GaugeRing,
+    HeroCard,
     KeyInfoRow,
     LineChart,
-    Pill,
     StatTile,
+    ThemeLabel,
     toast_for,
 )
 from nexus.ui.tabs.base import BaseTab
 
 
 class _IssueRow(QFrame):
+    """Linha de recomendação: ícone semântico + texto."""
+
     def __init__(self, icon_name: str, color: str, text: str, parent=None):
         super().__init__(parent)
         self.setStyleSheet("background: transparent; border: none;")
         lay = QHBoxLayout(self)
-        lay.setContentsMargins(0, 4, 0, 4)
-        lay.setSpacing(8)
+        lay.setContentsMargins(0, 5, 0, 5)
+        lay.setSpacing(theme.pad("sm"))
         ic = QLabel()
-        ic.setPixmap(icons.pixmap(icon_name, color, 16))
+        ic.setPixmap(icons.pixmap(icon_name, color, 15))
         lay.addWidget(ic)
-        lbl = QLabel(text)
-        lbl.setWordWrap(True)
-        lbl.setStyleSheet(
-            f"color: {theme.TEXT_MUTED}; font-size: 12px; background: transparent;"
-        )
+        lbl = ThemeLabel(text, "body_sm", wrap=True)
         lay.addWidget(lbl, 1)
+        self._ic = ic
+
+    def retheme(self) -> None:
+        pass
 
 
 class ClickableTile(StatTile):
     """StatTile que navega para uma aba ao ser clicado."""
 
     def __init__(self, icon_name, label, value="—", sub="", tab_id="", services=None, parent=None):
-        super().__init__(icon_name, label, value, sub, parent=parent)
+        super().__init__(icon_name, label, value, sub, parent=parent, clickable=True)
         self.tab_id = tab_id
         self.services = services
         self._main_ref = None
-        self.setCursor(Qt.CursorShape.PointingHandCursor)
 
     def mousePressEvent(self, event) -> None:
         if event.button() == Qt.MouseButton.LeftButton and self.main is not None:
@@ -79,81 +81,75 @@ class DashboardTab(BaseTab):
 
         self.services.monitor.hardware_ready.connect(self._on_hardware_ready)
 
-        # ---------------------------------------------------------- hero
-        from nexus.ui.components import HeroCard
+        # ------------------------------------------------- faixa de saúde
+        health = Card("Saúde do sistema", "activity")
+        rings = QHBoxLayout()
+        rings.setSpacing(theme.pad("xl"))
+        self.cpu_ring = GaugeRing("CPU", size=136)
+        self.gpu_ring = GaugeRing("GPU", size=136)
+        self.ram_ring = GaugeRing("RAM", size=136)
+        self.disk_ring = GaugeRing("Disco (C:)", size=136)
+        for ring in (self.cpu_ring, self.gpu_ring, self.ram_ring, self.disk_ring):
+            rings.addWidget(ring, 0, Qt.AlignmentFlag.AlignHCenter)
+        rings.addStretch(1)
+        temps = QVBoxLayout()
+        temps.setSpacing(theme.pad("sm"))
+        self.cpu_temp_tile = StatTile("thermometer", "Temp. CPU", "N/D", color="muted")
+        self.gpu_temp_tile = StatTile("fan", "Temp. GPU", "N/D", color="muted")
+        temps.addWidget(self.cpu_temp_tile)
+        temps.addWidget(self.gpu_temp_tile)
+        temps.addStretch(1)
+        rings.addLayout(temps)
+        health.body_layout().addLayout(rings)
+        self.add(health)
 
+        # -------------------------------------------------- hero / ação
         hero = HeroCard("brand.jpg", "", "")
         hero_h = QHBoxLayout()
-        hero_h.setSpacing(24)
-
-        # anel de status geral
-        self.score_ring = GaugeRing("Status geral", size=140, warn_at=101)
-        hero_h.addWidget(self.score_ring)
+        hero_h.setSpacing(theme.pad("lg"))
 
         col = QVBoxLayout()
-        col.setSpacing(4)
-        title = QLabel("Desempenho do computador")
-        title.setStyleSheet(f"color: {theme.TEXT}; font-size: 16px; font-weight: 800;")
+        col.setSpacing(theme.pad("xs"))
+        title = ThemeLabel("Desempenho do computador", "title_sm")
         col.addWidget(title)
-        self.hero_sub = QLabel("Detectando hardware…")
-        self.hero_sub.setStyleSheet(f"color: {theme.TEXT_MUTED}; font-size: 12px;")
-        self.hero_sub.setWordWrap(True)
+        self.hero_sub = ThemeLabel("Detectando hardware…", "body_sm", wrap=True)
         col.addWidget(self.hero_sub)
         self.issues_box = QVBoxLayout()
-        self.issues_box.setSpacing(2)
+        self.issues_box.setSpacing(0)
         col.addLayout(self.issues_box)
         col.addStretch(1)
         hero_h.addLayout(col, 1)
 
         btn_col = QVBoxLayout()
-        btn_col.setSpacing(8)
-        opt_btn = QPushButton("  OTIMIZAR AGORA")
-        opt_btn.setProperty("accent", True)
-        opt_btn.setMinimumSize(200, 46)
-        opt_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        opt_btn.setIcon(icons.icon("zap", "#04121f", 20))
+        btn_col.setSpacing(theme.pad("sm"))
+        opt_btn = Button("Otimizar agora", "primary", "zap")
+        opt_btn.setMinimumSize(210, 46)
         opt_btn.clicked.connect(self._emit_optimize)
         btn_col.addWidget(opt_btn)
-        self.last_opt = QLabel("—")
-        self.last_opt.setStyleSheet(
-            f"color: {theme.TEXT_FAINT}; font-size: 11px; background: transparent;"
-        )
-        self.last_opt.setWordWrap(True)
-        btn_col.addWidget(self.last_opt)
+        undo_row = QHBoxLayout()
+        undo_row.setSpacing(theme.pad("sm"))
+        self.last_opt = ThemeLabel("—", "caption", wrap=True)
+        self.last_opt.setMaximumWidth(240)
+        undo_row.addWidget(self.last_opt, 1)
+        self.undo_shortcut = Button("Desfazer", "subtle", "undo")
+        self.undo_shortcut.setToolTip("Abre o Histórico para reverter alterações")
+        self.undo_shortcut.clicked.connect(lambda: self._go("history"))
+        undo_row.addWidget(self.undo_shortcut)
+        btn_col.addLayout(undo_row)
         hero_h.addLayout(btn_col)
         hero.body_layout().addLayout(hero_h)
         self.add(hero)
 
         self._refresh_last_opt()
 
-        # ------------------------------------------------------- medidores
-        gauges_row = QHBoxLayout()
-        gauges_row.setSpacing(16)
-        self.cpu_ring = GaugeRing("CPU")
-        self.gpu_ring = GaugeRing("GPU", size=150)
-        self.ram_ring = GaugeRing("RAM", size=150)
-        self.disk_ring = GaugeRing("Disco (C:)", size=150)
-        for ring in (self.cpu_ring, self.gpu_ring, self.ram_ring, self.disk_ring):
-            gauges_row.addWidget(ring, 0, Qt.AlignmentFlag.AlignHCenter)
-
-        temps = QVBoxLayout()
-        temps.setSpacing(10)
-        self.cpu_temp_tile = StatTile("thermometer", "Temp. CPU", "N/D", color="muted")
-        self.gpu_temp_tile = StatTile("fan", "Temp. GPU", "N/D", color="muted")
-        temps.addWidget(self.cpu_temp_tile)
-        temps.addWidget(self.gpu_temp_tile)
-        temps.addStretch(1)
-        gauges_row.addLayout(temps)
-        self.add_layout(gauges_row)
-
         # --------------------------------------------------------- gráficos
         charts = QGridLayout()
-        charts.setSpacing(16)
+        charts.setSpacing(theme.pad("md"))
 
-        cpu_card = Card("CPU e RAM (%)", "activity")
+        cpu_card = Card("CPU e RAM", "activity")
         self.cpu_chart = LineChart(unit="%", fixed_max=100.0)
-        self.cpu_chart.add_series("CPU", theme.ACCENT)
-        self.cpu_chart.add_series("RAM", theme.SUCCESS)
+        self.cpu_chart.add_series("CPU", "accent")
+        self.cpu_chart.add_series("RAM", "success")
         cpu_card.body_layout().addWidget(self.cpu_chart)
         charts.addWidget(cpu_card, 0, 0)
 
@@ -163,17 +159,17 @@ class DashboardTab(BaseTab):
         gpu_card.body_layout().addWidget(self.gpu_chart)
         charts.addWidget(gpu_card, 0, 1)
 
-        disk_card = Card("Disco — leitura/escrita (MB/s)", "disk")
+        disk_card = Card("Disco — leitura/escrita", "disk")
         self.disk_chart = LineChart(unit="MB/s", fixed_max=None)
-        self.disk_chart.add_series("Leitura", theme.ACCENT)
-        self.disk_chart.add_series("Escrita", theme.SUCCESS)
+        self.disk_chart.add_series("Leitura", "accent")
+        self.disk_chart.add_series("Escrita", "success")
         disk_card.body_layout().addWidget(self.disk_chart)
         charts.addWidget(disk_card, 1, 0)
 
-        net_card = Card("Rede — download/upload (MB/s)", "globe")
+        net_card = Card("Rede — download/upload", "globe")
         self.net_chart = LineChart(unit="MB/s", fixed_max=None)
-        self.net_chart.add_series("Download", theme.ACCENT)
-        self.net_chart.add_series("Upload", theme.SUCCESS)
+        self.net_chart.add_series("Download", "accent")
+        self.net_chart.add_series("Upload", "success")
         net_card.body_layout().addWidget(self.net_chart)
         charts.addWidget(net_card, 1, 1)
 
@@ -187,11 +183,15 @@ class DashboardTab(BaseTab):
 
         # -------------------------------------------------------- atalhos
         tiles = QHBoxLayout()
-        tiles.setSpacing(16)
-        self.games_tile = ClickableTile("gamepad", "Jogos detectados", "—", "clique p/ abrir", "library")
-        self.startup_tile = ClickableTile("power", "Itens de inicialização", "—", "clique p/ gerenciar", "startup")
-        self.clean_tile = ClickableTile("broom", "Espaço recuperável", "—", "última análise", "cleanup")
-        self.history_tile = ClickableTile("history", "Ações registradas", "—", "histórico", "history")
+        tiles.setSpacing(theme.pad("md"))
+        self.games_tile = ClickableTile("gamepad", "Jogos detectados", "—",
+                                        "clique p/ abrir", "library")
+        self.startup_tile = ClickableTile("power", "Itens de inicialização", "—",
+                                          "clique p/ gerenciar", "startup")
+        self.clean_tile = ClickableTile("broom", "Espaço recuperável", "—",
+                                        "última análise", "cleanup")
+        self.history_tile = ClickableTile("history", "Ações registradas", "—",
+                                          "histórico", "history")
         for tile in (self.games_tile, self.startup_tile, self.clean_tile, self.history_tile):
             tile.set_main(main_window)
             tiles.addWidget(tile)
@@ -200,7 +200,7 @@ class DashboardTab(BaseTab):
         # ------------------------------------------------------ hardware
         hw_card = Card("Identificação do hardware", "cpu")
         grid = QHBoxLayout()
-        grid.setSpacing(24)
+        grid.setSpacing(theme.pad("xl"))
         col1 = QVBoxLayout()
         col2 = QVBoxLayout()
         grid.addLayout(col1)
@@ -278,14 +278,11 @@ class DashboardTab(BaseTab):
             f" · {ram_desc} · {hw.os_name} ({hw.os_build})"
         )
         # Preenche o card de hardware
-        while self.hw_col1.count():
-            item = self.hw_col1.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
-        while self.hw_col2.count():
-            item = self.hw_col2.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
+        for col in (self.hw_col1, self.hw_col2):
+            while col.count():
+                item = col.takeAt(0)
+                if item.widget():
+                    item.widget().deleteLater()
 
         c1 = [
             ("Processador", hw.cpu_name, "cpu"),
@@ -312,12 +309,14 @@ class DashboardTab(BaseTab):
 
     # ---------------------------------------------------------- ao vivo
     def on_monitor_update(self, snap) -> None:
-        self.cpu_ring.set_value(snap.cpu_percent, f"{snap.cpu_freq_mhz:.0f} MHz" if snap.cpu_freq_mhz else "")
+        self.cpu_ring.set_value(snap.cpu_percent,
+                                f"{snap.cpu_freq_mhz:.0f} MHz" if snap.cpu_freq_mhz else "")
         if snap.gpu and snap.gpu.utilization is not None:
             self.gpu_ring.set_value(snap.gpu.utilization, snap.gpu.name[:22])
         else:
             self.gpu_ring.set_value(None, "uso não suportado")
-        self.ram_ring.set_value(snap.ram_percent, f"{snap.ram_used_gb:.1f}/{snap.ram_total_gb:.0f} GB")
+        self.ram_ring.set_value(snap.ram_percent,
+                                f"{snap.ram_used_gb:.1f}/{snap.ram_total_gb:.0f} GB")
         if snap.disks:
             d = snap.disks[0]
             self.disk_ring.set_value(d.percent, f"{d.free_gb:.0f} GB livres")
@@ -333,7 +332,8 @@ class DashboardTab(BaseTab):
 
         self.cpu_chart.push("CPU", snap.cpu_percent)
         self.cpu_chart.push("RAM", snap.ram_percent)
-        self.gpu_chart.push("GPU", snap.gpu.utilization if snap.gpu and snap.gpu.utilization is not None else None)
+        self.gpu_chart.push("GPU", snap.gpu.utilization
+                            if snap.gpu and snap.gpu.utilization is not None else None)
         self.disk_chart.push("Leitura", snap.disk_read_mbs)
         self.disk_chart.push("Escrita", snap.disk_write_mbs)
         self.net_chart.push("Download", snap.net_down_mbs)
@@ -357,20 +357,25 @@ class DashboardTab(BaseTab):
             d = snap.disks[0]
             parts.append((max(0.0, min(100.0, d.free_gb / d.total_gb * 200)), 1.5))
             if d.free_gb < 15:
-                issues.append(("alert", "warning", f"Pouco espaço em {d.path} ({d.free_gb:.0f} GB livres)"))
+                issues.append(("alert", "warning",
+                               f"Pouco espaço em {d.path} ({d.free_gb:.0f} GB livres)"))
         if snap.cpu_temp and snap.cpu_temp > 85:
-            issues.append(("alert", "danger", f"Temperatura alta da CPU: {snap.cpu_temp:.0f} °C"))
+            issues.append(("alert", "danger",
+                           f"Temperatura alta da CPU: {snap.cpu_temp:.0f} °C"))
             parts.append((40.0, 1.0))
         startup_n = getattr(self, "_startup_count", 0)
         if startup_n:
             st_score = max(0.0, 100 - max(0, startup_n - 8) * 6)
             parts.append((st_score, 1.0))
             if startup_n > 15:
-                issues.append(("info", "info", f"{startup_n} itens de inicialização — considere desativar alguns"))
+                issues.append(("info", "info",
+                               f"{startup_n} itens de inicialização — considere desativar alguns"))
         if snap.ram_percent > 90:
-            issues.append(("alert", "warning", f"Uso de RAM muito alto ({snap.ram_percent:.0f}%)"))
+            issues.append(("alert", "warning",
+                           f"Uso de RAM muito alto ({snap.ram_percent:.0f}%)"))
         if snap.cpu_percent > 85:
-            issues.append(("alert", "warning", f"Uso de CPU muito alto ({snap.cpu_percent:.0f}%)"))
+            issues.append(("alert", "warning",
+                           f"Uso de CPU muito alto ({snap.cpu_percent:.0f}%)"))
 
         total_w = sum(w for _, w in parts)
         score = sum(s * w for s, w in parts) / total_w if total_w else 0
@@ -378,18 +383,23 @@ class DashboardTab(BaseTab):
 
     def _update_score(self) -> None:
         score, issues = self._score()
-        self.score_ring.set_value(score, "índice simplificado")
+        self._last_score = score
         # limpa issues antigas
         while self.issues_box.count():
             item = self.issues_box.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
         if not issues:
-            self.issues_box.addWidget(_IssueRow("check", "success", "Nenhum problema detectado no momento."))
+            self.issues_box.addWidget(
+                _IssueRow("check_circle", "success", "Nenhum problema detectado no momento.")
+            )
         else:
             for icon_name, color, text in issues[:4]:
-                color_key = color if color in ("accent", "success", "warning", "danger", "muted") else "accent"
+                color_key = color if color in (
+                    "accent", "success", "warning", "danger", "muted", "info", "faint"
+                ) else "accent"
                 self.issues_box.addWidget(_IssueRow(icon_name, color_key, text))
+        self._last_score = score
 
     def _update_issues(self) -> None:
         self._update_score()

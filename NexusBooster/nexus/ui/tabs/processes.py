@@ -2,25 +2,31 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QCheckBox,
     QHBoxLayout,
     QHeaderView,
-    QLabel,
-    QLineEdit,
-    QPushButton,
-    QTableWidget,
     QTableWidgetItem,
-    QVBoxLayout,
+    QTableWidget,
     QWidget,
+    QVBoxLayout,
 )
 
 from nexus.core import safety
 from nexus.core.worker import run_task
 from nexus.system import processes as sys_processes
 from nexus.ui import theme
-from nexus.ui.components import Card, Pill, toast_for
+from nexus.ui.components import (
+    Button,
+    Card,
+    MiniBar,
+    Pill,
+    SearchBox,
+    ThemeLabel,
+    toast_for,
+)
 from nexus.ui.tabs.base import BaseTab
 
 
@@ -81,21 +87,39 @@ class _ProcessTable(QTableWidget):
             self.setItem(row, base, QTableWidgetItem(str(p.pid)))
             name_item = QTableWidgetItem(p.name)
             if safety.is_protected_process(p.name):
-                name_item.setForeground(QColor_safe())
+                name_item.setForeground(QColor(theme.WARNING))
             self.setItem(row, base + 1, name_item)
-            self.setItem(row, base + 2, QTableWidgetItem(f"{p.cpu:.1f}"))
-            self.setItem(row, base + 3, QTableWidgetItem(f"{p.mem_mb:.0f}"))
+
+            # CPU/RAM com barras inline
+            cpu_cell = _UsageCell(p.cpu, 100.0, f"{p.cpu:.1f}")
+            self.setCellWidget(row, base + 2, cpu_cell)
+            ram_cell = _UsageCell(p.mem_mb, 8192.0, f"{p.mem_mb:.0f}")
+            self.setCellWidget(row, base + 3, ram_cell)
+
             status = "suspenso" if p.suspended else ("rodando" if p.status == "running" else p.status)
             self.setItem(row, base + 4, QTableWidgetItem(status))
             self.setItem(row, base + 5, QTableWidgetItem(p.exe or "—"))
+            self.setRowHeight(row, 40)
         self.resizeRowsToContents()
         self.setUpdatesEnabled(True)
 
 
-def QColor_safe():
-    from PySide6.QtGui import QColor
+class _UsageCell(QWidget):
+    """Célula de uso: valor + barra compacta."""
 
-    return QColor(theme.WARNING)
+    def __init__(self, value: float, scale: float, text: str, parent=None):
+        super().__init__(parent)
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(6, 4, 6, 4)
+        lay.setSpacing(2)
+        lbl = ThemeLabel(text, "caption")
+        lbl.setStyleSheet(
+            f"color: {theme.TEXT_MUTED}; font-size: 11px;"
+            f"font-family: {theme.MONO_STACK}; background: transparent;"
+        )
+        lay.addWidget(lbl)
+        self.bar = MiniBar(min(100.0, value / scale * 100.0))
+        lay.addWidget(self.bar)
 
 
 class ProcessesTab(BaseTab):
@@ -103,20 +127,18 @@ class ProcessesTab(BaseTab):
         super().__init__(services, main_window)
 
         intro = Card("Processos em execução", "list")
-        txt = QLabel(
+        txt = ThemeLabel(
             "Ordenado por consumo real de CPU/RAM (psutil). Processos essenciais do "
             "Windows aparecem em destaque e são protegidos contra finalização. "
-            "Suspender é reversível — o app volta exatamente onde estava."
+            "Suspender é reversível — o app volta exatamente onde estava.",
+            "body_sm", wrap=True,
         )
-        txt.setWordWrap(True)
-        txt.setStyleSheet(f"color: {theme.TEXT_MUTED}; font-size: 12px;")
         intro.body_layout().addWidget(txt)
 
         row = QHBoxLayout()
-        self.search = QLineEdit()
-        self.search.setPlaceholderText("Filtrar por nome ou caminho…")
+        self.search = SearchBox("Filtrar por nome ou caminho…")
         self.search.textChanged.connect(lambda _t: self._filter())
-        refresh = QPushButton("Atualizar agora")
+        refresh = Button("Atualizar agora", "secondary", "refresh")
         refresh.clicked.connect(self._refresh)
         self.auto_refresh = QCheckBox("Atualização automática (2s)")
         self.auto_refresh.setChecked(True)
