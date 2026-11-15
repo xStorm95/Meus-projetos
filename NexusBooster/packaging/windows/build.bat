@@ -22,12 +22,13 @@ call .venv-build\Scripts\activate.bat || goto :fail
 echo.
 echo [3/5] Instalando dependencias...
 python -m pip install --upgrade pip || goto :fail
-pip install -r requirements.txt pyinstaller pillow numpy || goto :fail
+pip install -r requirements.txt pyinstaller pillow || goto :fail
 
 echo.
 echo [4/5] Gerando icone do aplicativo...
 python tools\make_icon.py assets\icon.ico || (
-    echo AVISO: falha ao gerar .ico — usando logo.svg direto.
+    echo AVISO: falha ao gerar .ico — verifique a mensagem acima.
+    goto :fail
 )
 
 echo.

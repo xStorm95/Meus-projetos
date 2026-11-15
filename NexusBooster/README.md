@@ -65,12 +65,22 @@ O Nexus Booster foi construído com três princípios:
 
 ## 3. Instalação (usuário final)
 
-1. Execute **`NexusBooster-Setup-1.0.0.exe`**
-2. Avance no assistente (atalho na área de trabalho é opcional)
-3. Abra o **Nexus Booster** no menu Iniciar
+### Modo 1 — Instalador pronto (recomendado)
+
+Baixe **`NexusBooster-Setup-1.0.0.exe`** nos [**Releases do GitHub**](https://github.com/xStorm95/Meus-projetos/releases),
+dê dois cliques e avance no assistente (atalho na área de trabalho é opcional).
 
 O instalador inclui **desinstalador completo** e prepara o terreno para **atualizações
 futuras** (versões novas instalam por cima, mantendo seus dados em `%APPDATA%\NexusBooster`).
+
+### Modo 2 — Pela pasta do projeto (sem instalador)
+
+1. Extraia o ZIP e entre na pasta `NexusBooster`
+2. Duplo clique em **`INSTALAR-E-ABRIR.bat`** — instala tudo sozinho
+   (Python + dependências, se necessário) e abre o app
+3. Nos próximos dias, use **`ABRIR-NEXUS-BOOSTER.bat`**
+
+Detalhes em `COMO-INSTALAR.txt`.
 
 > 💡 **Dica:** clique em *"Reiniciar como administrador"* na aba Configurações para
 > liberar recursos que precisam de elevação (serviços, pasta Temp do Windows, Winsock).
@@ -207,6 +217,13 @@ NexusBooster/
 ```
 
 ### Gerar o .EXE (Windows)
+
+Jeito automático (nuvem): todo push que altera `NexusBooster/**` dispara o workflow
+**"Nexus Booster — Build Windows"** (GitHub Actions), que compila o instalador e
+publica em [Releases](https://github.com/xStorm95/Meus-projetos/releases). Também pode
+ser disparado manualmente na aba *Actions* do repositório.
+
+Jeito local:
 
 ```bat
 cd NexusBooster

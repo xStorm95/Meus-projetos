@@ -2,11 +2,10 @@
 # Especificação PyInstaller do Nexus Booster
 # Uso: pyinstaller packaging/windows/nexusbooster.spec
 
-import sys
 from pathlib import Path
 
-block_cipher = None
-ROOT = Path(SPECPATH).parent  # NexusBooster/
+# SPECPATH = pasta que contém este .spec (packaging/windows)
+ROOT = Path(SPECPATH).parent.parent  # NexusBooster/
 
 a = Analysis(
     [str(ROOT / "main.py")],
@@ -36,13 +35,10 @@ a = Analysis(
         "PySide6.QtTest", "PySide6.QtDesigner", "PySide6.QtHelp",
         "PySide6.QtPdf", "PySide6.QtPdfWidgets", "PySide6.QtUiTools",
     ],
-    win_no_prefer_redirects=False,
-    win_private_assemblies=False,
-    cipher=block_cipher,
     noarchive=False,
 )
 
-pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+pyz = PYZ(a.pure, a.zipped_data)
 
 exe = EXE(
     pyz,
@@ -64,7 +60,6 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=str(ROOT / "assets" / "icon.ico") if (ROOT / "assets" / "icon.ico").exists() else None,
-    version=str(ROOT / "packaging" / "windows" / "version_info.txt")
-    if (ROOT / "packaging" / "windows" / "version_info.txt").exists() else None,
+    icon=str(ROOT / "assets" / "icon.ico"),
+    version=str(ROOT / "packaging" / "windows" / "version_info.txt"),
 )

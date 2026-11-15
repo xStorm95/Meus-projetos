@@ -1,0 +1,41 @@
+═══════════════════════════════════════════════════════
+  NEXUS BOOSTER — COMO INSTALAR (passo a passo simples)
+═══════════════════════════════════════════════════════
+
+MODO 1 — O MAIS FÁCIL (instalador pronto .exe)
+──────────────────────────────────────────────
+1. Baixe o arquivo "NexusBooster-Setup-1.0.0.exe" em:
+   https://github.com/xStorm95/Meus-projetos/releases
+2. Dê dois cliques nele.
+3. Avance em "Avançar >" até "Concluir".
+4. O Nexus Booster abre pelo atalho na área de trabalho.
+
+MODO 2 — Usando esta pasta (baixou o ZIP do projeto)
+──────────────────────────────────────────────────────
+1. Extraia o ZIP em qualquer pasta (ex.: Área de Trabalho).
+2. Entre na pasta "NexusBooster".
+3. Dê DUPLO CLIQUE em:  INSTALAR-E-ABRIR.bat
+   • Na primeira vez ele instala tudo sozinho
+     (Python + componentes — pode demorar de 3 a 10 minutos).
+   • A janela do app abre quando terminar.
+4. Para abrir nos próximos dias:  ABRIR-NEXUS-BOOSTER.bat
+
+DÚVIDAS RÁPIDAS
+──────────────
+• Apareceu aviso do Windows (Tela azul "Proteção do Windows")?
+  Clique em "Mais informações" > "Executar assim mesmo".
+  O app é novo e sem assinatura digital — isso é normal
+  para programas novos de código aberto.
+
+• Recursos que pedem administrador?
+  No app: Configurações > "Reiniciar como administrador".
+  Funciona sem administrador também (com menos recursos).
+
+• Medir FPS nos jogos?
+  Baixe o PresentMon (grátis, link dentro da aba FPS Monitor
+  do aplicativo) e informe o caminho nas Configurações.
+
+• Onde ficam meus dados?
+  %APPDATA%\NexusBooster  (histórico, logs e backups)
+
+Bom jogo! ⚡
