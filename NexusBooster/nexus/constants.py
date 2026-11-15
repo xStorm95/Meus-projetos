@@ -4,16 +4,17 @@ import platform
 
 APP_NAME = "Nexus Booster"
 APP_ID = "nexusbooster"
-APP_VERSION = "1.2.0"
+APP_VERSION = "1.3.0"
 ORG_NAME = "Nexus Booster"
 
-# Cores base do tema (azul neon).
+# Cores base do tema (accent "roxo" = cor do ícone oficial da marca).
 ACCENTS = {
+    "roxo": "#673ecb",
     "neon": "#00d4ff",
     "cyan": "#22d3ee",
     "violet": "#8b5cf6",
 }
-DEFAULT_ACCENT = "neon"
+DEFAULT_ACCENT = "roxo"
 
 # Repositório / páginas de referência
 PRESENTMON_URL = "https://github.com/GameTechDev/PresentMon/releases"

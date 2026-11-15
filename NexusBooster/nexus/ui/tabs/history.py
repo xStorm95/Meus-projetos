@@ -55,11 +55,15 @@ class HistoryTab(BaseTab):
         self.filter.currentIndexChanged.connect(self._load)
         refresh = Button("Atualizar", "secondary", "refresh")
         refresh.clicked.connect(self._load)
+        export_csv = Button("Exportar CSV", "secondary", "download")
+        export_csv.setToolTip("Salva o histórico completo em planilha (CSV)")
+        export_csv.clicked.connect(self._export_csv)
         undo_all = Button("Desfazer otimizações", "danger", "undo")
         undo_all.clicked.connect(self._undo_all)
         row.addWidget(ThemeLabel("Filtro:"))
         row.addWidget(self.filter, 1)
         row.addWidget(refresh)
+        row.addWidget(export_csv)
         row.addWidget(undo_all)
         top.body_layout().addLayout(row)
         self.add(top)
@@ -238,6 +242,43 @@ class HistoryTab(BaseTab):
                 "success" if ok_n else "warning",
             )
             self._load()
+
+        run_task(job, on_done=done)
+
+    # --------------------------------------------------------------- export
+    def _export_csv(self) -> None:
+        import csv
+
+        from PySide6.QtWidgets import QFileDialog
+
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Exportar histórico", "nexus-historico.csv", "Planilha CSV (*.csv)"
+        )
+        if not path:
+            return
+
+        def job():
+            return self.services.db.history_list(limit=100000)
+
+        def done(entries) -> None:
+            try:
+                # utf-8-sig + ';' → abre direto no Excel em português
+                with open(path, "w", newline="", encoding="utf-8-sig") as fh:
+                    writer = csv.writer(fh, delimiter=";")
+                    writer.writerow(["Data", "Categoria", "Ação", "Descrição",
+                                     "Detalhes", "Estado"])
+                    for e in entries:
+                        writer.writerow([
+                            time.strftime("%d/%m/%Y %H:%M:%S", time.localtime(e.ts)),
+                            CATEGORY_LABELS.get(e.category, e.category),
+                            e.action,
+                            e.description or "",
+                            e.details or "",
+                            "desfeita" if e.undone else "ativa",
+                        ])
+                toast_for(self, f"Histórico exportado: {len(entries)} registros.", "success")
+            except Exception as exc:  # noqa: BLE001
+                toast_for(self, f"Falha ao exportar: {exc}", "error")
 
         run_task(job, on_done=done)
 

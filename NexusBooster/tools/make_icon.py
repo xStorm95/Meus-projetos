@@ -13,8 +13,26 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+ICON = ROOT / "assets" / "icon.png"
 BRAND = ROOT / "assets" / "brand.jpg"
 SVG = ROOT / "assets" / "logo.svg"
+
+
+def _render_icon(size: int):
+    """Ícone oficial do aplicativo (assets/icon.png), mantendo transparência."""
+    from PySide6.QtCore import Qt
+    from PySide6.QtGui import QImage
+
+    if not ICON.is_file():
+        return None
+    src = QImage(str(ICON))
+    if src.isNull():
+        return None
+    return src.scaled(
+        size, size,
+        Qt.AspectRatioMode.KeepAspectRatio,
+        Qt.TransformationMode.SmoothTransformation,
+    )
 
 
 def _render_brand(size: int):
@@ -91,7 +109,7 @@ def main() -> int:
     sizes = [16, 24, 32, 48, 64, 128, 256]
     png_bytes: list[bytes] = []
     for size in sizes:
-        img = _render_brand(size) if BRAND.is_file() else None
+        img = _render_icon(size) or (_render_brand(size) if BRAND.is_file() else None)
         if img is None:
             img = _render_svg(size)
         buf = QBuffer()

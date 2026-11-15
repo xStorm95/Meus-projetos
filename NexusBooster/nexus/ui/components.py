@@ -241,9 +241,14 @@ class HeroCard(Card):
         self._pm = QPixmap()
         from nexus.core.paths import asset_path
 
-        p = asset_path(image_name)
-        if p.is_file():
-            self._pm.load(str(p))
+        # prioridade: ícone oficial da marca (assets/icon.png)
+        icon_file = asset_path("icon.png")
+        if icon_file.is_file():
+            self._pm.load(str(icon_file))
+        if self._pm.isNull():
+            p = asset_path(image_name)
+            if p.is_file():
+                self._pm.load(str(p))
 
     def paintEvent(self, event) -> None:
         p = QPainter(self)

@@ -24,8 +24,10 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QMainWindow,
+    QMenu,
     QPushButton,
     QStackedWidget,
+    QSystemTrayIcon,
     QToolButton,
     QVBoxLayout,
     QWidget,
@@ -82,6 +84,14 @@ def _brand_pixmap(size: int) -> QPixmap:
     from nexus.core.paths import asset_path
 
     pm = QPixmap()
+    # ícone oficial (assets/icon.png — emblema circular com transparência)
+    icon_file = asset_path("icon.png")
+    if icon_file.is_file():
+        pm.load(str(icon_file))
+        if not pm.isNull():
+            return pm.scaled(size, size, Qt.AspectRatioMode.KeepAspectRatio,
+                             Qt.TransformationMode.SmoothTransformation)
+    # fallback: imagem da marca em quadrado arredondado
     if asset_path("brand.jpg").is_file():
         pm.load(str(asset_path("brand.jpg")))
     if pm.isNull():
@@ -102,6 +112,7 @@ class NavButton(QFrame):
         self._label_text = label
         self._active = False
         self._hover = False
+        self._hover_level = 0.0
         self._indicator = 0.0
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setFixedHeight(36)
@@ -109,8 +120,27 @@ class NavButton(QFrame):
 
         self._anim = QVariantAnimation(self)
         self._anim.valueChanged.connect(self._on_anim)
+        self._hover_anim = QVariantAnimation(self)
+        self._hover_anim.valueChanged.connect(self._on_hover_anim)
         theme.manager.changed.connect(self.update)
         self.setAccessibleName(label)
+
+    def _on_hover_anim(self, v: float) -> None:
+        self._hover_level = v
+        self.update()
+
+    def _animate_hover(self, target: float) -> None:
+        d = theme.dur("fast")
+        if d <= 0:
+            self._hover_level = target
+            self.update()
+            return
+        self._hover_anim.stop()
+        self._hover_anim.setDuration(d)
+        self._hover_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self._hover_anim.setStartValue(self._hover_level)
+        self._hover_anim.setEndValue(target)
+        self._hover_anim.start()
 
     def _on_anim(self, v: float) -> None:
         self._indicator = v
@@ -132,12 +162,12 @@ class NavButton(QFrame):
 
     def enterEvent(self, event) -> None:
         self._hover = True
-        self.update()
+        self._animate_hover(1.0)
         super().enterEvent(event)
 
     def leaveEvent(self, event) -> None:
         self._hover = False
-        self.update()
+        self._animate_hover(0.0)
         super().leaveEvent(event)
 
     def mousePressEvent(self, event) -> None:
@@ -152,8 +182,9 @@ class NavButton(QFrame):
         w, h = self.width(), self.height()
         compact = w < (SIDEBAR_WIDE + SIDEBAR_COMPACT) / 2
 
-        if self._hover or self._active:
-            bg = QColor(theme.with_alpha(theme.ACCENT, 22 if self._active else 12))
+        if self._hover_level > 0.01 or self._active:
+            alpha = (22 if self._active else 0) + int(14 * self._hover_level)
+            bg = QColor(theme.with_alpha(theme.ACCENT, alpha))
             p.setPen(Qt.PenStyle.NoPen)
             p.setBrush(bg)
             p.drawRoundedRect(QRectF(4, 2, w - 8, h - 4), 7, 7)
@@ -204,7 +235,14 @@ class MainWindow(QMainWindow):
         mode = s.get_str("theme_mode") or "dark"
         if mode == "system":
             mode = "dark" if theme.system_prefers_dark() else "light"
-        theme.set_theme(mode, s.get_str("accent") or None, s.get_str("density") or None)
+        accent_key = s.get_str("accent") or None
+        # migração única: quem usava o antigo padrão "neon" sem escolher
+        # explicitamente passa para o "roxo" (cor do novo ícone da marca)
+        if accent_key in ("", "neon") and not s.get_bool("accent_migrated_roxo"):
+            accent_key = "roxo"
+            s.set("accent", "roxo")
+            s.set("accent_migrated_roxo", True)
+        theme.set_theme(mode, accent_key, s.get_str("density") or None)
 
         self.setWindowIcon(QIcon(_brand_pixmap(64)))
 
@@ -241,8 +279,17 @@ class MainWindow(QMainWindow):
         self.toast_host = ToastHost(central)
         services.toast_host = self.toast_host
 
+        # bandeja do sistema (ações rápidas + continuar ativo ao fechar)
+        self._really_quit = False
+        self._tray = None
+        self._build_tray()
+
         self._build_tabs()
-        self._apply_sidebar_width()
+        # largura inicial instantânea (sem animação) para a janela já abrir
+        # no layout final — a animação fica apenas para o toggle do usuário
+        self._set_sidebar_width(
+            float(SIDEBAR_COMPACT if self._sidebar_compact else SIDEBAR_WIDE)
+        )
         self.navigate("dashboard")
 
         # Conexões de monitoramento
@@ -296,6 +343,12 @@ class MainWindow(QMainWindow):
         head.addWidget(self.collapse_btn)
         lay.addLayout(head)
 
+        # divisor neon sob a marca (cor do acento, gradiente discreto)
+        self._accent_div = QFrame()
+        self._accent_div.setFixedHeight(2)
+        self._accent_div.setContentsMargins(14, 0, 14, 0)
+        lay.addWidget(self._accent_div)
+
         current_group = 0
         for item_id, icon_name, label, group in NAV_ITEMS:
             if group != current_group:
@@ -323,12 +376,20 @@ class MainWindow(QMainWindow):
         self._update_admin_pill()
 
     def _apply_sidebar_style(self) -> None:
+        acc = theme.ACCENT
         self._sidebar_host.setStyleSheet(
-            f"#sidebar {{ background: {theme.SURFACE1}; border-right: 1px solid {theme.BORDER}; }}"
+            f"#sidebar {{ background: {theme.SURFACE1};"
+            f" border-right: 1px solid {theme.with_alpha(acc, 70)}; }}"
+        )
+        self._accent_div.setStyleSheet(
+            f"background: qlineargradient(x1:0, y1:0, x2:1, y2:0,"
+            f" stop:0 {theme.with_alpha(acc, 0)}, stop:0.35 {theme.with_alpha(acc, 200)},"
+            f" stop:0.65 {theme.with_alpha(acc, 200)}, stop:1 {theme.with_alpha(acc, 0)});"
+            "border: none; border-radius: 1px; margin-left: 14px; margin-right: 14px;"
         )
         self.collapse_btn.setStyleSheet(
             f"QToolButton {{ background: transparent; border: none; border-radius: 6px; padding: 4px; }}"
-            f"QToolButton:hover {{ background: {theme.with_alpha(theme.ACCENT, 24)}; }}"
+            f"QToolButton:hover {{ background: {theme.with_alpha(acc, 24)}; }}"
         )
 
     def _retheme_chrome(self) -> None:
@@ -539,6 +600,60 @@ class MainWindow(QMainWindow):
 
         page_transition(self._tabs[tab_id])
 
+    # ------------------------------------------------------------- bandeja
+    def _build_tray(self) -> None:
+        if not QSystemTrayIcon.isSystemTrayAvailable():
+            return
+        self._tray = QSystemTrayIcon(QIcon(_brand_pixmap(64)), self)
+        self._tray.setToolTip(f"Nexus Booster v{__version__}")
+
+        menu = QMenu()
+        act_open = menu.addAction("Abrir Nexus Booster")
+        act_open.triggered.connect(self._show_from_tray)
+        menu.addSeparator()
+        act_opt = menu.addAction("Otimizar agora")
+        act_opt.triggered.connect(self.optimize_requested.emit)
+        self._tray_stop_act = menu.addAction("Encerrar sessão de boost")
+        self._tray_stop_act.setEnabled(False)
+        self._tray_stop_act.triggered.connect(self._tray_stop_boost)
+        menu.addSeparator()
+        act_quit = menu.addAction("Sair do Nexus Booster")
+        act_quit.triggered.connect(self._quit_from_tray)
+        self._tray.setContextMenu(menu)
+        self._tray.activated.connect(
+            lambda reason: self._show_from_tray()
+            if reason in (QSystemTrayIcon.ActivationReason.DoubleClick,
+                          QSystemTrayIcon.ActivationReason.Trigger)
+            else None
+        )
+        self._tray.show()
+
+    def _show_from_tray(self) -> None:
+        self.show()
+        self.raise_()
+        self.activateWindow()
+
+    def _quit_from_tray(self) -> None:
+        self._really_quit = True
+        self.close()
+
+    def _tray_stop_boost(self) -> None:
+        from nexus.core.worker import run_task
+
+        def job():
+            return self.services.booster.stop()
+
+        def done(res) -> None:
+            ok, msg = res
+            if self._tray is not None and self._tray.isVisible():
+                self._tray.showMessage(
+                    "Nexus Booster", msg,
+                    QSystemTrayIcon.MessageIcon.Information if ok
+                    else QSystemTrayIcon.MessageIcon.Warning, 3000,
+                )
+
+        run_task(job, on_done=done)
+
     # ------------------------------------------------------------- atalhos
     def _install_shortcuts(self) -> None:
         for i, (tab_id, _icon, _label, _g) in enumerate(NAV_ITEMS[:9], start=1):
@@ -577,6 +692,14 @@ class MainWindow(QMainWindow):
         else:
             self._boost_text = ""
         self._render_boost_badge()
+        act = getattr(self, "_tray_stop_act", None)
+        if act is not None:
+            act.setEnabled(state.active)
+        if self._tray is not None:
+            self._tray.setToolTip(
+                f"Nexus Booster v{__version__} — boost ativo" if state.active
+                else f"Nexus Booster v{__version__}"
+            )
 
     def _render_boost_badge(self) -> None:
         text = getattr(self, "_boost_text", "")
@@ -638,6 +761,23 @@ class MainWindow(QMainWindow):
 
     # ---------------------------------------------------------------- close
     def closeEvent(self, event: QCloseEvent) -> None:
+        # fechar para a bandeja (padrão) — o app continua monitorando
+        if (not self._really_quit and self._tray is not None
+                and self._tray.isVisible()
+                and self.services.settings.get("minimize_to_tray") is not False):
+            self.hide()
+            if not self.services.settings.get_bool("tray_notice_shown"):
+                self._tray.showMessage(
+                    "Nexus Booster",
+                    "O aplicativo continua ativo na bandeja (ícone roxo). "
+                    "Clique duas vezes para reabrir ou use o botão direito → Sair "
+                    "para encerrar de vez.",
+                    QSystemTrayIcon.MessageIcon.Information, 5000,
+                )
+                self.services.settings.set("tray_notice_shown", True)
+            event.ignore()
+            return
+
         if self.services.booster.state.active:
             from nexus.ui.components import confirm
 
@@ -663,6 +803,8 @@ class MainWindow(QMainWindow):
             pass
         theme.manager.changed.disconnect(self._apply_sidebar_style)
         theme.manager.changed.disconnect(self._retheme_chrome)
+        if self._tray is not None:
+            self._tray.hide()
         self.services.shutdown()
         super().closeEvent(event)
         QApplication.quit()

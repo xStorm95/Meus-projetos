@@ -27,7 +27,9 @@ class NexusSplash(QWidget):
         self.setFixedSize(420, 220)
         self._start = time.time()
         self._brand = QPixmap()
-        if asset_path("brand.jpg").is_file():
+        if asset_path("icon.png").is_file():
+            self._brand.load(str(asset_path("icon.png")))
+        elif asset_path("brand.jpg").is_file():
             self._brand.load(str(asset_path("brand.jpg")))
         self._msg = ""
 

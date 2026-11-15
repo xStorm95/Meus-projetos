@@ -165,6 +165,19 @@ class SettingsTab(BaseTab):
         w2.addWidget(lbl)
         w2.addStretch(1)
         win.body_layout().addLayout(w2)
+
+        w3 = QHBoxLayout()
+        # padrão: continuar na bandeja ao fechar
+        tray_default = s.get("minimize_to_tray") is not False
+        self.tray_toggle = ToggleSwitch(tray_default)
+        self.tray_toggle.toggled.connect(
+            lambda on: self.services.settings.set("minimize_to_tray", on)
+        )
+        lbl3 = ThemeLabel("Ao fechar, continuar ativo na bandeja do sistema", "body")
+        w3.addWidget(self.tray_toggle)
+        w3.addWidget(lbl3)
+        w3.addStretch(1)
+        win.body_layout().addLayout(w3)
         self.add(win)
 
         # ------------------------------------------------------------- dados
