@@ -254,8 +254,17 @@ class LibraryTab(BaseTab):
 
     # -------------------------------------------------------------- dados
     def _load(self) -> None:
-        self._games = self.services.db.games_all()
-        self._render()
+        from nexus.core.worker import run_task
+
+        # leitura do banco fora da thread da interface
+        def job():
+            return self.services.db.games_all()
+
+        def done(games) -> None:
+            self._games = games or []
+            self._render()
+
+        run_task(job, done)
 
     def _render(self) -> None:
         # limpa grade

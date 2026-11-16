@@ -39,7 +39,7 @@ echo Compilando instalador...
 
 echo.
 echo ============================================================
-echo  INSTALADOR GERADO: installer_output\DK-Setup-1.4.0.exe
+echo  INSTALADOR GERADO: installer_output\DK-Setup-1.5.0.exe
 echo ============================================================
 popd
 endlocal

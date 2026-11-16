@@ -67,7 +67,7 @@ O DK foi construído com três princípios:
 
 ### Modo 1 — Instalador pronto (recomendado)
 
-Baixe **`DK-Setup-1.4.0.exe`** nos [**Releases do GitHub**](https://github.com/xStorm95/Meus-projetos/releases),
+Baixe **`DK-Setup-1.5.0.exe`** nos [**Releases do GitHub**](https://github.com/xStorm95/Meus-projetos/releases),
 dê dois cliques e avance no assistente (atalho na área de trabalho é opcional).
 
 O instalador inclui **desinstalador completo** e prepara o terreno para **atualizações
@@ -208,7 +208,7 @@ NexusBooster/
 │   │   └── build.bat           # gera dist/DK.exe
 │   └── installer/
 │       ├── nexusbooster.iss    # script Inno Setup
-│       └── build_installer.bat # gera DK-Setup-1.4.0.exe
+│       └── build_installer.bat # gera DK-Setup-1.5.0.exe
 ├── tools/
 │   ├── make_icon.py            # logo.svg → icon.ico
 │   ├── dev_ui_check.py         # verificação headless da interface
@@ -241,7 +241,7 @@ Pré-requisito: [Inno Setup 6](https://jrsoftware.org/isdl.php) + `dist\DK.exe` 
 packaging\installer\build_installer.bat
 ```
 
-Saída: `installer_output\DK-Setup-1.4.0.exe` — instalação simples, atalho
+Saída: `installer_output\DK-Setup-1.5.0.exe` — instalação simples, atalho
 opcional na área de trabalho, desinstalador, tarefas opcionais (iniciar com o Windows)
 e suporte a atualizações (versões futuras sobrescrevem mantendo dados).
 
@@ -359,4 +359,4 @@ inicialização em `startup_backup\`. Removê-los não afeta o Windows.
 
 ---
 
-**DK v1.4.0** · Python 3.12 · PySide6 · psutil · SQLite
+**DK v1.5.0** · Python 3.12 · PySide6 · psutil · SQLite

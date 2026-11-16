@@ -42,7 +42,7 @@ class SettingsTab(BaseTab):
 
         row_theme = QHBoxLayout()
         row_theme.setSpacing(theme.pad("md"))
-        current_mode = s.get_str("theme_mode") or "light"
+        current_mode = s.get_str("theme_mode") or "dark"
         self.theme_seg = SegmentedControl(
             [("dark", "Escuro"), ("light", "Claro"), ("system", "Sistema")],
             current_mode,

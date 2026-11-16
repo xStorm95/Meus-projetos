@@ -4,7 +4,7 @@ import platform
 
 APP_NAME = "DK"
 APP_ID = "nexusbooster"
-APP_VERSION = "1.4.0"
+APP_VERSION = "1.5.0"
 ORG_NAME = "DK"
 
 # Cores base do tema (accent "roxo" = cor do ícone oficial da marca).

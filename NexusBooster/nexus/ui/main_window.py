@@ -233,12 +233,13 @@ class MainWindow(QMainWindow):
 
         # tema salvo (modo + acento + densidade) — lido antes de construir
         s = services.settings
-        mode = s.get_str("theme_mode") or "light"
-        # migração única: identidade DK é roxo & branco — quem nunca escolheu
-        # um tema explicitamente passa para o claro
-        if not s.get_str("theme_mode") and not s.get_bool("theme_migrated_claro"):
-            s.set("theme_mode", "light")
-            s.set("theme_migrated_claro", True)
+        mode = s.get_str("theme_mode") or "dark"
+        # migração única da identidade neon: o fundo escuro profundo passa a
+        # ser o padrão do DK — o tema claro segue a um clique nas Configurações
+        if not s.get_bool("theme_migrated_neon"):
+            s.set("theme_mode", "dark")
+            s.set("theme_migrated_neon", True)
+            mode = "dark"
         if mode == "system":
             mode = "dark" if theme.system_prefers_dark() else "light"
         accent_key = s.get_str("accent") or None

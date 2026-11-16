@@ -77,20 +77,15 @@ class ProfilesTab(BaseTab):
         glob.body_layout().addWidget(note)
         self.add(glob)
 
-        # ------------------------------------------------------ jogos com perfil
-        games = self.services.db.games_all()
-        matched = {}
-        for g in games:
-            prof = get_profile(g.profile_id)
-            matched.setdefault(prof.id, []).append(g.name)
-
+        # ------------------------------------------ jogos com perfil (em thread)
+        # cartões são montados na hora; o selo "instalado (N)" chega depois,
+        # vindo do banco em thread separada — a aba abre sem travar
+        cards: dict[str, Card] = {}
         for prof in BUILTIN_PROFILES:
             card = Card(prof.game_name, "gamepad")
+            cards[prof.id] = card
             if prof.platform_note:
                 card.header_layout().addWidget(Pill(prof.platform_note, "muted"))
-            has = matched.get(prof.id, [])
-            if has:
-                card.header_layout().addWidget(Pill(f"instalado ({len(has)})", "success"))
 
             if prof.recommendations:
                 card.body_layout().addWidget(SectionTitle("Recomendações verificáveis"))
@@ -133,3 +128,22 @@ class ProfilesTab(BaseTab):
                 )
 
             self.add(card)
+
+        from nexus.core.worker import run_task
+
+        def job():
+            games = self.services.db.games_all()
+            m: dict = {}
+            for g in games:
+                prof = get_profile(g.profile_id)
+                m.setdefault(prof.id, []).append(g.name)
+            return m
+
+        def done(matched) -> None:
+            for pid, names in (matched or {}).items():
+                card = cards.get(pid)
+                if card is not None and names:
+                    card.header_layout().addWidget(
+                        Pill(f"instalado ({len(names)})", "success"))
+
+        run_task(job, done)

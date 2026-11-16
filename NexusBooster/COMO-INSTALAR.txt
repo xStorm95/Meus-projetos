@@ -4,7 +4,7 @@
 
 MODO 1 — O MAIS FÁCIL (instalador pronto .exe)
 ──────────────────────────────────────────────
-1. Baixe o arquivo "DK-Setup-1.4.0.exe" em:
+1. Baixe o arquivo "DK-Setup-1.5.0.exe" em:
    https://github.com/xStorm95/Meus-projetos/releases
 2. Dê dois cliques nele.
 3. Avance em "Avançar >" até "Concluir".
