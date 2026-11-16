@@ -11,7 +11,6 @@ from nexus.ui.components import (
     GaugeRing,
     KeyInfoRow,
     LineChart,
-    Sparkline,
     StatTile,
 )
 from nexus.ui.tabs.base import BaseTab

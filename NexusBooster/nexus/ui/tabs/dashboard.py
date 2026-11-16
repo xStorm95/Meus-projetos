@@ -11,7 +11,6 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QVBoxLayout,
-    QWidget,
 )
 
 from nexus.optimization import startup as startup_mod
@@ -26,7 +25,6 @@ from nexus.ui.components import (
     LineChart,
     StatTile,
     ThemeLabel,
-    toast_for,
 )
 from nexus.ui.tabs.base import BaseTab
 

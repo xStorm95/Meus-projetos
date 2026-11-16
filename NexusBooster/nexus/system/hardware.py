@@ -6,7 +6,6 @@ Em outros sistemas: /proc, psutil e platform (para desenvolvimento).
 
 from __future__ import annotations
 
-import json
 import logging
 import platform as pyplatform
 from dataclasses import dataclass, field

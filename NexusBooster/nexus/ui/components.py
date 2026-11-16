@@ -7,17 +7,17 @@ troca de tema/acento/densidade via ``theme.manager.changed``.
 
 from __future__ import annotations
 
-import time
+import re
 from collections import deque
 from typing import Callable, Optional
 
 from PySide6.QtCore import (
     QEasingCurve,
-    QPoint,
+    QEvent,
     QPointF,
-    QPropertyAnimation,
     QRectF,
     Qt,
+    QObject,
     QTimer,
     QVariantAnimation,
     Signal,
@@ -35,19 +35,18 @@ from PySide6.QtGui import (
     QPixmap,
 )
 from PySide6.QtWidgets import (
+    QGraphicsDropShadowEffect,
     QDialog,
     QFrame,
     QGraphicsOpacityEffect,
     QHBoxLayout,
     QLabel,
-    QLayout,
     QLineEdit,
     QListWidget,
     QListWidgetItem,
     QMessageBox,
     QPushButton,
     QScrollArea,
-    QSizePolicy,
     QSlider,
     QVBoxLayout,
     QWidget,
@@ -164,6 +163,44 @@ class SectionTitle(QLabel):
 # -------------------------------------------------------------------- Card
 
 
+class _GlowFilter(QObject):
+    """Liga/desliga um brilho neon suave conforme o hover do widget."""
+
+    def __init__(self, target, radius: int, color_fn):
+        super().__init__(target)
+        self._color_fn = color_fn
+        self._effect = QGraphicsDropShadowEffect(target)
+        self._effect.setBlurRadius(radius)
+        self._effect.setOffset(0, 0)
+        self._effect.setEnabled(False)
+        target.setGraphicsEffect(self._effect)
+        target.installEventFilter(self)
+
+    def eventFilter(self, obj, ev) -> bool:
+        t = ev.type()
+        if t == QEvent.Type.HoverEnter:
+            self._set_on(True)
+        elif t in (QEvent.Type.HoverLeave, QEvent.Type.Hide):
+            self._set_on(False)
+        return False
+
+    def _set_on(self, on: bool) -> None:
+        if on and theme.reduce_motion():
+            on = False
+        if on:
+            c = QColor(self._color_fn())
+            c.setAlpha(140)
+            self._effect.setColor(c)
+        self._effect.setEnabled(on)
+
+
+def hover_glow(widget, radius: int = 24, color_fn=None) -> None:
+    """Brilho neon no hover — desativado quando "reduzir animações" está ligado."""
+    if color_fn is None:
+        color_fn = lambda: theme.ACCENT
+    _GlowFilter(widget, radius, color_fn)
+
+
 class Card(QFrame):
     """Superfície de cartão: título + ação opcional + corpo (layout vertical).
 
@@ -194,6 +231,8 @@ class Card(QFrame):
         self._header.addStretch(1)
         self._layout.addLayout(self._header)
         bind_retheme(self, self._retheme)
+        # cartões ganham um brilho neon sutil ao receber o mouse
+        hover_glow(self, 20)
 
     def _retheme(self) -> None:
         if self._icon_label is not None:
@@ -354,6 +393,11 @@ class Button(QPushButton):
         self.setProperty("variant", self._variant)
         self._spinner = None
         self._apply_icon()
+        # botões de destaque ganham brilho neon no hover
+        if self._variant == "primary":
+            hover_glow(self, 24)
+        elif self._variant == "danger":
+            hover_glow(self, 24, lambda: theme.DANGER)
 
     def _apply_icon(self) -> None:
         if self._loading:
@@ -557,10 +601,55 @@ class StatTile(QFrame):
         self._ic.setPixmap(icons.pixmap(self._icon_name, self._color, 22))
         self.update()
 
+    _NUM_RE = re.compile(r"^(\D*?)(-?\d+(?:[.,]\d+)?)(.*)$")
+
     def set_value(self, value: str, sub: str = "") -> None:
-        self._value.setText(value)
+        self._roll_to(value)
         if sub or sub == "":
             self._sub.setText(sub)
+
+    def _roll_to(self, value: str) -> None:
+        """Anima a troca do número (roll rápido) para dar vida ao painel."""
+        old = self._value.text()
+        if theme.dur("fast") <= 0 or old == value:
+            self._value.setText(value)
+            return
+        mo, mn = self._NUM_RE.match(old), self._NUM_RE.match(value)
+        if (not mo or not mn or mo.group(1) != mn.group(1)
+                or mo.group(3) != mn.group(3)):
+            self._value.setText(value)  # prefixo/sufixo mudou: troca direta
+            return
+        try:
+            a = float(mo.group(2).replace(",", "."))
+            b = float(mn.group(2).replace(",", "."))
+        except ValueError:
+            self._value.setText(value)
+            return
+        if a == b:
+            self._value.setText(value)
+            return
+        num = mn.group(2)
+        if "." in num or "," in num:
+            sep = "," if "," in num else "."
+            dec = len(num.replace(",", ".").split(".")[1])
+        else:
+            sep, dec = "", 0
+        anim = QVariantAnimation(self)
+        anim.setDuration(theme.dur("fast"))
+        anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+        anim.setStartValue(a)
+        anim.setEndValue(b)
+
+        def tick(v) -> None:
+            s = f"{v:.{dec}f}"
+            if sep == ",":
+                s = s.replace(".", ",")
+            self._value.setText(mn.group(1) + s + mn.group(3))
+
+        anim.valueChanged.connect(tick)
+        anim.finished.connect(lambda: self._value.setText(value))
+        anim.start()
+        self._roll = anim  # guarda referência para não ser coletado
 
     def set_color(self, color: str) -> None:
         self._color = color

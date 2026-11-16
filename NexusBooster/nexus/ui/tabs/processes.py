@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -22,7 +22,6 @@ from nexus.ui.components import (
     Button,
     Card,
     MiniBar,
-    Pill,
     SearchBox,
     ThemeLabel,
     toast_for,

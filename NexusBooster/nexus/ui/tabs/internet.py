@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import time
 
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import (
@@ -14,7 +13,7 @@ from PySide6.QtWidgets import (
 
 from nexus.core.worker import run_task
 from nexus.network import diagnostics
-from nexus.ui import icons, theme
+from nexus.ui import theme
 from nexus.ui.components import (
     ensure_admin_or_warn,
     Button,

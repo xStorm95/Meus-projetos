@@ -15,11 +15,10 @@ from PySide6.QtWidgets import (
 )
 
 from nexus.core.worker import run_task
-from nexus.ui import icons, theme
+from nexus.ui import theme
 from nexus.ui.components import (
     Button,
     Card,
-    Pill,
     ThemeLabel,
     confirm,
     toast_for,
@@ -125,7 +124,7 @@ class HistoryTab(BaseTab):
         erow.addStretch(1)
         err_card.body_layout().addLayout(erow)
         # lista monoespaçada — cada linha é um evento; tooltip mostra o traceback
-        from PySide6.QtWidgets import QListWidget, QListWidgetItem
+        from PySide6.QtWidgets import QListWidget
         self.err_list = QListWidget()
         self.err_list.setWordWrap(True)
         self.err_list.setStyleSheet(
@@ -305,14 +304,12 @@ class HistoryTab(BaseTab):
             return self.services.db.errors_list(limit=200, level=level or "")
 
         def done(errors) -> None:
-            self.err_list.clear()
-            if not errors:
-                from PySide6.QtWidgets import QListWidgetItem
-
-                self.err_list.addItem("Nenhum registro neste nível. ✓")
-                return
             from PySide6.QtWidgets import QListWidgetItem
 
+            self.err_list.clear()
+            if not errors:
+                self.err_list.addItem("Nenhum registro neste nível. ✓")
+                return
             colors = {"WARNING": theme.WARNING, "ERROR": theme.DANGER,
                       "CRITICAL": theme.DANGER}
             for e in errors:

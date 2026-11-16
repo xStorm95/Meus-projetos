@@ -2,19 +2,17 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
     QFileDialog,
     QHBoxLayout,
-    QLabel,
     QLineEdit,
     QVBoxLayout,
 )
 
 from nexus.core.database import GameRecord
-from nexus.ui import icons, theme
+from nexus.ui import theme
 from nexus.ui.components import Button, SearchBox, ThemeLabel, toast_for
 from nexus.ui.tabs.processes import _ProcessTable
 

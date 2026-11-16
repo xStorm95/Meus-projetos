@@ -12,7 +12,6 @@ import logging
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 from nexus.core.paths import backup_dir
 from nexus.system import registry_utils as reg

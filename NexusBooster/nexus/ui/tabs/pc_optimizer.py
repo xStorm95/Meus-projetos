@@ -9,7 +9,6 @@ from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QHeaderView,
-    QLabel,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -18,14 +17,12 @@ from PySide6.QtWidgets import (
 
 from nexus.core.worker import run_task
 from nexus.optimization import power, services_win, visual_effects
-from nexus.ui import icons, theme
+from nexus.ui import theme
 from nexus.ui.components import (
     Button,
     Card,
     Pill,
     SearchBox,
-    SectionTitle,
-    Spinner,
     ThemeLabel,
     ToggleSwitch,
     toast_for,

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import ctypes
 import sys
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from typing import Dict, Optional
 
 from PySide6.QtCore import QObject, Signal
@@ -92,24 +92,24 @@ class Palette:
 
 DARK = Palette(
     name="dark",
-    bg="#14161b",
-    surface1="#1a1d23",
-    surface2="#1f232b",
-    surface3="#262b35",
-    border="#262b35",
-    border_strong="#363d4a",
-    text="#eceef2",
-    text_muted="#a7aebc",
-    text_faint="#7d8595",
-    text_disabled="#5b6371",
+    bg="#0b0b14",          # neon: fundo bem escuro (identidade DK)
+    surface1="#12121c",
+    surface2="#181826",
+    surface3="#1f1f30",
+    border="#23233a",
+    border_strong="#32324e",
+    text="#eceef4",
+    text_muted="#a7aec2",
+    text_faint="#7d85a0",
+    text_disabled="#5b6379",
     success="#3fd68f",
-    success_bg="#12261e",
+    success_bg="#0f241c",
     warning="#e8b33c",
-    warning_bg="#2a2210",
+    warning_bg="#271f0e",
     danger="#f0777c",
-    danger_bg="#2b1518",
+    danger_bg="#2a1417",
     info="#4cc2ff",
-    info_bg="#0e2231",
+    info_bg="#0d1f2e",
     on_accent_dark="#04222f",
     on_accent_light="#f3fbff",
 )

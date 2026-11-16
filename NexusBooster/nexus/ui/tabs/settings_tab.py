@@ -10,15 +10,13 @@ from PySide6.QtWidgets import (
     QComboBox,
     QFileDialog,
     QHBoxLayout,
-    QLabel,
     QLineEdit,
-    QVBoxLayout,
 )
 
 from nexus.constants import ACCENTS, APP_VERSION, PRESENTMON_URL
 from nexus.core import elevation
 from nexus.core.paths import app_data_dir
-from nexus.ui import icons, theme
+from nexus.ui import theme
 from nexus.ui.components import (
     Button,
     Card,

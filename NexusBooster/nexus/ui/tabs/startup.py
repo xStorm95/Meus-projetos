@@ -9,7 +9,6 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QTableWidget,
     QTableWidgetItem,
-    QVBoxLayout,
     QWidget,
 )
 
@@ -19,7 +18,6 @@ from nexus.ui import theme
 from nexus.ui.components import (
     Button,
     Card,
-    Pill,
     SearchBox,
     ThemeLabel,
     ToggleSwitch,

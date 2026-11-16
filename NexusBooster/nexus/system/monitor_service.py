@@ -256,6 +256,15 @@ class MonitorService(QObject):
         self._thread.stop()
         self._thread.wait(3000)
 
+    def pause(self) -> None:
+        """Pausa as atualizações da interface (janela oculta/minimizada)."""
+        self._poll.stop()
+
+    def resume(self) -> None:
+        """Retoma as atualizações pausadas por ``pause`` (não inicia sozinha)."""
+        if self._thread.isRunning() and not self._poll.isActive():
+            self._poll.start()
+
     def set_interval(self, interval_ms: int) -> None:
         self._thread.set_interval(interval_ms)
         self._poll.setInterval(max(100, min(500, interval_ms // 2)))

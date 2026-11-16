@@ -70,7 +70,7 @@ class _CategoryRow(QFrame):
 
     def paintEvent(self, event) -> None:
         from PySide6.QtCore import QRectF
-        from PySide6.QtGui import QPainter, QPainterPath, QPen, QColor
+        from PySide6.QtGui import QPainter, QPen, QColor
 
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)

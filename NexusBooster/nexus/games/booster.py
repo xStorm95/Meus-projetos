@@ -19,7 +19,7 @@ from PySide6.QtCore import QObject, Qt, QTimer, Signal
 from nexus.core import safety
 from nexus.core.settings import Settings
 from nexus.games.models import Game
-from nexus.games.profiles import COMMON_SUSPEND, get_profile
+from nexus.games.profiles import get_profile
 from nexus.optimization import power
 from nexus.system import processes as sys_processes
 

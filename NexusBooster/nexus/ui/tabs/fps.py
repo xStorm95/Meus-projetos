@@ -16,7 +16,7 @@ from nexus.core.worker import run_task
 from nexus.games.profiles import get_profile
 from nexus.system import fps_monitor as fpsmod
 from nexus.system import processes as sys_processes
-from nexus.ui import icons, theme
+from nexus.ui import theme
 from nexus.ui.components import (
     Button,
     Card,
@@ -24,7 +24,6 @@ from nexus.ui.components import (
     Pill,
     StatTile,
     ThemeLabel,
-    confirm,
     toast_for,
 )
 from nexus.ui.tabs.base import BaseTab

@@ -7,7 +7,6 @@ from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
-    QVBoxLayout,
 )
 
 from nexus.games.profiles import BUILTIN_PROFILES, get_profile

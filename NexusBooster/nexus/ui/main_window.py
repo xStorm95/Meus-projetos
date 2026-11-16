@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from PySide6.QtCore import QEasingCurve, QRectF, Qt, QTimer, QVariantAnimation, Signal
+from PySide6.QtCore import QEvent, QEasingCurve, QRectF, Qt, QTimer, QVariantAnimation, Signal
 from PySide6.QtGui import (
     QCloseEvent,
     QColor,
@@ -19,13 +19,13 @@ from PySide6.QtGui import (
     QShortcut,
 )
 from PySide6.QtWidgets import (
+    QGraphicsDropShadowEffect,
     QApplication,
     QFrame,
     QHBoxLayout,
     QLabel,
     QMainWindow,
     QMenu,
-    QPushButton,
     QStackedWidget,
     QSystemTrayIcon,
     QToolButton,
@@ -40,24 +40,24 @@ from nexus.ui.components import Button, ThemeLabel, ToastHost, toast_for
 
 log = logging.getLogger("nexus.ui.main")
 
-# (id, ícone, rótulo, grupo)
+# (id, ícone, rótulo, grupo) — agrupado por jornada de uso
 NAV_ITEMS = [
     ("dashboard", "dashboard", "Dashboard", 1),
     ("optimizer", "gauge", "PC Optimizer", 1),
-    ("booster", "rocket", "Game Booster", 1),
-    ("library", "gamepad", "Biblioteca de Jogos", 1),
-    ("fps", "activity", "FPS Monitor", 1),
+    ("cleanup", "broom", "Limpeza Avançada", 1),
+    ("processes", "list", "Processos", 1),
     ("hardware", "cpu", "Hardware Monitor", 1),
-    ("cleanup", "broom", "Limpeza Avançada", 2),
-    ("internet", "globe", "Internet Boost", 2),
-    ("startup", "power", "Inicialização", 2),
-    ("processes", "list", "Processos", 2),
-    ("profiles", "sliders", "Perfis", 3),
-    ("history", "history", "Histórico", 3),
-    ("settings", "settings", "Configurações", 3),
+    ("booster", "rocket", "Game Booster", 2),
+    ("library", "gamepad", "Biblioteca de Jogos", 2),
+    ("fps", "activity", "FPS Monitor", 2),
+    ("internet", "globe", "Internet Boost", 3),
+    ("startup", "power", "Inicialização", 4),
+    ("profiles", "sliders", "Perfis", 4),
+    ("history", "history", "Histórico", 4),
+    ("settings", "settings", "Configurações", 4),
 ]
 
-GROUP_LABELS = {1: "Geral", 2: "Ferramentas", 3: "Sistema"}
+GROUP_LABELS = {1: "Desempenho", 2: "Jogos", 3: "Rede", 4: "Sistema"}
 
 SIDEBAR_WIDE = 224
 SIDEBAR_COMPACT = 60
@@ -107,7 +107,14 @@ class NavButton(QFrame):
         self._hover_anim = QVariantAnimation(self)
         self._hover_anim.valueChanged.connect(self._on_hover_anim)
         theme.manager.changed.connect(self.update)
+        theme.manager.changed.connect(self._refresh_glow)
         self.setAccessibleName(label)
+        # brilho neon permanente no item ativo da navegação
+        self._glow = QGraphicsDropShadowEffect(self)
+        self._glow.setBlurRadius(26)
+        self._glow.setOffset(0, 0)
+        self._glow.setEnabled(False)
+        self.setGraphicsEffect(self._glow)
 
     def _on_hover_anim(self, v: float) -> None:
         self._hover_level = v
@@ -130,8 +137,18 @@ class NavButton(QFrame):
         self._indicator = v
         self.update()
 
+    def _refresh_glow(self) -> None:
+        # brilho acompanha o acento/tema escolhido e some se ativo=não
+        on = self._active and not theme.reduce_motion()
+        if on:
+            c = QColor(theme.ACCENT)
+            c.setAlpha(160)
+            self._glow.setColor(c)
+        self._glow.setEnabled(on)
+
     def set_active(self, active: bool) -> None:
         self._active = active
+        self._refresh_glow()
         d = theme.dur("fast")
         if d <= 0:
             self._indicator = 1.0 if active else 0.0
@@ -388,6 +405,30 @@ class MainWindow(QMainWindow):
         self._update_admin_pill()
         for btn in self._nav_buttons.values():
             btn.update()
+
+    # ---- pausa da coleta quando a janela não está visível (economia de CPU)
+    def hideEvent(self, event) -> None:
+        self._set_monitor_paused(True)
+        super().hideEvent(event)
+
+    def showEvent(self, event) -> None:
+        self._set_monitor_paused(False)
+        super().showEvent(event)
+
+    def changeEvent(self, event) -> None:
+        if event.type() == QEvent.Type.WindowStateChange:
+            self._set_monitor_paused(
+                bool(self.windowState() & Qt.WindowState.WindowMinimized))
+        super().changeEvent(event)
+
+    def _set_monitor_paused(self, paused: bool) -> None:
+        mon = getattr(self.services, "monitor", None)
+        if mon is None:
+            return
+        if paused:
+            mon.pause()
+        else:
+            mon.resume()
 
     def toggle_sidebar(self) -> None:
         self._sidebar_compact = not self._sidebar_compact

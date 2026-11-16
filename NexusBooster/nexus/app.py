@@ -38,12 +38,11 @@ import faulthandler  # noqa: E402
 
 faulthandler.enable()
 
-from PySide6.QtCore import Qt  # noqa: E402
 from PySide6.QtWidgets import QApplication, QMessageBox  # noqa: E402
 
 from nexus import __version__  # noqa: E402
 from nexus.core.database import Database  # noqa: E402
-from nexus.core.logging_setup import format_exception, setup_logging  # noqa: E402
+from nexus.core.logging_setup import setup_logging  # noqa: E402
 from nexus.core.paths import db_path  # noqa: E402
 from nexus.core.settings import Settings  # noqa: E402
 from nexus.games.booster import BoostSession  # noqa: E402

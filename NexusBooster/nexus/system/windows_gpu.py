@@ -9,7 +9,6 @@ não suportado — nenhuma métrica é inventada.
 from __future__ import annotations
 
 import logging
-import re
 from typing import Optional
 
 from nexus.system import powershell as ps
