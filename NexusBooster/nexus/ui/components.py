@@ -1624,6 +1624,42 @@ class KeyInfoRow(QFrame):
 # --------------------------------------------------------------- dialogs
 
 
+def ensure_admin_or_warn(parent: QWidget, action: str) -> bool:
+    """Pré-checagem de elevação para ações administrativas.
+
+    Retorna True se a ação pode continuar (já é admin, não-Windows, ou o
+    usuário optou por tentar mesmo assim). Se o usuário aceitar elevar, o DK
+    é relançado como administrador e a ação atual é abortada (False).
+    """
+    import sys as _sys
+
+    if _sys.platform != "win32":
+        return True
+    from nexus.core import elevation
+
+    if elevation.is_admin():
+        return True
+    from PySide6.QtWidgets import QApplication, QMessageBox
+
+    ret = QMessageBox.question(
+        parent,
+        "Permissão de administrador",
+        f"A ação “{action}” precisa de privilégios de administrador.\n\n"
+        "Elevar o DK agora? O aplicativo reinicia como administrador e você "
+        "repete a ação.\n\n"
+        "Escolha “Não” para tentar mesmo assim — alguns ajustes podem falhar.",
+        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+    )
+    if ret == QMessageBox.StandardButton.Yes:
+        if elevation.relaunch_as_admin():
+            app = QApplication.instance()
+            if app is not None:
+                app.quit()
+            return False
+        toast_for(parent, "Não foi possível relançar como administrador.", "error")
+    return True
+
+
 def confirm(parent: QWidget, title: str, text: str, dangerous: bool = False,
             confirm_text: str = "Confirmar", undo_note: Optional[bool] = None) -> bool:
     """Confirmação padronizada.

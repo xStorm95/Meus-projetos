@@ -63,17 +63,16 @@ def create_services() -> Services:
     monitor = MonitorService(settings.get_int("monitor_interval"))
     engine = OptimizationEngine(db)
     booster = BoostSession(db, settings)
+    # liga o capturador de erros do logging ao banco: tudo que for
+    # WARNING+ aparece no painel "Registro de erros" do Histórico
+    from nexus.core.logging_setup import set_error_sink
+
+    set_error_sink(db.error_add)
     return Services(db=db, settings=settings, monitor=monitor, engine=engine, booster=booster)
 
 
 def _excepthook(exc_type, exc, tb) -> None:  # pragma: no cover
     log.critical("exceção não tratada: %s", exc, exc_info=(exc_type, exc, tb))
-    try:
-        from nexus.core.logging_setup import set_error_sink
-
-        # banco pode não existir em falhas muito cedo — log é o suficiente
-    except Exception:
-        pass
     if QApplication.instance() is not None:
         msg = QMessageBox()
         msg.setWindowTitle("Erro inesperado")

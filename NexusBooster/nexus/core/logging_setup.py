@@ -49,12 +49,14 @@ def setup_logging() -> logging.Logger:
 
     class ErrorCapture(logging.Handler):
         def emit(self, record: logging.LogRecord) -> None:
-            if record.levelno >= logging.ERROR and _ERROR_SINK:
+            # captura WARNING+ com nível — visível no painel "Registro de erros"
+            if record.levelno >= logging.WARNING and _ERROR_SINK:
                 try:
                     _ERROR_SINK(
                         record.name,
                         record.getMessage(),
                         record.exc_text or "",
+                        record.levelname,
                     )
                 except Exception:
                     pass

@@ -105,23 +105,38 @@ class HistoryTab(BaseTab):
         erow = QHBoxLayout()
         err_refresh = Button("Atualizar", "secondary", "refresh")
         err_refresh.clicked.connect(self._load_errors)
+        self.err_filter = QComboBox()
+        self.err_filter.addItem("Todos os níveis", "")
+        self.err_filter.addItem("Avisos (WARNING)", "WARNING")
+        self.err_filter.addItem("Erros (ERROR)", "ERROR")
+        self.err_filter.addItem("Críticos (CRITICAL)", "CRITICAL")
+        self.err_filter.currentIndexChanged.connect(self._load_errors)
+        export_err = Button("Exportar", "secondary", "download")
+        export_err.clicked.connect(self._export_errors)
         clear_err = Button("Limpar registro", "danger")
         clear_err.clicked.connect(self._clear_errors)
         open_logs = Button("Abrir pasta de logs", "secondary", "folder")
         open_logs.clicked.connect(self._open_logs)
         erow.addWidget(err_refresh)
+        erow.addWidget(self.err_filter)
+        erow.addWidget(export_err)
         erow.addWidget(clear_err)
         erow.addWidget(open_logs)
         erow.addStretch(1)
         err_card.body_layout().addLayout(erow)
-        self.err_label = ThemeLabel("Nenhum erro registrado.", "caption", wrap=True)
-        self.err_label.setTextFormat(Qt.TextFormat.PlainText)
-        self.err_label.setStyleSheet(
-            f"color: {theme.TEXT_MUTED}; font-size: 11px; background: {theme.SURFACE1};"
-            f"border: 1px solid {theme.BORDER}; border-radius: 8px; padding: 8px;"
+        # lista monoespaçada — cada linha é um evento; tooltip mostra o traceback
+        from PySide6.QtWidgets import QListWidget, QListWidgetItem
+        self.err_list = QListWidget()
+        self.err_list.setWordWrap(True)
+        self.err_list.setStyleSheet(
+            f"QListWidget {{ background: {theme.SURFACE1}; border: 1px solid {theme.BORDER};"
+            f" border-radius: 8px; color: {theme.TEXT_MUTED};"
+            f" font-family: {theme.MONO_STACK}; font-size: 11px; }}"
+            f"QListWidget::item {{ padding: 6px 8px; border-bottom: 1px solid {theme.BORDER}; }}"
         )
-        self.err_label.setMinimumHeight(60)
-        err_card.body_layout().addWidget(self.err_label)
+        self.err_list.setMinimumHeight(140)
+        self.err_list.setMaximumHeight(240)
+        err_card.body_layout().addWidget(self.err_list)
         self.add(err_card)
 
         self._entries = []
@@ -284,18 +299,59 @@ class HistoryTab(BaseTab):
 
     # ----------------------------------------------------------------- erros
     def _load_errors(self) -> None:
+        level = self.err_filter.currentData() if hasattr(self, "err_filter") else ""
+
         def job():
-            return self.services.db.errors_list(limit=20)
+            return self.services.db.errors_list(limit=200, level=level or "")
 
         def done(errors) -> None:
+            self.err_list.clear()
             if not errors:
-                self.err_label.setText("Nenhum erro registrado.")
+                from PySide6.QtWidgets import QListWidgetItem
+
+                self.err_list.addItem("Nenhum registro neste nível. ✓")
                 return
+            from PySide6.QtWidgets import QListWidgetItem
+
+            colors = {"WARNING": theme.WARNING, "ERROR": theme.DANGER,
+                      "CRITICAL": theme.DANGER}
+            for e in errors:
+                when = time.strftime("%d/%m/%Y %H:%M", time.localtime(e.ts))
+                item = QListWidgetItem(f"[{when}] {e.level:8s} {e.module}: {e.message[:200]}")
+                item.setForeground(QColor(colors.get(e.level, theme.TEXT_MUTED)))
+                tip = e.traceback.strip() if e.traceback else "(sem traceback)"
+                item.setToolTip(tip[:2000])
+                self.err_list.addItem(item)
+
+        run_task(job, on_done=done)
+
+    def _export_errors(self) -> None:
+        """Exporta o registro de erros completo em .txt (abrível em qualquer lugar)."""
+        from PySide6.QtWidgets import QFileDialog
+
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Exportar registro de erros", "dk-erros.txt", "Texto (*.txt)"
+        )
+        if not path:
+            return
+
+        def job():
+            rows = self.services.db.errors_list(limit=100000)
             lines = []
-            for e in errors[:10]:
-                when = time.strftime("%d/%m %H:%M", time.localtime(e.ts))
-                lines.append(f"[{when}] {e.module}: {e.message[:160]}")
-            self.err_label.setText("\n".join(lines))
+            for e in rows:
+                when = time.strftime("%d/%m/%Y %H:%M:%S", time.localtime(e.ts))
+                lines.append(f"[{when}] {e.level} {e.module}: {e.message}")
+                if e.traceback:
+                    lines.append(e.traceback.rstrip())
+            return "\n".join(lines)
+
+        def done(text) -> None:
+            try:
+                with open(path, "w", encoding="utf-8") as fh:
+                    fh.write(text or "(nenhum erro registrado)")
+                toast_for(self, f"Erros exportados para {path}", "success")
+            except OSError as exc:
+                toast_for(self, f"Falha ao exportar: {exc}", "error")
 
         run_task(job, on_done=done)
 

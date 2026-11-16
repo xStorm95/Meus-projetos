@@ -206,25 +206,42 @@ class GameBoosterTab(BaseTab):
             )
             self.suspend_list_box.addWidget(empty)
             return
-        for name in items:
-            row = QFrame()
-            row.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
-            row.setStyleSheet("QFrame { background: transparent; border: none; }")
-            lay = QHBoxLayout(row)
-            lay.setContentsMargins(theme.pad("md"), 6, theme.pad("md"), 6)
-            lay.setSpacing(theme.pad("md"))
-            ic = QLabel()
-            ic.setPixmap(icons.pixmap("pause", "muted", 15))
-            lay.addWidget(ic)
-            lbl = ThemeLabel(name, "body_sm")
-            lay.addWidget(lbl, 1)
-            status = sys_processes.find_by_names([name])
-            lay.addWidget(Pill("em execução" if status else "não está rodando",
-                               "success" if status else "muted"))
-            rm = Button("Remover", "subtle")
-            rm.clicked.connect(lambda _=False, n=name: self._remove_suspend(n))
-            lay.addWidget(rm)
-            self.suspend_list_box.addWidget(row)
+
+        # a enumeração de processos (psutil) roda em worker — na thread da UI
+        # ela travava a aba com listas grandes
+        from nexus.core.worker import run_task
+
+        def job():
+            running = {}
+            for name in items:
+                try:
+                    running[name] = bool(sys_processes.find_by_names([name]))
+                except Exception:
+                    running[name] = False
+            return running
+
+        def done(running) -> None:
+            for name in items:
+                status = running.get(name, False)
+                row = QFrame()
+                row.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
+                row.setStyleSheet("QFrame { background: transparent; border: none; }")
+                lay = QHBoxLayout(row)
+                lay.setContentsMargins(theme.pad("md"), 6, theme.pad("md"), 6)
+                lay.setSpacing(theme.pad("md"))
+                ic = QLabel()
+                ic.setPixmap(icons.pixmap("pause", "muted", 15))
+                lay.addWidget(ic)
+                lbl = ThemeLabel(name, "body_sm")
+                lay.addWidget(lbl, 1)
+                lay.addWidget(Pill("em execução" if status else "não está rodando",
+                                   "success" if status else "muted"))
+                rm = Button("Remover", "subtle")
+                rm.clicked.connect(lambda _=False, n=name: self._remove_suspend(n))
+                lay.addWidget(rm)
+                self.suspend_list_box.addWidget(row)
+
+        run_task(job, on_done=done)
 
     def _add_suspend(self) -> None:
         name = self.suspend_input.text().strip()
@@ -266,14 +283,26 @@ class GameBoosterTab(BaseTab):
             item = self.fav_box.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
-        favs = [g for g in self.services.db.games_all() if g.favorite]
-        if not favs:
-            empty = ThemeLabel(
-                "Nenhum favorito ainda. Marque jogos com a estrela na Biblioteca de Jogos.",
-                "caption", wrap=True,
-            )
-            self.fav_box.addWidget(empty)
-            return
+
+        # consulta ao banco em worker (banco grande = micro-freeze na UI)
+        from nexus.core.worker import run_task
+
+        def job():
+            return [g for g in self.services.db.games_all() if g.favorite]
+
+        def done(favs) -> None:
+            if not favs:
+                empty = ThemeLabel(
+                    "Nenhum favorito ainda. Marque jogos com a estrela na Biblioteca de Jogos.",
+                    "caption", wrap=True,
+                )
+                self.fav_box.addWidget(empty)
+                return
+            self._render_fav_rows(favs)
+
+        run_task(job, on_done=done)
+
+    def _render_fav_rows(self, favs) -> None:
         from nexus.ui.tabs.library import GameTile
 
         tiles = QHBoxLayout()

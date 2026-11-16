@@ -16,6 +16,7 @@ from nexus.core.worker import run_task
 from nexus.network import diagnostics
 from nexus.ui import icons, theme
 from nexus.ui.components import (
+    ensure_admin_or_warn,
     Button,
     Card,
     LineChart,
@@ -139,10 +140,10 @@ class InternetTab(BaseTab):
         )
         rep_card.body_layout().addWidget(rnote)
 
-        def mk_repair(label: str, fn, danger: bool, desc: str):
+        def mk_repair(label: str, fn, danger: bool, desc: str, needs_admin: bool = False):
             row = QHBoxLayout()
             btn = Button(label, "danger" if danger else "secondary")
-            btn.clicked.connect(lambda: self._run_repair(label, desc, fn))
+            btn.clicked.connect(lambda a=needs_admin: self._run_repair(label, desc, fn, a))
             row.addWidget(btn)
             d = ThemeLabel(desc, "caption", wrap=True)
             row.addWidget(d, 1)
@@ -342,9 +343,11 @@ class InternetTab(BaseTab):
         run_task(job, on_done=done)
 
     # -------------------------------------------------------------- reparos
-    def _run_repair(self, label: str, desc: str, fn) -> None:
+    def _run_repair(self, label: str, desc: str, fn, needs_admin: bool = False) -> None:
         if not confirm(self, label, f"{desc}\n\nContinuar?", dangerous=True,
                        confirm_text="Executar"):
+            return
+        if needs_admin and not ensure_admin_or_warn(self, label):
             return
 
         def job():

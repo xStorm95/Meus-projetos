@@ -372,6 +372,10 @@ class PcOptimizerTab(BaseTab):
                         "Ele voltará na próxima inicialização (o tipo não muda).",
                         dangerous=True, confirm_text="Parar"):
             return
+        from nexus.ui.components import ensure_admin_or_warn
+
+        if not ensure_admin_or_warn(self, f"Parar o serviço {name}"):
+            return
 
         def job():
             return services_win.stop_service(name)
@@ -403,6 +407,10 @@ class PcOptimizerTab(BaseTab):
             f"'{target_label}'?\nIsso pede elevação (UAC) e é reversível "
             "pelo Histórico.", dangerous=True, confirm_text="Alterar",
         ):
+            return
+        from nexus.ui.components import ensure_admin_or_warn
+
+        if not ensure_admin_or_warn(self, f"Alterar o serviço {name}"):
             return
 
         def job():

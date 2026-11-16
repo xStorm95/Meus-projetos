@@ -45,6 +45,7 @@ class ErrorEntry:
     module: str
     message: str
     traceback: str
+    level: str = "ERROR"
 
 
 @dataclass
@@ -304,23 +305,47 @@ class Database:
         )
 
     # --------------------------------------------------------------- erros
-    def error_add(self, module: str, message: str, tb: str = "") -> None:
+    def error_add(self, module: str, message: str, tb: str = "",
+                  level: str = "ERROR") -> None:
         try:
             self.execute(
-                "INSERT INTO error_log (ts, module, message, traceback) VALUES (?,?,?,?)",
-                (time.time(), module, message, tb),
+                "INSERT INTO error_log (ts, module, message, traceback, level)"
+                " VALUES (?,?,?,?,?)",
+                (time.time(), module, message, tb, level),
             )
         except Exception:
-            pass
+            # coluna 'level' pode não existir em bancos antigos → migração única
+            try:
+                self.execute("ALTER TABLE error_log ADD COLUMN level TEXT DEFAULT 'ERROR'")
+                self.execute(
+                    "INSERT INTO error_log (ts, module, message, traceback, level)"
+                    " VALUES (?,?,?,?,?)",
+                    (time.time(), module, message, tb, level),
+                )
+            except Exception:
+                import logging
 
-    def errors_list(self, limit: int = 100) -> list[ErrorEntry]:
-        rows = self.query(
-            "SELECT * FROM error_log ORDER BY id DESC LIMIT ?", (limit,)
-        )
-        return [
-            ErrorEntry(r["id"], r["ts"], r["module"], r["message"], r["traceback"])
-            for r in rows
-        ]
+                logging.getLogger("nexus.db").warning(
+                    "falha ao gravar error_log: %s / %s", module, message[:120]
+                )
+
+    def errors_list(self, limit: int = 100, level: str = "") -> list[ErrorEntry]:
+        if level:
+            rows = self.query(
+                "SELECT * FROM error_log WHERE level=? ORDER BY id DESC LIMIT ?",
+                (level, limit),
+            )
+        else:
+            rows = self.query(
+                "SELECT * FROM error_log ORDER BY id DESC LIMIT ?", (limit,)
+            )
+        out = []
+        for r in rows:
+            out.append(ErrorEntry(
+                r["id"], r["ts"], r["module"], r["message"], r["traceback"],
+                r["level"] if "level" in r.keys() else "ERROR",
+            ))
+        return out
 
     def errors_clear(self) -> None:
         self.execute("DELETE FROM error_log")

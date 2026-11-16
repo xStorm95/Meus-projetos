@@ -248,6 +248,13 @@ class OptimizerWizard(QDialog):
         ):
             return
 
+        # etapas de energia/serviços/efeitos visuais podem exigir elevação —
+        # avisa ANTES de rodar em vez de falhar no meio
+        from nexus.ui.components import ensure_admin_or_warn
+
+        if not ensure_admin_or_warn(self, "Otimização do Windows"):
+            return
+
         self.accept()
         dialog = TaskDialog("Otimização em andamento", self.parent())
         create_rp = self.rp_toggle.isChecked()

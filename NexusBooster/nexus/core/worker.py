@@ -44,7 +44,11 @@ def run_task(
     on_done: Optional[Callable] = None,
     on_error: Optional[Callable] = None,
 ) -> FunctionTask:
-    """Executa `fn` em segundo plano. Mantém referência até concluir."""
+    """Executa `fn` em segundo plano. Mantém referência até concluir.
+
+    Sem ``on_error``, a falha é registrada no log (e portanto no painel
+    "Registro de erros") — nunca engolida em silêncio.
+    """
     task = FunctionTask(fn)
 
     def _cleanup():
@@ -53,10 +57,16 @@ def run_task(
         except ValueError:
             pass
 
+    def _default_error(msg: str) -> None:
+        import logging
+
+        logging.getLogger("nexus.worker").error(
+            "tarefa em segundo plano falhou: %s", msg
+        )
+
     if on_done is not None:
         task.done.connect(on_done)
-    if on_error is not None:
-        task.fail.connect(on_error)
+    task.fail.connect(on_error if on_error is not None else _default_error)
     task.all_finished.connect(_cleanup)
     _KEEPALIVE.append(task)
     task.start()
